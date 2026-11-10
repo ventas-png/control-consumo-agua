@@ -67,21 +67,30 @@ export interface PlantillaTareaSuministro {
   suministro_activo?: boolean
 }
 
-/** Herramienta/equipo planificado de una actividad. */
+/**
+ * Herramienta/equipo planificado de una actividad. Desde 20261122000000 el recurso es un
+ * EQUIPO (`equipo_id` → equipos_comunes); las filas anteriores apuntan a Inventario
+ * (`inventario_id`) y siguen vigentes. Exactamente uno de los dos va lleno.
+ */
 export interface PlantillaTareaHerramienta {
   id: string
   company_id: string
   project_id: string
   plantilla_tarea_id: string
-  inventario_id: string
+  /** LEGADO: artículo de inventario_condominio vinculado antes de 20261122000000. */
+  inventario_id: string | null
+  /** Equipo del catálogo operativo (equipos_comunes). */
+  equipo_id: string | null
   cantidad: number
   obligatoria: boolean
   notas?: string | null
   creado_por?: string | null
   created_at: string
-  // joins (embed inventario_condominio(nombre, estado))
+  // joins (embed inventario_condominio(nombre, estado) · equipos_comunes(nombre, estado))
   inventario_nombre?: string
   inventario_estado?: string
+  equipo_nombre?: string
+  equipo_estado?: string
 }
 
 // ── Carga masiva de actividades y recursos en bloque (20261031000200) ────────
@@ -108,7 +117,8 @@ export interface FilaImportacionActividad {
     checklist: string[]
     recursos: {
       suministros: { id: string; nombre: string; cantidad: number }[]
-      inventario: { id: string; nombre: string; categoria: 'herramienta' | 'equipo'; cantidad: number; obligatoria: boolean }[]
+      /** Herramientas y equipo resueltos contra Equipos (equipos_comunes); `categoria` es la del equipo. */
+      equipos: { id: string; nombre: string; categoria: string; cantidad: number; obligatoria: boolean }[]
     }
     n_recursos: number
   } | null

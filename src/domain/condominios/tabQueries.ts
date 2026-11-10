@@ -588,7 +588,7 @@ export async function fetchRecursosPlantillas(
       .eq('company_id', companyId),
     db
       .from('plantilla_tarea_herramientas')
-      .select('*, inventario_condominio(nombre, estado)')
+      .select('*, inventario_condominio(nombre, estado), equipos_comunes(nombre, estado)')
       .eq('project_id', projectId)
       .eq('company_id', companyId),
   ])
@@ -603,10 +603,12 @@ export async function fetchRecursosPlantillas(
     }),
   )
   const herramientas: PlantillaTareaHerramienta[] = (herRes.data ?? []).map(
-    ({ inventario_condominio: h, ...resto }) => ({
+    ({ inventario_condominio: h, equipos_comunes: e, ...resto }) => ({
       ...resto,
       inventario_nombre: h?.nombre,
       inventario_estado: h?.estado,
+      equipo_nombre: e?.nombre,
+      equipo_estado: e?.estado,
     }),
   )
   return { suministros, herramientas, error: error ? { message: error.message } : null }
@@ -815,15 +817,17 @@ export async function fetchHerramientasDePlantillas(
 
   const { data, error } = await db
     .from('plantilla_tarea_herramientas')
-    .select('*, inventario_condominio(nombre, estado)')
+    .select('*, inventario_condominio(nombre, estado), equipos_comunes(nombre, estado)')
     .in('plantilla_tarea_id', plantillaIds)
 
   reportDegradedQuery('condominios.fetchHerramientasDePlantillas', error)
   const herramientas: PlantillaTareaHerramienta[] = (data ?? []).map(
-    ({ inventario_condominio: h, ...resto }) => ({
+    ({ inventario_condominio: h, equipos_comunes: e, ...resto }) => ({
       ...resto,
       inventario_nombre: h?.nombre,
       inventario_estado: h?.estado,
+      equipo_nombre: e?.nombre,
+      equipo_estado: e?.estado,
     }),
   )
   return { herramientas, error: error ? { message: error.message } : null }

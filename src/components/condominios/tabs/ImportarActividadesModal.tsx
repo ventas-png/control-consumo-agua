@@ -48,7 +48,7 @@ function descargar(contenido: BlobPart, nombre: string, tipo: string) {
 function recursosDe(d: NonNullable<FilaImportacionActividad['datos']>): string {
   const partes = [
     ...d.recursos.suministros.map((s) => `🧴 ${s.nombre} ×${s.cantidad}`),
-    ...d.recursos.inventario.map((i) => `${i.categoria === 'equipo' ? '⚙️' : '🔧'} ${i.nombre} ×${i.cantidad}${i.obligatoria ? ' (obligatoria)' : ''}`),
+    ...(d.recursos.equipos ?? []).map((e) => `${e.categoria === 'herramienta' ? '🔧' : '⚙️'} ${e.nombre} ×${e.cantidad}${e.obligatoria ? ' (obligatoria)' : ''}`),
   ]
   return partes.join(' · ')
 }

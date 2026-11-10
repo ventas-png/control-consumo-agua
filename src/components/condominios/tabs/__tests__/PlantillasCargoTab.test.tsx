@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import type {
   CatalogoRrhhItem,
-  ItemInventario,
+  EquipoComun,
   PlantillaTareaCargo,
   PlantillaTareaHerramienta,
   PlantillaTareaSuministro,
@@ -68,11 +68,11 @@ const suministro = {
   activo: true, created_at: '2026-01-01T00:00:00.000Z',
 } as SuministroCondominio
 
+// Las herramientas y el equipo salen de EQUIPOS (equipos_comunes), no de Inventario.
 const herramienta = {
-  id: 'inv1', company_id: 'co1', project_id: 'p1', nombre: 'Hidrolavadora',
-  categoria: 'equipo', estado: 'disponible', cantidad: 1, cantidad_minima: 0,
-  unidad_medida: 'unidad', created_at: '2026-01-01T00:00:00.000Z',
-} as ItemInventario
+  id: 'eq1', company_id: 'co1', project_id: 'p1', nombre: 'Hidrolavadora',
+  categoria: 'herramienta', estado: 'operativo', cantidad: 1, created_at: '2026-01-01T00:00:00.000Z',
+} as EquipoComun
 
 function vinculoSuministro(over: Partial<PlantillaTareaSuministro> = {}): PlantillaTareaSuministro {
   return {
@@ -89,7 +89,7 @@ function renderTab(props: Partial<Parameters<typeof PlantillasCargoTab>[0]> = {}
       plantillas={[plantilla()]}
       areas={[]}
       suministros={[suministro]}
-      inventario={[herramienta]}
+      equipos={[herramienta]}
       proyectoId="p1"
       companyId="co1"
       canCreate
@@ -288,7 +288,7 @@ describe('PlantillasCargoTab — recursos planificados', () => {
     renderTab()
     await esperarRecursos()
     fireEvent.click(screen.getByLabelText('Recursos de Limpiar lobby'))
-    fireEvent.change(screen.getByLabelText('Herramienta a agregar'), { target: { value: 'inv1' } })
+    fireEvent.change(screen.getByLabelText('Herramienta a agregar'), { target: { value: 'eq1' } })
     fireEvent.change(screen.getByLabelText('Cantidad de herramientas'), { target: { value: '2' } })
     fireEvent.click(screen.getAllByText('Obligatoria')[0])
     fireEvent.click(screen.getAllByText('Agregar')[1])
@@ -296,7 +296,8 @@ describe('PlantillasCargoTab — recursos planificados', () => {
     await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
     const [tabla, payload] = mocks.createCondominioRow.mock.calls[0] as unknown as [string, Record<string, unknown>]
     expect(tabla).toBe('plantilla_tarea_herramientas')
-    expect(payload).toMatchObject({ plantilla_tarea_id: 'pl1', inventario_id: 'inv1', cantidad: 2, obligatoria: true })
+    expect(payload).toMatchObject({ plantilla_tarea_id: 'pl1', equipo_id: 'eq1', cantidad: 2, obligatoria: true })
+    expect(payload).not.toHaveProperty('inventario_id')
   })
 
   it('el duplicado (23505) se explica: editar la cantidad, no repetir el recurso', async () => {

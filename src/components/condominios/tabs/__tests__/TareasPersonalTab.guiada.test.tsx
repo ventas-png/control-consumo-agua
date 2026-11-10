@@ -133,7 +133,7 @@ describe('antes de iniciar: lo que hay que tener a mano', () => {
   beforeEach(() => {
     mocks.fetchHerramientasDePlantillas.mockResolvedValue({
       herramientas: [
-        { plantilla_tarea_id: 'barrer', inventario_id: 'escoba', inventario_nombre: 'Escoba', cantidad: 1, obligatoria: true },
+        { plantilla_tarea_id: 'barrer', equipo_id: 'escoba', inventario_id: null, equipo_nombre: 'Escoba', cantidad: 1, obligatoria: true },
       ],
       error: null,
     })

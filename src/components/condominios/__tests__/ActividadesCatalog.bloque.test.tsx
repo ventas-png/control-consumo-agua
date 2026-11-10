@@ -4,7 +4,7 @@
 // UNA llamada atómica con los ids y los recursos elegidos; agregar y quitar; errores sin prefijo.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
-import type { AreaCondominio, ItemInventario, PlantillaTareaCargo, SuministroCondominio } from '../../../types'
+import type { AreaCondominio, EquipoComun, PlantillaTareaCargo, SuministroCondominio } from '../../../types'
 
 const m = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -43,15 +43,16 @@ const suministros: SuministroCondominio[] = [
   { id: 's1', company_id: 'co1', project_id: 'p1', nombre: 'Escoba', categoria: 'limpieza', unidad_medida: 'unidad', stock_actual: 1, stock_minimo: 0, activo: true, created_at: '' } as SuministroCondominio,
   { id: 's2', company_id: 'co1', project_id: 'p1', nombre: 'Cloro', categoria: 'limpieza', unidad_medida: 'litro', stock_actual: 1, stock_minimo: 0, activo: false, created_at: '' } as SuministroCondominio,
 ]
-const inventario: ItemInventario[] = [
-  { id: 'i1', company_id: 'co1', project_id: 'p1', nombre: 'Trapeador', categoria: 'herramienta', estado: 'disponible', cantidad: 1, cantidad_minima: 0, unidad_medida: 'unidad', created_at: '' } as ItemInventario,
-  { id: 'i2', company_id: 'co1', project_id: 'p1', nombre: 'Hidrolavadora', categoria: 'equipo', estado: 'disponible', cantidad: 1, cantidad_minima: 0, unidad_medida: 'unidad', created_at: '' } as ItemInventario,
-  { id: 'i3', company_id: 'co1', project_id: 'p1', nombre: 'Aspiradora', categoria: 'equipo', estado: 'dado_de_baja', cantidad: 1, cantidad_minima: 0, unidad_medida: 'unidad', created_at: '' } as ItemInventario,
+// Herramientas y equipo: del catálogo de EQUIPOS (equipos_comunes), no de Inventario.
+const equipos: EquipoComun[] = [
+  { id: 'e1', company_id: 'co1', project_id: 'p1', nombre: 'Trapeador', categoria: 'herramienta', estado: 'operativo', cantidad: 4, created_at: '' } as EquipoComun,
+  { id: 'e2', company_id: 'co1', project_id: 'p1', nombre: 'Hidrolavadora', categoria: 'limpieza', estado: 'operativo', cantidad: 1, created_at: '' } as EquipoComun,
+  { id: 'e3', company_id: 'co1', project_id: 'p1', nombre: 'Aspiradora', categoria: 'limpieza', estado: 'baja', cantidad: 1, created_at: '' } as EquipoComun,
 ]
 
 function abrir(over: Partial<Parameters<typeof ActividadesCatalog>[0]> = {}) {
   const onRefresh = vi.fn()
-  render(<ActividadesCatalog plantillas={plantillas} areas={areas} suministros={suministros} inventario={inventario}
+  render(<ActividadesCatalog plantillas={plantillas} areas={areas} suministros={suministros} equipos={equipos}
     proyectoId="p1" companyId="co1" canCreate canEdit canDelete onRefresh={onRefresh} {...over} />)
   return { onRefresh }
 }
@@ -99,7 +100,7 @@ describe('Catálogo de actividades · carga masiva y recursos en bloque', () => 
     expect(screen.queryByRole('toolbar')).toBeNull()
   })
 
-  it('agregar en bloque: elige insumo con cantidad y equipo obligatorio, confirma, manda UNA RPC con los ids y recarga', async () => {
+  it('agregar en bloque: elige insumo con cantidad y equipo obligatorio (de Equipos, sin los de baja), confirma, manda UNA RPC con los ids y recarga', async () => {
     m.rpc.mockResolvedValueOnce({ data: resultado(), error: null })
     abrir()
     fireEvent.click(screen.getByLabelText('Seleccionar Barrido'))
@@ -112,9 +113,9 @@ describe('Catálogo de actividades · carga masiva y recursos en bloque', () => 
     expect(screen.queryByLabelText('Elegir Cloro')).toBeNull()
     fireEvent.click(screen.getByLabelText('Elegir Escoba'))
     fireEvent.change(screen.getByLabelText('Cantidad de Escoba'), { target: { value: '2.5' } })
-    // equipo: sin los dados de baja; herramientas no aparecen en esa pestaña
-    fireEvent.click(screen.getByRole('tab', { name: /Equipo/ }))
-    expect(screen.queryByLabelText('Elegir Trapeador')).toBeNull()
+    // herramientas y equipo: UNA pestaña con todo el catálogo de Equipos, sin los de baja
+    fireEvent.click(screen.getByRole('tab', { name: /Herramientas y equipo/ }))
+    expect(screen.getByLabelText('Elegir Trapeador')).toBeTruthy()
     expect(screen.queryByLabelText('Elegir Aspiradora')).toBeNull()
     fireEvent.click(screen.getByLabelText('Elegir Hidrolavadora'))
     fireEvent.click(screen.getByLabelText('Hidrolavadora obligatoria'))
@@ -123,7 +124,7 @@ describe('Catálogo de actividades · carga masiva y recursos en bloque', () => 
     expect(m.confirm.mock.calls[0][0].text).toMatch(/Se vincularán 2 recursos a 2 actividades/)
     expect(m.rpc).toHaveBeenCalledWith('plantillas_recursos_en_bloque', {
       p_project_id: 'p1', p_plantilla_ids: ['pl1', 'pl2'], p_accion: 'agregar',
-      p_suministros: [{ id: 's1', cantidad: 2.5 }], p_inventario: [{ id: 'i2', cantidad: 1, obligatoria: true }],
+      p_suministros: [{ id: 's1', cantidad: 2.5 }], p_equipos: [{ id: 'e2', cantidad: 1, obligatoria: true }],
     })
     await waitFor(() => expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', text: '3 vínculos agregados en 2 actividades · 1 ya estaba (sin cambios)' })))
     // recarga los recursos de las tarjetas y limpia la selección
@@ -138,11 +139,13 @@ describe('Catálogo de actividades · carga masiva y recursos en bloque', () => 
     fireEvent.click(screen.getByRole('button', { name: 'Recursos en bloque' }))
     await screen.findByText(/Recursos en bloque · 1 actividad/)
     fireEvent.click(screen.getByLabelText('Quitar de las actividades'))
-    fireEvent.click(screen.getByRole('tab', { name: /Herramientas/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Herramientas y equipo/ }))
+    // al quitar también se ofrecen los de baja: hay que poder desvincularlos
+    expect(screen.getByLabelText('Elegir Aspiradora')).toBeTruthy()
     fireEvent.click(screen.getByLabelText('Elegir Trapeador'))
     expect(screen.queryByLabelText('Cantidad de Trapeador')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Quitar de 1 actividad' }))
-    await waitFor(() => expect(m.rpc).toHaveBeenCalledWith('plantillas_recursos_en_bloque', expect.objectContaining({ p_accion: 'quitar', p_plantilla_ids: ['pl3'], p_inventario: [{ id: 'i1', cantidad: 1, obligatoria: false }] })))
+    await waitFor(() => expect(m.rpc).toHaveBeenCalledWith('plantillas_recursos_en_bloque', expect.objectContaining({ p_accion: 'quitar', p_plantilla_ids: ['pl3'], p_equipos: [{ id: 'e1', cantidad: 1, obligatoria: false }] })))
     expect(m.confirm.mock.calls[0][0].variant).toBe('danger')
     await waitFor(() => expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', text: '1 vínculo quitado de 1 actividad' })))
   })

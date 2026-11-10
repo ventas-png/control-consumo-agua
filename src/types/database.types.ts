@@ -8781,12 +8781,14 @@ export type Database = {
       }
       equipos_comunes: {
         Row: {
+          cantidad: number
           categoria: string
           company_id: string
           creado_por: string | null
           created_at: string
           estado: string
           fecha_compra: string | null
+          foto_url: string | null
           id: string
           marca: string | null
           modelo: string | null
@@ -8801,12 +8803,14 @@ export type Database = {
           vida_util_anios: number | null
         }
         Insert: {
+          cantidad?: number
           categoria?: string
           company_id: string
           creado_por?: string | null
           created_at?: string
           estado?: string
           fecha_compra?: string | null
+          foto_url?: string | null
           id?: string
           marca?: string | null
           modelo?: string | null
@@ -8821,12 +8825,14 @@ export type Database = {
           vida_util_anios?: number | null
         }
         Update: {
+          cantidad?: number
           categoria?: string
           company_id?: string
           creado_por?: string | null
           created_at?: string
           estado?: string
           fecha_compra?: string | null
+          foto_url?: string | null
           id?: string
           marca?: string | null
           modelo?: string | null
@@ -15432,8 +15438,9 @@ export type Database = {
           company_id: string
           creado_por: string | null
           created_at: string
+          equipo_id: string | null
           id: string
-          inventario_id: string
+          inventario_id: string | null
           notas: string | null
           obligatoria: boolean
           plantilla_tarea_id: string
@@ -15444,8 +15451,9 @@ export type Database = {
           company_id: string
           creado_por?: string | null
           created_at?: string
+          equipo_id?: string | null
           id?: string
-          inventario_id: string
+          inventario_id?: string | null
           notas?: string | null
           obligatoria?: boolean
           plantilla_tarea_id: string
@@ -15456,8 +15464,9 @@ export type Database = {
           company_id?: string
           creado_por?: string | null
           created_at?: string
+          equipo_id?: string | null
           id?: string
-          inventario_id?: string
+          inventario_id?: string | null
           notas?: string | null
           obligatoria?: boolean
           plantilla_tarea_id?: string
@@ -15491,6 +15500,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_herramienta_equipo_fk"
+            columns: ["equipo_id", "company_id", "project_id"]
+            isOneToOne: false
+            referencedRelation: "equipos_comunes"
+            referencedColumns: ["id", "company_id", "project_id"]
           },
           {
             foreignKeyName: "pt_herramienta_plantilla_fk"
@@ -26593,7 +26609,7 @@ export type Database = {
         Returns: Json
       }
       plantillas_recursos_en_bloque: {
-        Args: { p_project_id: string; p_plantilla_ids: string[]; p_accion: string; p_suministros?: Json; p_inventario?: Json }
+        Args: { p_project_id: string; p_plantilla_ids: string[]; p_accion: string; p_suministros?: Json; p_equipos?: Json }
         Returns: Json
       }
       personal_usuarios_asignables: {

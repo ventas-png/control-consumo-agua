@@ -23,7 +23,7 @@ const datos = {
   requiere_foto: false, requiere_comentario: false, requiere_checklist: true, checklist: ['Barrer', 'Recoger'],
   recursos: {
     suministros: [{ id: 's1', nombre: 'Escoba', cantidad: 1 }, { id: 's2', nombre: 'Bolsa', cantidad: 3 }],
-    inventario: [{ id: 'i1', nombre: 'Hidrolavadora', categoria: 'equipo', cantidad: 1, obligatoria: true }],
+    equipos: [{ id: 'e1', nombre: 'Hidrolavadora', categoria: 'herramienta', cantidad: 1, obligatoria: true }],
   },
   n_recursos: 3,
 }
@@ -38,7 +38,7 @@ function vista(conError: number) {
       fila(1, datos, [], { titulo: 'Barrido' }),
       conError
         ? fila(2, null, [{ campo: 'insumos', mensaje: 'El insumo «Nada» no existe (o está inactivo) en este proyecto. La importación no crea insumos.' }], { titulo: 'Poda', cargo: 'jardinero', insumos: 'Nada' })
-        : fila(2, { ...datos, titulo: 'Poda', cargo: 'jardinero', servicio: 'jardineria', recursos: { suministros: [], inventario: [] }, n_recursos: 0, requiere_checklist: false, checklist: [] }, [], { titulo: 'Poda' }),
+        : fila(2, { ...datos, titulo: 'Poda', cargo: 'jardinero', servicio: 'jardineria', recursos: { suministros: [], equipos: [] }, n_recursos: 0, requiere_checklist: false, checklist: [] }, [], { titulo: 'Poda' }),
     ],
   }
 }

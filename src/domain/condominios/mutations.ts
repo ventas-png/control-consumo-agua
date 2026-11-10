@@ -266,3 +266,14 @@ export async function createSuministrosCondominio(
   const { error } = await db.from('suministros_condominio').insert(rows as TablesInsert<'suministros_condominio'>[])
   return { error: error?.message ?? null }
 }
+
+// ── Importación de equipos ─────────────────────────────────────────────────
+
+/** Inserta equipos del condominio en lote (import; payload ya armado por la UI). */
+export async function createEquiposComunes(
+  rows: Record<string, unknown>[],
+): Promise<{ error: string | null }> {
+  // Cast en la frontera: el payload lo arma la UI sin tipar (import CSV).
+  const { error } = await db.from('equipos_comunes').insert(rows as TablesInsert<'equipos_comunes'>[])
+  return { error: error?.message ?? null }
+}

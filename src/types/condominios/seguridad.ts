@@ -360,7 +360,14 @@ export interface BitacoraGuardia {
   created_at: string
 }
 
-export type CategoriaEquipo = 'bomba' | 'ascensor' | 'generador' | 'camara' | 'extintor' | 'planta_electrica' | 'otro'
+/**
+ * Categoría del equipo del condominio. Desde 20261122000000 el catálogo también es la
+ * fuente de las HERRAMIENTAS y el equipo de las actividades (antes salían de Inventario),
+ * por eso admite herramienta y los rubros de limpieza, jardinería y seguridad.
+ */
+export type CategoriaEquipo =
+  | 'bomba' | 'ascensor' | 'generador' | 'camara' | 'extintor' | 'planta_electrica'
+  | 'herramienta' | 'limpieza' | 'jardineria' | 'seguridad' | 'otro'
 export type EstadoEquipo = 'operativo' | 'mantenimiento' | 'fuera_servicio' | 'baja'
 
 export interface EquipoComun {
@@ -379,6 +386,10 @@ export interface EquipoComun {
   estado: EstadoEquipo
   ultimo_mantenimiento?: string | null
   proximo_mantenimiento?: string | null
+  /** Unidades de este equipo (p. ej. 3 hidrolavadoras iguales). Entero ≥ 0; 1 por defecto. */
+  cantidad: number
+  /** Ruta de la foto en el bucket `condominios-media` (`<project_id>/equipos/...`). */
+  foto_url?: string | null
   notas?: string | null
   created_at: string
 }

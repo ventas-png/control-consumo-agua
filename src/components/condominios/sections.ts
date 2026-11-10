@@ -42,14 +42,14 @@ export const SECTIONS: SectionDef[] = [
   ]},
   { id: 'operaciones', label: 'Operaciones', tabs: [
     'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
-    'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros',
+    'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'equipos',
     'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
     'permisos_obra', 'garantias', 'areas_config', 'checklist_areas', 'control_plagas',
     'prestamos',
   ]},
   { id: 'instalaciones', label: 'Instalaciones', tabs: [
     'amenidades', 'utilizacion_amenidades', 'parqueos', 'estac_visita', 'bodegas', 'llaves',
-    'equipos', 'consumo_energia', 'medidores_unidad', 'control_piscina', 'jardineria',
+    'consumo_energia', 'medidores_unidad', 'control_piscina', 'jardineria',
     'elevadores', 'cisternas', 'generador', 'incendio', 'camaras', 'gas', 'integracion_agua',
   ]},
   { id: 'seguridad', label: 'Seguridad', tabs: [

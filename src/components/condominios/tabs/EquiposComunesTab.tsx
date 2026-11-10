@@ -1,11 +1,24 @@
+// Equipos (Operaciones, junto a Suministros): el catálogo de equipos y
+// herramientas del condominio —bombas, generadores, hidrolavadoras, pulidoras—
+// con la misma visual y funcionalidad que Suministros: cabecera con filtros,
+// «Solo alertas», carga masiva y alta; aviso de equipos que piden mantenimiento;
+// tarjetas en rejilla; y la ficha en ventana emergente (pantalla completa en el
+// teléfono) con foto, cantidad, datos, cambio de estado y registro de
+// mantenimiento. Desde 20261122000000 de aquí salen también las herramientas y
+// el equipo de las actividades del catálogo (antes, de Inventario).
 import { hoyLocalISO } from '../../../lib/format'
-import { useMemo, useState, type CSSProperties} from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { createCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
+import { removeCondominiosMedia } from '../../../domain/shared/storage'
 import { notify } from '../../shared/Dialog'
 import { tint } from '../../shared/statusTone'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { EditModal } from '../../shared/EditModal'
-import { EquipoComun, CategoriaEquipo, EstadoEquipo } from '../../../types'
+import { SecureImage } from '../../shared/SecureImage'
+import { FotoSuministroModal } from './suministros/FotoSuministroModal'
+import { ImportEquiposModal } from '../ImportEquiposModal'
+import { CATEGORIAS_EQUIPO, ESTADOS_EQUIPO, alertaManto, categoriaEquipo, diasParaManto, estadoEquipo, requiereAtencion } from '../../../lib/equiposComunes'
+import type { EquipoComun, CategoriaEquipo, EstadoEquipo } from '../../../types'
 
 interface Props {
   equipos: EquipoComun[]
@@ -17,40 +30,10 @@ interface Props {
   onRefresh: () => void
 }
 
-const CATEGORIAS: { value: CategoriaEquipo; label: string; icon: string }[] = [
-  { value: 'bomba', label: 'Bomba', icon: '💧' },
-  { value: 'ascensor', label: 'Ascensor', icon: '🛗' },
-  { value: 'generador', label: 'Generador', icon: '⚡' },
-  { value: 'camara', label: 'Cámara', icon: '📷' },
-  { value: 'extintor', label: 'Extintor', icon: '🧯' },
-  { value: 'planta_electrica', label: 'Planta eléctrica', icon: '🔌' },
-  { value: 'otro', label: 'Otro', icon: '🔧' },
-]
-
-const ESTADOS: { value: EstadoEquipo; label: string; color: string }[] = [
-  { value: 'operativo', label: 'Operativo', color: 'var(--at-success)' },
-  { value: 'mantenimiento', label: 'En mantenimiento', color: 'var(--at-warning)' },
-  { value: 'fuera_servicio', label: 'Fuera de servicio', color: 'var(--at-danger)' },
-  { value: 'baja', label: 'De baja', color: 'var(--at-ink-3)' },
-]
-
-function diasParaManto(fecha?: string | null): number | null {
-  if (!fecha) return null
-  const diff = (new Date(fecha).getTime() - Date.now()) / 86400000
-  return Math.round(diff)
-}
-
-function alertaManto(equipo: EquipoComun): 'vencido' | 'proximo' | 'ok' | 'sin_fecha' {
-  const dias = diasParaManto(equipo.proximo_mantenimiento)
-  if (dias === null) return 'sin_fecha'
-  if (dias < 0) return 'vencido'
-  if (dias <= 30) return 'proximo'
-  return 'ok'
-}
-
 interface FormEquipo {
   nombre: string
   categoria: CategoriaEquipo
+  cantidad: string
   marca: string
   modelo: string
   serial: string
@@ -61,27 +44,34 @@ interface FormEquipo {
   estado: EstadoEquipo
   ultimo_mantenimiento: string
   proximo_mantenimiento: string
+  foto_url: string
   notas: string
 }
 
 const FORM_VACIO: FormEquipo = {
-  nombre: '', categoria: 'otro', marca: '', modelo: '', serial: '', ubicacion: '', fecha_compra: '', valor_compra: '',
-  vida_util_anios: '', estado: 'operativo', ultimo_mantenimiento: '', proximo_mantenimiento: '', notas: '',
+  nombre: '', categoria: 'otro', cantidad: '1', marca: '', modelo: '', serial: '', ubicacion: '', fecha_compra: '', valor_compra: '',
+  vida_util_anios: '', estado: 'operativo', ultimo_mantenimiento: '', proximo_mantenimiento: '', foto_url: '', notas: '',
 }
 
 /** La ficha tal como la edita la persona. */
 function formDesde(e: EquipoComun): FormEquipo {
   return {
     nombre: e.nombre, categoria: e.categoria,
+    cantidad: String(e.cantidad ?? 1),
     marca: e.marca ?? '', modelo: e.modelo ?? '', serial: e.serial ?? '', ubicacion: e.ubicacion ?? '',
     fecha_compra: e.fecha_compra ?? '',
     valor_compra: e.valor_compra != null ? String(e.valor_compra) : '',
     vida_util_anios: e.vida_util_anios != null ? String(e.vida_util_anios) : '',
     estado: e.estado,
     ultimo_mantenimiento: e.ultimo_mantenimiento ?? '', proximo_mantenimiento: e.proximo_mantenimiento ?? '',
+    foto_url: e.foto_url ?? '',
     notas: e.notas ?? '',
   }
 }
+
+const FOTO_TITULO = 'Foto del equipo'
+const FOTO_FOLDER = 'equipos'
+const FOTO_VACIA = 'Este equipo no tiene foto.'
 
 export default function EquiposComunesTab({ equipos, proyectoId, companyId, moneda, canCreate, canEdit, onRefresh }: Props) {
   // Se guarda el id y no la fila: cuando `equipos` vuelve a cargar tras editar,
@@ -93,28 +83,50 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
   const [saving, setSaving] = useState(false)
   const [filtroCategoria, setFiltroCategoria] = useState<CategoriaEquipo | ''>('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoEquipo | ''>('')
+  const [soloAlertas, setSoloAlertas] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  /** Qué ventana de foto está abierta: la de la ficha (guarda ya) o la del formulario (guarda con la ficha). */
+  const [fotoAbierta, setFotoAbierta] = useState<'detalle' | 'form' | null>(null)
   const [form, setForm] = useState<FormEquipo>(FORM_VACIO)
 
   const lista = equipos.filter(e =>
     (filtroCategoria === '' || e.categoria === filtroCategoria) &&
-    (filtroEstado === '' || e.estado === filtroEstado)
+    (filtroEstado === '' || e.estado === filtroEstado) &&
+    (!soloAlertas || requiereAtencion(e)),
   )
 
-  const alertas = equipos.filter(e => ['vencido', 'proximo'].includes(alertaManto(e)))
+  const alertas = equipos.filter(e => requiereAtencion(e))
+
+  /** La foto que la fila en edición tiene guardada (en «nuevo» no hay fila). */
+  const fotoGuardada = vista === 'editar' ? selected?.foto_url ?? null : null
+
+  /**
+   * Una foto subida en el formulario que no llegó a guardarse no la referencia
+   * ninguna fila: al salir sin guardar se borra del bucket. La guardada no se
+   * toca: la fila todavía apunta a ella.
+   */
+  function descartarFotoPendiente() {
+    if (vista !== 'nuevo' && vista !== 'editar') return
+    if (form.foto_url && form.foto_url !== fotoGuardada) void removeCondominiosMedia([form.foto_url])
+  }
 
   function seleccionar(id: string) {
+    descartarFotoPendiente()
     setSelectedId(id)
     setVista('lista')
   }
 
-  /** Cerrar la ventana de la ficha: el formulario de edición cuelga de ella y se descarta con ella. */
+  /** Cerrar la ventana de la ficha: el formulario y la foto cuelgan de ella y se descartan con ella. */
   function cerrarDetalle() {
+    descartarFotoPendiente()
     setForm(FORM_VACIO)
+    setFotoAbierta(null)
     setVista('lista')
     setSelectedId(null)
   }
 
   function abrirNuevo() {
+    descartarFotoPendiente()
     setForm(FORM_VACIO)
     setVista('nuevo')
   }
@@ -125,16 +137,36 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
   }
 
   function cancelarFormulario() {
+    descartarFotoPendiente()
     setForm(FORM_VACIO)
     setVista('lista')
+  }
+
+  /** La foto elegida en la ventana viaja con la ficha; la pendiente que reemplaza ya no sirve. */
+  function elegirFotoForm(foto: string | null) {
+    if (form.foto_url && form.foto_url !== foto && form.foto_url !== fotoGuardada) void removeCondominiosMedia([form.foto_url])
+    setForm(p => ({ ...p, foto_url: foto ?? '' }))
+  }
+
+  /** Desde la ficha la foto se guarda en el acto, sin pasar por el formulario. */
+  async function guardarFoto(e: EquipoComun, foto: string | null): Promise<boolean> {
+    const { error } = await updateCondominioRow('equipos_comunes', e.id, { foto_url: foto })
+    if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
+    // La fila ya no apunta a la anterior: ahora sí se puede borrar.
+    if (e.foto_url && e.foto_url !== foto) void removeCondominiosMedia([e.foto_url])
+    notify({ variant: 'success', title: foto ? 'Foto guardada' : 'Foto quitada', text: e.nombre })
+    onRefresh()
+    return true
   }
 
   /** Lo que la persona puede cambiar de la ficha; el tenant lo añade sólo el alta. */
   function fichaDesdeForm(): { ficha: Record<string, unknown> } | { error: string } {
     if (!form.nombre.trim()) return { error: 'Nombre del equipo obligatorio' }
+    const cantidad = form.cantidad.trim() === '' ? 1 : Number(form.cantidad)
+    if (!Number.isInteger(cantidad) || cantidad < 0) return { error: 'La cantidad debe ser un entero mayor o igual a 0' }
     return {
       ficha: {
-        nombre: form.nombre.trim(), categoria: form.categoria,
+        nombre: form.nombre.trim(), categoria: form.categoria, cantidad,
         marca: form.marca.trim() || null, modelo: form.modelo.trim() || null,
         serial: form.serial.trim() || null, ubicacion: form.ubicacion.trim() || null,
         fecha_compra: form.fecha_compra || null,
@@ -143,6 +175,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
         estado: form.estado,
         ultimo_mantenimiento: form.ultimo_mantenimiento || null,
         proximo_mantenimiento: form.proximo_mantenimiento || null,
+        foto_url: form.foto_url || null,
         notas: form.notas.trim() || null,
       },
     }
@@ -157,6 +190,8 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
       : await createCondominioRow('equipos_comunes', { company_id: companyId, project_id: proyectoId, ...r.ficha })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
+    // Se reemplazó o se quitó la foto: la fila ya no apunta a la anterior.
+    if (fotoGuardada && fotoGuardada !== r.ficha.foto_url) void removeCondominiosMedia([fotoGuardada])
     if (vista === 'editar') notify({ variant: 'success', title: 'Equipo actualizado', text: r.ficha.nombre as string })
     setForm(FORM_VACIO)
     setVista('lista')
@@ -194,36 +229,47 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
   const inp: CSSProperties = { width: '100%', padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 6, fontSize: 13 }
   const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
   const btnSecundario: CSSProperties = { padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }
-  const btnPrimario: CSSProperties = { padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }
+  const btnPrimario: CSSProperties = { padding: '8px 20px', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }
   const editando = vista === 'editar'
+  const fmtMoneda = (n: number) => `${moneda} ${n.toFixed(2)}`
+  const colorAlerta = (a: ReturnType<typeof alertaManto>) =>
+    a === 'vencido' ? 'var(--at-danger)' : a === 'proximo' ? 'var(--at-warning)' : 'var(--at-ink-3)'
 
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
-      {/* Cabecera: filtros y alta. La ficha ya no vive en un panel al lado:
-          abre en ventana emergente (más abajo), así la lista ocupa todo el
-          ancho —en el teléfono antes compartían 320px + lo que sobrara—. */}
+      {/* Cabecera: filtros y altas, igual que Suministros. La ficha abre en
+          ventana emergente (más abajo), así la lista ocupa todo el ancho. */}
       <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid var(--at-line)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 12px' }}>
-        <span style={{ fontWeight: 600, fontSize: 14, marginRight: 'auto' }}>Equipos ({lista.length})</span>
+        <span style={{ fontWeight: 600, fontSize: 14, marginRight: 'auto' }}>Equipos</span>
         <select style={{ ...inp, width: 'auto', minWidth: 170 }} value={filtroCategoria} aria-label="Categoría" onChange={e => setFiltroCategoria(e.target.value as CategoriaEquipo | '')}>
           <option value="">Todas las categorías</option>
-          {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+          {CATEGORIAS_EQUIPO.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
         </select>
         <select style={{ ...inp, width: 'auto', minWidth: 160 }} value={filtroEstado} aria-label="Estado" onChange={e => setFiltroEstado(e.target.value as EstadoEquipo | '')}>
           <option value="">Todos los estados</option>
-          {ESTADOS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          {ESTADOS_EQUIPO.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
+          <input type="checkbox" checked={soloAlertas} onChange={e => setSoloAlertas(e.target.checked)} />
+          Solo alertas de mantenimiento ({alertas.length})
+        </label>
         {canCreate && (
-          <button onClick={abrirNuevo}
-            style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
-            + Nuevo
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setShowImportModal(true)} title="Carga masiva desde Excel/CSV"
+              style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              ⬆ Masiva
+            </button>
+            <button onClick={abrirNuevo}
+              style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+              + Nuevo
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Alertas */}
-      {alertas.length > 0 && (
-        <div style={{ padding: '8px 16px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)' }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-warning-strong)' }}>⚠️ {alertas.length} equipos requieren atención</div>
+      {alertas.length > 0 && !soloAlertas && (
+        <div style={{ padding: '6px 16px', background: 'var(--at-warning-tint)', borderBottom: '1px solid var(--at-warning-border)', fontSize: 12, color: 'var(--at-warning-strong)' }}>
+          ⚠️ {alertas.length} {alertas.length === 1 ? 'equipo requiere' : 'equipos requieren'} mantenimiento
         </div>
       )}
 
@@ -232,30 +278,35 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
       {/* Tarjetas: una por equipo, en rejilla que se adapta al ancho (una
           columna en el teléfono). Pulsar una abre la ficha en ventana. */}
       {lista.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10, padding: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10, padding: 16 }}>
           {lista.map(e => {
-            const cat = CATEGORIAS.find(c => c.value === e.categoria)
-            const est = ESTADOS.find(s => s.value === e.estado)
+            const cat = categoriaEquipo(e.categoria)
+            const est = estadoEquipo(e.estado)
             const alerta = alertaManto(e)
             const dias = diasParaManto(e.proximo_mantenimiento)
             return (
               <div key={e.id} role="button" tabIndex={0} aria-label={e.nombre}
                 onClick={() => seleccionar(e.id)}
                 onKeyDown={ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); seleccionar(e.id) } }}
-                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderLeft: alerta === 'vencido' ? '4px solid var(--at-danger)' : alerta === 'proximo' ? '4px solid var(--at-warning)' : '4px solid var(--at-line)' }}>
+                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface)', opacity: e.estado === 'baja' ? 0.5 : 1, border: '1px solid var(--at-line)', borderLeft: alerta === 'vencido' ? '4px solid var(--at-danger)' : alerta === 'proximo' ? '4px solid var(--at-warning)' : '4px solid var(--at-line)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{cat?.icon} {e.nombre}</span>
-                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap', background: est && tint(est.color, 12), color: est?.color }}>{est?.label}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{cat.icon} {e.nombre}</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', color: est.color }} title="Unidades">
+                    ×{e.cantidad ?? 1}
+                  </span>
                 </div>
-                {(e.marca || e.ubicacion) && (
-                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>
-                    {e.marca && <span>{e.marca} {e.modelo}</span>}
-                    {e.marca && e.ubicacion && ' · '}
-                    {e.ubicacion && <span>{e.ubicacion}</span>}
-                  </div>
-                )}
-                {dias !== null && (
-                  <div style={{ fontSize: 11, color: alerta === 'vencido' ? 'var(--at-danger)' : alerta === 'proximo' ? 'var(--at-warning)' : 'var(--at-ink-3)', marginTop: 2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px 8px', flexWrap: 'wrap', marginTop: 3 }}>
+                  <span style={{ fontSize: 11, padding: '1px 8px', borderRadius: 10, whiteSpace: 'nowrap', background: tint(est.color, 12), color: est.color }}>{est.label}</span>
+                  {(e.marca || e.ubicacion) && (
+                    <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>
+                      {e.marca && <span>{e.marca} {e.modelo}</span>}
+                      {e.marca && e.ubicacion && ' · '}
+                      {e.ubicacion && <span>{e.ubicacion}</span>}
+                    </span>
+                  )}
+                </div>
+                {dias !== null && e.estado !== 'baja' && (
+                  <div style={{ fontSize: 11, color: colorAlerta(alerta), marginTop: 2 }}>
                     {alerta === 'vencido' ? `⚠️ Manto vencido hace ${Math.abs(dias)} días` : alerta === 'proximo' ? `⏳ Manto en ${dias} días` : `Próx. manto: ${e.proximo_mantenimiento}`}
                   </div>
                 )}
@@ -265,21 +316,21 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
         </div>
       )}
 
-      {/* Ventana: la ficha del equipo. Va ANTES de la ventana del formulario
-          en el árbol: se abre desde aquí y debe quedar encima (EditModal
-          apila por orden de montaje y Escape sólo cierra la de arriba). En
-          el teléfono ocupa toda la pantalla. */}
+      {/* Ventana: la ficha del equipo. Va ANTES de las ventanas de formulario y
+          de foto en el árbol: se abren desde aquí y deben quedar encima
+          (EditModal apila por orden de montaje y Escape sólo cierra la de
+          arriba). En el teléfono ocupa toda la pantalla. */}
       {selected && (() => {
-        const cat = CATEGORIAS.find(c => c.value === selected.categoria)
-        const est = ESTADOS.find(s => s.value === selected.estado)
+        const cat = categoriaEquipo(selected.categoria)
+        const est = estadoEquipo(selected.estado)
         const alerta = alertaManto(selected)
         const dias = diasParaManto(selected.proximo_mantenimiento)
         return (
           <EditModal
-            title={`${cat?.icon ?? ''} ${selected.nombre}`.trim()}
+            title={`${cat.icon} ${selected.nombre}`.trim()}
             subtitle={
               <span style={{ display: 'inline-flex', gap: '2px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ padding: '2px 10px', borderRadius: 10, background: est && tint(est.color, 12), color: est?.color, fontWeight: 600, fontSize: 12 }}>{est?.label}</span>
+                <span style={{ padding: '2px 10px', borderRadius: 10, background: tint(est.color, 12), color: est.color, fontWeight: 600, fontSize: 12 }}>{est.label}</span>
                 {selected.marca && <span>{selected.marca} {selected.modelo}</span>}
                 {selected.ubicacion && <span>📍 {selected.ubicacion}</span>}
               </span>
@@ -292,10 +343,11 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
                 <button type="button" onClick={cerrarDetalle} style={btnSecundario}>Cerrar</button>
                 {canEdit && (<>
                   <button type="button" onClick={() => abrirEdicion(selected)}
-                    style={{ padding: '8px 16px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                    style={{ ...btnPrimario, background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)' }}>
                     ✏️ Editar
                   </button>
-                  <button type="button" onClick={() => registrarMantenimiento(selected)} style={btnPrimario}>
+                  <button type="button" onClick={() => registrarMantenimiento(selected)}
+                    style={{ ...btnPrimario, background: 'var(--at-accent)', color: 'white' }}>
                     🔧 Registrar mantenimiento
                   </button>
                 </>)}
@@ -311,30 +363,56 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               </div>
             )}
 
-            {/* Datos */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            {/* Foto + resumen, como en Suministros */}
+            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 16 }}>
+              {(selected.foto_url || canEdit) && (
+                <button type="button" onClick={() => setFotoAbierta('detalle')}
+                  aria-label={selected.foto_url ? `Ver foto de ${selected.nombre}` : `Agregar foto de ${selected.nombre}`}
+                  title={selected.foto_url ? 'Ver foto' : 'Agregar foto'}
+                  style={{ width: 76, height: 76, flexShrink: 0, padding: 0, overflow: 'hidden', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: selected.foto_url ? '1px solid var(--at-line)' : '2px dashed var(--at-line-strong)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                  {selected.foto_url
+                    ? <SecureImage src={selected.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <><span aria-hidden="true" style={{ fontSize: 22 }}>📷</span><span style={{ fontSize: 10 }}>Agregar foto</span></>}
+                </button>
+              )}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: 'var(--at-ink-2)' }}>{cat.icon} {cat.label}</div>
+                {selected.serial && <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 2 }}>Serial: <span style={{ fontWeight: 600, color: 'var(--at-ink-2)' }}>{selected.serial}</span></div>}
+                {selected.notas && (
+                  <div style={{ fontSize: 12, color: 'var(--at-ink-3)', marginTop: 4, whiteSpace: 'pre-wrap' }}>{selected.notas}</div>
+                )}
+              </div>
+            </div>
+
+            {/* KPIs */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 16 }}>
               {[
-                { label: 'Categoría', value: `${cat?.icon} ${cat?.label}` },
-                { label: 'Serial', value: selected.serial || '—' },
-                { label: 'Fecha compra', value: selected.fecha_compra || '—' },
-                { label: `Valor compra (${moneda})`, value: selected.valor_compra != null ? selected.valor_compra.toLocaleString() : '—' },
-                { label: 'Vida útil', value: selected.vida_util_anios ? `${selected.vida_util_anios} años` : '—' },
-                { label: 'Último mantenimiento', value: selected.ultimo_mantenimiento || '—' },
-                { label: 'Próximo mantenimiento', value: selected.proximo_mantenimiento || '—' },
-              ].map(d => (
-                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 6, padding: '8px 12px' }}>
-                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{d.label}</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{d.value}</div>
+                { label: 'Unidades', value: `×${selected.cantidad ?? 1}`, color: (selected.cantidad ?? 1) > 0 ? 'var(--at-success)' : 'var(--at-danger)' },
+                { label: 'Próximo mantenimiento', value: dias === null ? '—' : dias < 0 ? `hace ${Math.abs(dias)} d` : `en ${dias} d`, color: colorAlerta(alerta) },
+                { label: `Valor compra (${moneda})`, value: selected.valor_compra != null ? selected.valor_compra.toFixed(2) : '—', color: 'var(--at-accent)' },
+                { label: 'Vida útil', value: selected.vida_util_anios ? `${selected.vida_util_anios} años` : '—', color: 'var(--at-ink-2)' },
+              ].map(k => (
+                <div key={k.label} style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: k.color }}>{k.value}</div>
+                  <div style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{k.label}</div>
                 </div>
               ))}
             </div>
 
-            {selected.notas && (
-              <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px', marginBottom: 16, fontSize: 13, whiteSpace: 'pre-wrap' }}>
-                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 4 }}>Notas</div>
-                {selected.notas}
-              </div>
-            )}
+            {/* Datos */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10, marginBottom: 16 }}>
+              {[
+                { label: 'Fecha de compra', value: selected.fecha_compra || '—' },
+                { label: 'Último mantenimiento', value: selected.ultimo_mantenimiento || '—' },
+                { label: 'Próximo mantenimiento', value: selected.proximo_mantenimiento || '—' },
+                { label: 'Valor total', value: selected.valor_compra != null ? fmtMoneda(selected.valor_compra * (selected.cantidad ?? 1)) : '—' },
+              ].map(d => (
+                <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: 6, padding: '8px 12px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--at-ink-3)' }}>{d.label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{d.value}</div>
+                </div>
+              ))}
+            </div>
 
             {/* Cambio de estado: acciones secundarias, en el cuerpo y no en el
                 pie, que ya lleva Editar y Registrar mantenimiento. */}
@@ -342,7 +420,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Cambiar estado</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {ESTADOS.filter(s => s.value !== selected.estado).map(s => (
+                  {ESTADOS_EQUIPO.filter(s => s.value !== selected.estado).map(s => (
                     <button key={s.value} type="button" onClick={() => actualizarEstado(selected, s.value)}
                       style={{ padding: '7px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', fontSize: 12 }}>
                       → {s.label}
@@ -369,7 +447,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
             <button type="button" onClick={cancelarFormulario} disabled={saving} style={btnSecundario}>
               Cancelar
             </button>
-            <button type="button" onClick={() => void guardar()} disabled={saving} style={btnPrimario}>
+            <button type="button" onClick={() => void guardar()} disabled={saving} style={{ ...btnPrimario, background: 'var(--at-success)', color: 'var(--at-on-status)' }}>
               {saving ? 'Guardando…' : editando ? '✅ Guardar cambios' : '✅ Guardar equipo'}
             </button>
           </>}
@@ -377,13 +455,17 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
           <div className="at-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div style={{ gridColumn: 'span 2' }}>
               <label style={lbl} htmlFor="eq-f-nombre">Nombre *</label>
-              <input id="eq-f-nombre" style={inp} placeholder="Bomba de agua principal" value={form.nombre} autoFocus onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+              <input id="eq-f-nombre" style={inp} placeholder="Hidrolavadora, bomba de agua principal…" value={form.nombre} autoFocus onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
             </div>
             <div>
               <label style={lbl} htmlFor="eq-f-categoria">Categoría</label>
               <select id="eq-f-categoria" style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaEquipo }))}>
-                {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+                {CATEGORIAS_EQUIPO.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
               </select>
+            </div>
+            <div>
+              <label style={lbl} htmlFor="eq-f-cantidad">Cantidad</label>
+              <input id="eq-f-cantidad" type="number" min={0} step={1} style={inp} value={form.cantidad} onChange={e => setForm(p => ({ ...p, cantidad: e.target.value }))} />
             </div>
             <div>
               <label style={lbl} htmlFor="eq-f-marca">Marca</label>
@@ -397,9 +479,9 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               <label style={lbl} htmlFor="eq-f-serial">Serial</label>
               <input id="eq-f-serial" style={inp} value={form.serial} onChange={e => setForm(p => ({ ...p, serial: e.target.value }))} />
             </div>
-            <div style={{ gridColumn: 'span 3' }}>
+            <div style={{ gridColumn: 'span 2' }}>
               <label style={lbl} htmlFor="eq-f-ubicacion">Ubicación</label>
-              <input id="eq-f-ubicacion" style={inp} placeholder="Cuarto de máquinas, Piso 1…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
+              <input id="eq-f-ubicacion" style={inp} placeholder="Cuarto de máquinas, bodega de limpieza…" value={form.ubicacion} onChange={e => setForm(p => ({ ...p, ubicacion: e.target.value }))} />
             </div>
             <div>
               <label style={lbl} htmlFor="eq-f-fecha-compra">Fecha de compra</label>
@@ -416,7 +498,7 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
             <div>
               <label style={lbl} htmlFor="eq-f-estado">Estado</label>
               <select id="eq-f-estado" style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoEquipo }))}>
-                {ESTADOS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                {ESTADOS_EQUIPO.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
             <div>
@@ -428,11 +510,47 @@ export default function EquiposComunesTab({ equipos, proyectoId, companyId, mone
               <input id="eq-f-proximo" type="date" style={inp} value={form.proximo_mantenimiento} onChange={e => setForm(p => ({ ...p, proximo_mantenimiento: e.target.value }))} />
             </div>
             <div style={{ gridColumn: 'span 3' }}>
+              <div style={lbl}>Foto</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {form.foto_url && (
+                  <SecureImage src={form.foto_url} alt={`Foto de ${form.nombre || 'el equipo'}`}
+                    style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)', display: 'block' }} />
+                )}
+                <button type="button" onClick={() => setFotoAbierta('form')}
+                  style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                  📷 {form.foto_url ? 'Cambiar foto' : 'Agregar foto'}
+                </button>
+                {(form.foto_url || null) !== fotoGuardada && (
+                  <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Se guarda con la ficha</span>
+                )}
+              </div>
+            </div>
+            <div style={{ gridColumn: 'span 3' }}>
               <label style={lbl} htmlFor="eq-f-notas">Notas</label>
               <textarea id="eq-f-notas" style={{ ...inp, height: 60, resize: 'vertical' }} value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} />
             </div>
           </div>
         </EditModal>
+      )}
+
+      {fotoAbierta === 'detalle' && selected && (
+        <FotoSuministroModal titulo={FOTO_TITULO} folder={FOTO_FOLDER} sinFoto={FOTO_VACIA}
+          nombre={selected.nombre} valor={selected.foto_url ?? null} editable={canEdit}
+          onGuardar={foto => guardarFoto(selected, foto)} onClose={() => setFotoAbierta(null)} />
+      )}
+      {fotoAbierta === 'form' && (
+        <FotoSuministroModal titulo={FOTO_TITULO} folder={FOTO_FOLDER} sinFoto={FOTO_VACIA}
+          nombre={form.nombre.trim() || 'Nuevo equipo'} valor={form.foto_url || null} editable
+          accion="Usar esta foto" onGuardar={foto => { elegirFotoForm(foto); return true }} onClose={() => setFotoAbierta(null)} />
+      )}
+
+      {showImportModal && (
+        <ImportEquiposModal
+          proyectoId={proyectoId}
+          companyId={companyId}
+          onClose={() => setShowImportModal(false)}
+          onImportado={() => { setShowImportModal(false); onRefresh() }}
+        />
       )}
     </div>
   )

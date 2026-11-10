@@ -3,7 +3,7 @@
 // consume EXACTAMENTE el mismo componente en modo consulta (filtrado por
 // servicio = limpieza), así que aquí no hay lógica propia que pueda divergir.
 import { ActividadesCatalog } from '../ActividadesCatalog'
-import type { AreaCondominio, CargoCatalogo, ItemInventario, PlantillaTareaCargo, SuministroCondominio } from '../../../types'
+import type { AreaCondominio, CargoCatalogo, EquipoComun, PlantillaTareaCargo, SuministroCondominio } from '../../../types'
 
 interface Props {
   plantillas: PlantillaTareaCargo[]
@@ -11,7 +11,8 @@ interface Props {
   cargos?: CargoCatalogo[]
   areas: AreaCondominio[]
   suministros: SuministroCondominio[]
-  inventario: ItemInventario[]
+  /** Equipos del condominio (Operaciones → Equipos): herramientas y equipo de las actividades. */
+  equipos: EquipoComun[]
   proyectoId: string
   companyId: string
   canCreate: boolean

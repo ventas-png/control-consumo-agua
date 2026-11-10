@@ -246,12 +246,13 @@ describe('cuotas / cobranza', () => {
 })
 
 describe('fetchRecursosPlantillas', () => {
-  it('aplana el embed del recurso (nombre, unidad, estado) en cada puente', async () => {
+  it('aplana el embed del recurso (nombre, unidad, estado) en cada puente: Equipos en las filas nuevas, Inventario en las legadas', async () => {
     h.state.byTable.plantilla_tarea_suministros = { data: [
       { id: 's1', plantilla_tarea_id: 'pl1', suministro_id: 'sum1', cantidad: 0.5, suministros_condominio: { nombre: 'Cloro', unidad_medida: 'litro', activo: true } },
     ], error: null }
     h.state.byTable.plantilla_tarea_herramientas = { data: [
-      { id: 'h1', plantilla_tarea_id: 'pl1', inventario_id: 'inv1', cantidad: 1, obligatoria: true, inventario_condominio: { nombre: 'Hidrolavadora', estado: 'dado_de_baja' } },
+      { id: 'h1', plantilla_tarea_id: 'pl1', inventario_id: 'inv1', equipo_id: null, cantidad: 1, obligatoria: true, inventario_condominio: { nombre: 'Hidrolavadora', estado: 'dado_de_baja' }, equipos_comunes: null },
+      { id: 'h2', plantilla_tarea_id: 'pl1', inventario_id: null, equipo_id: 'eq1', cantidad: 2, obligatoria: false, inventario_condominio: null, equipos_comunes: { nombre: 'Pulidora', estado: 'operativo' } },
     ], error: null }
     const r = await fetchRecursosPlantillas('p1', 'co1')
     expect(r.error).toBeNull()
@@ -259,7 +260,8 @@ describe('fetchRecursosPlantillas', () => {
       { id: 's1', plantilla_tarea_id: 'pl1', suministro_id: 'sum1', cantidad: 0.5, suministro_nombre: 'Cloro', unidad_medida: 'litro', suministro_activo: true },
     ])
     expect(r.herramientas).toEqual([
-      { id: 'h1', plantilla_tarea_id: 'pl1', inventario_id: 'inv1', cantidad: 1, obligatoria: true, inventario_nombre: 'Hidrolavadora', inventario_estado: 'dado_de_baja' },
+      { id: 'h1', plantilla_tarea_id: 'pl1', inventario_id: 'inv1', equipo_id: null, cantidad: 1, obligatoria: true, inventario_nombre: 'Hidrolavadora', inventario_estado: 'dado_de_baja', equipo_nombre: undefined, equipo_estado: undefined },
+      { id: 'h2', plantilla_tarea_id: 'pl1', inventario_id: null, equipo_id: 'eq1', cantidad: 2, obligatoria: false, inventario_nombre: undefined, inventario_estado: undefined, equipo_nombre: 'Pulidora', equipo_estado: 'operativo' },
     ])
   })
 

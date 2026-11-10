@@ -92,14 +92,14 @@ const TODAS_RESIDENTES = [
 
 const TODAS_OPERACIONES = [
   'mantenimiento', 'kanban_tickets', 'gantt_mantenimiento', 'calendario_mantenimiento',
-  'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'tareas_cond',
+  'mant_preventivo', 'bitacora_manto', 'inventario', 'suministros', 'equipos', 'tareas_cond',
   'ordenes_compra', 'eval_proveedor', 'proveedores', 'obras', 'proyectos_cond',
   'permisos_obra', 'garantias', 'areas_config', 'checklist_areas', 'prog_limpieza', 'control_plagas', 'prestamos',
 ]
 
 const TODAS_INSTALACIONES = [
   'amenidades', 'utilizacion_amenidades', 'parqueos', 'estac_visita', 'bodegas', 'llaves',
-  'equipos', 'consumo_energia', 'medidores_unidad', 'control_piscina', 'jardineria',
+  'consumo_energia', 'medidores_unidad', 'control_piscina', 'jardineria',
   'elevadores', 'cisternas', 'generador', 'incendio', 'camaras', 'gas', 'integracion_agua',
 ]
 
