@@ -6,6 +6,12 @@ import { removeCondominiosMedia } from '../../../../domain/shared/storage'
 
 interface Props {
   nombre: string
+  /** Título de la ventana; «Foto del insumo» salvo que otro catálogo la reutilice (Equipos). */
+  titulo?: string
+  /** Carpeta del bucket bajo `<project_id>/` donde se sube la foto. */
+  folder?: string
+  /** Texto cuando no hay foto y no se puede editar. */
+  sinFoto?: string
   /** La foto con la que se abre la ventana (ruta en `condominios-media`) o null. */
   valor: string | null
   /** Sin permiso de edición la ventana sólo muestra la foto en grande. */
@@ -23,12 +29,16 @@ interface Props {
 }
 
 /**
- * Ventana para ver, agregar, cambiar o quitar la foto de un insumo. Quitar no
+ * Ventana para ver, agregar, cambiar o quitar la foto de un insumo (o de un equipo:
+ * Equipos la reutiliza con otro título y otra carpeta). Quitar no
  * borra nada del bucket mientras no se confirme: la fila todavía apunta a esa
  * foto. Lo que se sube aquí y no se confirma no lo referencia ninguna fila, así
  * que se borra al salir.
  */
-export function FotoSuministroModal({ nombre, valor, editable, accion = 'Guardar foto', onGuardar, onClose }: Props) {
+export function FotoSuministroModal({
+  nombre, valor, editable, accion = 'Guardar foto', onGuardar, onClose,
+  titulo = 'Foto del insumo', folder = 'suministros', sinFoto = 'Este insumo no tiene foto.',
+}: Props) {
   const [foto, setFoto] = useState<string | null>(valor)
   const [subiendo, setSubiendo] = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -61,7 +71,7 @@ export function FotoSuministroModal({ nombre, valor, editable, accion = 'Guardar
 
   return (
     <EditModal
-      title="Foto del insumo"
+      title={titulo}
       subtitle={nombre}
       size="sm"
       onClose={cerrar}
@@ -87,7 +97,7 @@ export function FotoSuministroModal({ nombre, valor, editable, accion = 'Guardar
           <ImageUploader
             value={foto}
             onChange={p => { if (p) subidasRef.current.add(p); setFoto(p) }}
-            folder="suministros"
+            folder={folder}
             label={foto ? 'Para cambiarla, quítala con la ✕ y sube otra' : 'Toma una foto o elige una imagen (máx. 5 MB)'}
             borrarAlQuitar={false}
             onSubiendo={setSubiendo}
@@ -103,7 +113,7 @@ export function FotoSuministroModal({ nombre, valor, editable, accion = 'Guardar
           placeholder={<div style={{ fontSize: 13, color: 'var(--at-ink-3)', textAlign: 'center', padding: 24 }}>Cargando foto…</div>}
           style={{ width: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: 10, display: 'block' }} />
       ) : (
-        <div style={{ fontSize: 13, color: 'var(--at-ink-3)', textAlign: 'center', padding: 24 }}>Este insumo no tiene foto.</div>
+        <div style={{ fontSize: 13, color: 'var(--at-ink-3)', textAlign: 'center', padding: 24 }}>{sinFoto}</div>
       )}
     </EditModal>
   )

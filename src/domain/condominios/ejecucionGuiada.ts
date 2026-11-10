@@ -9,6 +9,7 @@
 import type {
   AreaCondominio, EstadoTareaBloque, PlantillaTareaHerramienta, TareaBloque, TareaBloqueSuministro,
 } from '../../types'
+import { herramientaId, herramientaNombre } from './herramientasPlantilla'
 
 /** Una tarea ya no se ejecuta: se cerró (bien o con observación) o se omitió. */
 export const tareaResuelta = (estado: EstadoTareaBloque) => estado !== 'pendiente'
@@ -78,7 +79,8 @@ export function siguientePendiente(tareas: TareaBloque[], desdeId: string | null
 // ── Preparación ─────────────────────────────────────────────────────────────
 
 export interface HerramientaAPreparar {
-  inventario_id: string
+  /** Id del recurso: el equipo (equipos_comunes) o, en vínculos anteriores a 20261122000000, el artículo de Inventario. */
+  recurso_id: string
   nombre: string
   /** La mayor cantidad que pide UNA tarea: la escoba se reusa, no se suma. */
   cantidad: number
@@ -133,15 +135,16 @@ export function preparacionDelTurno(
   for (const t of pendientes) {
     if (!t.plantilla_id) continue
     for (const h of herramientas.filter(x => x.plantilla_tarea_id === t.plantilla_id)) {
-      const actual = porHerramienta.get(h.inventario_id)
+      const recursoId = herramientaId(h)
+      const actual = porHerramienta.get(recursoId)
       if (actual) {
         actual.cantidad = Math.max(actual.cantidad, h.cantidad)
         actual.obligatoria = actual.obligatoria || h.obligatoria
         if (!actual.tareas.includes(t.titulo)) actual.tareas.push(t.titulo)
       } else {
-        porHerramienta.set(h.inventario_id, {
-          inventario_id: h.inventario_id,
-          nombre: h.inventario_nombre ?? 'Herramienta',
+        porHerramienta.set(recursoId, {
+          recurso_id: recursoId,
+          nombre: herramientaNombre(h) ?? 'Herramienta',
           cantidad: h.cantidad,
           obligatoria: h.obligatoria,
           tareas: [t.titulo],
@@ -199,7 +202,7 @@ export function preparacionDelTurno(
  */
 export function itemsPorConfirmar(p: PreparacionTurno): string[] {
   return [
-    ...p.herramientas.map(h => `herramienta:${h.inventario_id}`),
+    ...p.herramientas.map(h => `herramienta:${h.recurso_id}`),
     ...p.insumos.map(i => `insumo:${i.suministro_id}`),
     ...p.indicaciones.map((_, n) => `indicacion:${n}`),
     ...(p.conFoto > 0 ? ['camara'] : []),

@@ -66,10 +66,11 @@ describe('preparacionDelTurno', () => {
     t('3', 2, { plantilla_id: 'vidrios', area_id: 'a7', requiere_foto: true }),
     t('4', 3, { plantilla_id: 'vidrios', estado: 'completada', instrucciones_seguridad: 'Arnés' }),
   ]
+  // Escoba: equipo del catálogo (filas nuevas); Jalador: vínculo legado a Inventario. Ambos cuentan igual.
   const herramientas = [
-    { plantilla_tarea_id: 'barrer', inventario_id: 'escoba', inventario_nombre: 'Escoba', cantidad: 1, obligatoria: false },
-    { plantilla_tarea_id: 'vidrios', inventario_id: 'escoba', inventario_nombre: 'Escoba', cantidad: 2, obligatoria: true },
-    { plantilla_tarea_id: 'vidrios', inventario_id: 'jalador', inventario_nombre: 'Jalador', cantidad: 1, obligatoria: false },
+    { plantilla_tarea_id: 'barrer', equipo_id: 'escoba', inventario_id: null, equipo_nombre: 'Escoba', cantidad: 1, obligatoria: false },
+    { plantilla_tarea_id: 'vidrios', equipo_id: 'escoba', inventario_id: null, equipo_nombre: 'Escoba', cantidad: 2, obligatoria: true },
+    { plantilla_tarea_id: 'vidrios', equipo_id: null, inventario_id: 'jalador', inventario_nombre: 'Jalador', cantidad: 1, obligatoria: false },
   ] as PlantillaTareaHerramienta[]
   const insumos = [
     { id: 'i1', tarea_id: '1', suministro_id: 'alcohol', nombre_suministro: 'Alcohol 70%', cantidad_planificada: 0.5, unidad_medida: 'litro' },

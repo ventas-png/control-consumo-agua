@@ -7,6 +7,11 @@
 //     20260904000200, así que un operador de Limpieza lo lee sin permisos del
 //     módulo Seguridad).
 //
+// RECURSOS: los insumos salen de Suministros y las herramientas y el equipo
+// salen de EQUIPOS (Operaciones → Equipos, equipos_comunes; antes, de Inventario:
+// 20261122000000). Las filas vinculadas antes de ese cambio siguen apuntando a
+// Inventario y se muestran igual.
+//
 // GUARDADO: el formulario de la actividad es un BORRADOR (nada persiste hasta
 // "Guardar"); los recursos (insumos/herramientas) viven FUERA del formulario,
 // en el panel expandible de cada tarjeta, y cada cambio ahí se guarda al
@@ -28,11 +33,12 @@ import { ImportarActividadesModal } from './tabs/ImportarActividadesModal'
 import { RecursosEnBloqueModal } from './RecursosEnBloqueModal'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../domain/condominios/tabMutations'
 import { fetchRecursosPlantillas } from '../../domain/condominios/tabQueries'
+import { herramientaDeBaja, herramientaId, herramientaNombre } from '../../domain/condominios/plantillasRecursos'
 import { etiquetaCargo, opcionesSelect } from '../../domain/condominios/rrhhCatalogos'
 import type {
   AreaCondominio,
   CargoCatalogo,
-  ItemInventario,
+  EquipoComun,
   PlantillaTareaCargo,
   PlantillaTareaHerramienta,
   PlantillaTareaSuministro,
@@ -46,7 +52,8 @@ interface Props {
   cargos?: CargoCatalogo[]
   areas: AreaCondominio[]
   suministros: SuministroCondominio[]
-  inventario: ItemInventario[]
+  /** Equipos del condominio (Operaciones → Equipos): de aquí salen las herramientas y el equipo. */
+  equipos: EquipoComun[]
   proyectoId: string
   companyId: string
   canCreate: boolean
@@ -107,7 +114,7 @@ function blankForm() {
 }
 
 export function ActividadesCatalog({
-  plantillas, cargos = [], areas, suministros, inventario, proyectoId, companyId,
+  plantillas, cargos = [], areas, suministros, equipos, proyectoId, companyId,
   canCreate, canEdit, canDelete, onRefresh,
   servicioInicial, soloLectura = false, seleccion, titulo, subtitulo,
 }: Props) {
@@ -315,7 +322,7 @@ export function ActividadesCatalog({
     }
     const { error } = await createCondominioRow('plantilla_tarea_herramientas', {
       company_id: companyId, project_id: proyectoId,
-      plantilla_tarea_id: plantillaId, inventario_id: herSel, cantidad, obligatoria: herObligatoria,
+      plantilla_tarea_id: plantillaId, equipo_id: herSel, cantidad, obligatoria: herObligatoria,
     })
     if (error) {
       notify({ variant: 'error', title: 'Error', text: error.code === '23505' ? 'Esa herramienta ya está en la actividad: edita su cantidad en lugar de repetirla.' : error.message })
@@ -355,7 +362,7 @@ export function ActividadesCatalog({
 
   const recursoInactivo = (p: PlantillaTareaCargo) =>
     (sumPorPlantilla.get(p.id) ?? []).some(r => r.suministro_activo === false)
-    || (herPorPlantilla.get(p.id) ?? []).some(r => r.inventario_estado === 'dado_de_baja')
+    || (herPorPlantilla.get(p.id) ?? []).some(herramientaDeBaja)
 
   function panelRecursos(p: PlantillaTareaCargo) {
     const misSuministros = sumPorPlantilla.get(p.id) ?? []
@@ -363,8 +370,8 @@ export function ActividadesCatalog({
     const suministrosDisponibles = suministros
       .filter(s => s.activo && !misSuministros.some(r => r.suministro_id === s.id))
       .sort((a, b) => a.nombre.localeCompare(b.nombre))
-    const inventarioDisponible = inventario
-      .filter(i => i.estado !== 'dado_de_baja' && !misHerramientas.some(r => r.inventario_id === i.id))
+    const equiposDisponibles = equipos
+      .filter(e => e.estado !== 'baja' && !misHerramientas.some(r => herramientaId(r) === e.id))
       .sort((a, b) => a.nombre.localeCompare(b.nombre))
     return (
       <div style={{ marginTop: '10px', borderTop: '1px dashed var(--at-line)', paddingTop: '10px' }}>
@@ -412,8 +419,8 @@ export function ActividadesCatalog({
               {misHerramientas.map(r => (
                 <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', color: 'var(--at-ink-2)', marginBottom: '4px' }}>
                   <span style={{ flex: 1 }}>
-                    {r.inventario_nombre ?? 'Herramienta'} — {r.cantidad}
-                    {r.inventario_estado === 'dado_de_baja' && <span style={{ color: 'var(--at-warning-strong)', fontWeight: 700 }}> · ⚠ dada de baja</span>}
+                    {herramientaNombre(r) ?? 'Herramienta'} — {r.cantidad}
+                    {herramientaDeBaja(r) && <span style={{ color: 'var(--at-warning-strong)', fontWeight: 700 }}> · ⚠ de baja</span>}
                   </span>
                   {puedeEditar ? (
                     <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', cursor: 'pointer' }} title="La ejecución no debería iniciarse sin esta herramienta">
@@ -421,15 +428,15 @@ export function ActividadesCatalog({
                       Obligatoria
                     </label>
                   ) : r.obligatoria && <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>Obligatoria</span>}
-                  {puedeEditar && <button onClick={() => void editarCantidad('plantilla_tarea_herramientas', r, true)} aria-label={`Editar cantidad de ${r.inventario_nombre}`} style={{ padding: '2px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '11px' }}>✏️</button>}
-                  {puedeEditar && <button onClick={() => void quitarRecurso('plantilla_tarea_herramientas', r.id)} aria-label={`Quitar ${r.inventario_nombre}`} style={{ padding: '2px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', color: 'var(--at-danger)' }}>✕</button>}
+                  {puedeEditar && <button onClick={() => void editarCantidad('plantilla_tarea_herramientas', r, true)} aria-label={`Editar cantidad de ${herramientaNombre(r)}`} style={{ padding: '2px 8px', background: 'var(--at-chip)', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '11px' }}>✏️</button>}
+                  {puedeEditar && <button onClick={() => void quitarRecurso('plantilla_tarea_herramientas', r.id)} aria-label={`Quitar ${herramientaNombre(r)}`} style={{ padding: '2px 8px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', color: 'var(--at-danger)' }}>✕</button>}
                 </div>
               ))}
               {puedeEditar && (
                 <div style={{ display: 'flex', gap: '6px', marginTop: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <select value={herSel} onChange={e => setHerSel(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: '140px', padding: '6px 8px', fontSize: '12.5px' }} aria-label="Herramienta a agregar">
-                    <option value="">— Herramienta —</option>
-                    {inventarioDisponible.map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+                    <option value="">— Equipo o herramienta —</option>
+                    {equiposDisponibles.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
                   </select>
                   <input type="number" min={1} step={1} value={herCant} onChange={e => setHerCant(e.target.value)} style={{ ...inputStyle, width: '64px', padding: '6px 8px', fontSize: '12.5px' }} aria-label="Cantidad de herramientas" />
                   <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: 'var(--at-ink-2)', cursor: 'pointer' }}>
@@ -438,6 +445,11 @@ export function ActividadesCatalog({
                   </label>
                   <button onClick={() => void agregarHerramienta(p.id)} disabled={!herSel} style={{ padding: '6px 12px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Agregar</button>
                 </div>
+              )}
+              {puedeEditar && equipos.length === 0 && (
+                <p style={{ margin: '6px 0 0', fontSize: '11.5px', color: 'var(--at-ink-3)' }}>
+                  Las herramientas y el equipo salen de Operaciones → Equipos; aún no hay ninguno registrado.
+                </p>
               )}
             </div>
           </div>
@@ -486,7 +498,7 @@ export function ActividadesCatalog({
           proyectoId={proyectoId}
           plantillas={seleccionadas}
           suministros={suministros}
-          inventario={inventario}
+          equipos={equipos}
           onClose={() => setShowBloque(false)}
           onAplicado={() => { bloque.clear(); void cargarRecursos() }}
         />

@@ -5,11 +5,15 @@
 // todas las actividades o a ninguna. Al AGREGAR, los vínculos que ya existían no se tocan (ni su
 // cantidad ni su «obligatoria»); al QUITAR, los que no estaban simplemente no cuentan. El servidor
 // devuelve los conteos y la pantalla los muestra.
+//
+// Las herramientas y el equipo salen del catálogo de EQUIPOS (Operaciones → Equipos,
+// equipos_comunes), no de Inventario (20261122000000).
 import { useMemo, useRef, useState } from 'react'
 import { EditModal } from '../shared'
 import { confirm, notify } from '../shared/Dialog'
 import { aplicarRecursosEnBloque, resumenBloque, type AccionBloque, MAX_RECURSOS_BLOQUE } from '../../domain/condominios/plantillasRecursos'
-import type { ItemInventario, PlantillaTareaCargo, SuministroCondominio } from '../../types'
+import { categoriaEquipo } from '../../lib/equiposComunes'
+import type { EquipoComun, PlantillaTareaCargo, SuministroCondominio } from '../../types'
 import { btnPrimario, btnSecundario, input } from '../contabilidad/ui'
 
 interface Props {
@@ -17,28 +21,28 @@ interface Props {
   /** Actividades seleccionadas (ya filtradas por la pantalla). */
   plantillas: PlantillaTareaCargo[]
   suministros: SuministroCondominio[]
-  inventario: ItemInventario[]
+  /** Equipos del condominio: de aquí salen las herramientas y el equipo. */
+  equipos: EquipoComun[]
   onClose: () => void
   /** Se llama tras aplicar (para recargar los recursos de las tarjetas). */
   onAplicado: () => void
 }
 
-type Pestana = 'insumos' | 'herramientas' | 'equipo'
+type Pestana = 'insumos' | 'equipos'
 interface Elegido { cantidad: string; obligatoria: boolean }
 
 const PESTANAS: { key: Pestana; label: string }[] = [
   { key: 'insumos', label: '🧴 Insumos' },
-  { key: 'herramientas', label: '🔧 Herramientas' },
-  { key: 'equipo', label: '⚙️ Equipo' },
+  { key: 'equipos', label: '🔧 Herramientas y equipo' },
 ]
 
-export function RecursosEnBloqueModal({ proyectoId, plantillas, suministros, inventario, onClose, onAplicado }: Props) {
+export function RecursosEnBloqueModal({ proyectoId, plantillas, suministros, equipos, onClose, onAplicado }: Props) {
   const [pestana, setPestana] = useState<Pestana>('insumos')
   const [busqueda, setBusqueda] = useState('')
   const [accion, setAccion] = useState<AccionBloque>('agregar')
-  // id del recurso → cantidad / obligatoria. Los insumos y el inventario tienen ids distintos.
+  // id del recurso → cantidad / obligatoria. Los insumos y los equipos tienen ids distintos.
   const [sum, setSum] = useState<Map<string, Elegido>>(new Map())
-  const [inv, setInv] = useState<Map<string, Elegido>>(new Map())
+  const [eq, setEq] = useState<Map<string, Elegido>>(new Map())
   const [guardando, setGuardando] = useState(false)
   const enCurso = useRef(false)
 
@@ -47,28 +51,27 @@ export function RecursosEnBloqueModal({ proyectoId, plantillas, suministros, inv
     () => suministros.filter((s) => accion === 'quitar' || s.activo).sort((a, b) => a.nombre.localeCompare(b.nombre)),
     [suministros, accion],
   )
-  const listaInventario = useMemo(
-    () => inventario
-      .filter((i) => i.categoria === (pestana === 'equipo' ? 'equipo' : 'herramienta'))
-      .filter((i) => accion === 'quitar' || i.estado !== 'dado_de_baja')
+  const listaEquipos = useMemo(
+    () => equipos
+      .filter((e) => accion === 'quitar' || e.estado !== 'baja')
       .sort((a, b) => a.nombre.localeCompare(b.nombre)),
-    [inventario, pestana, accion],
+    [equipos, accion],
   )
   const q = busqueda.trim().toLowerCase()
   const filtra = <T extends { nombre: string }>(xs: T[]) => (q ? xs.filter((x) => x.nombre.toLowerCase().includes(q)) : xs)
 
-  const totalElegidos = sum.size + inv.size
+  const totalElegidos = sum.size + eq.size
 
-  function toggle(mapa: 'sum' | 'inv', id: string) {
-    const set = mapa === 'sum' ? setSum : setInv
+  function toggle(mapa: 'sum' | 'eq', id: string) {
+    const set = mapa === 'sum' ? setSum : setEq
     set((prev) => {
       const next = new Map(prev)
       if (next.has(id)) next.delete(id); else next.set(id, { cantidad: '1', obligatoria: false })
       return next
     })
   }
-  function cambiar(mapa: 'sum' | 'inv', id: string, cambio: Partial<Elegido>) {
-    const set = mapa === 'sum' ? setSum : setInv
+  function cambiar(mapa: 'sum' | 'eq', id: string, cambio: Partial<Elegido>) {
+    const set = mapa === 'sum' ? setSum : setEq
     set((prev) => {
       const actual = prev.get(id)
       if (!actual) return prev
@@ -87,9 +90,9 @@ export function RecursosEnBloqueModal({ proyectoId, plantillas, suministros, inv
         const c = Number(e.cantidad)
         if (!Number.isFinite(c) || c <= 0 || Math.round(c * 100) !== c * 100) return `La cantidad de «${suministros.find((s) => s.id === id)?.nombre ?? 'insumo'}» debe ser mayor que cero (hasta 2 decimales).`
       }
-      for (const [id, e] of inv) {
+      for (const [id, e] of eq) {
         const c = Number(e.cantidad)
-        if (!Number.isInteger(c) || c <= 0) return `La cantidad de «${inventario.find((i) => i.id === id)?.nombre ?? 'herramienta'}» debe ser un entero mayor que cero.`
+        if (!Number.isInteger(c) || c <= 0) return `La cantidad de «${equipos.find((x) => x.id === id)?.nombre ?? 'equipo'}» debe ser un entero mayor que cero.`
       }
     }
     return null
@@ -113,7 +116,7 @@ export function RecursosEnBloqueModal({ proyectoId, plantillas, suministros, inv
     try {
       const r = await aplicarRecursosEnBloque(proyectoId, plantillas.map((p) => p.id), accion, {
         suministros: [...sum].map(([id, e]) => ({ id, cantidad: Number(e.cantidad) })),
-        inventario: [...inv].map(([id, e]) => ({ id, cantidad: Number(e.cantidad), obligatoria: e.obligatoria })),
+        equipos: [...eq].map(([id, e]) => ({ id, cantidad: Number(e.cantidad), obligatoria: e.obligatoria })),
       })
       notify({ variant: 'success', title: 'Listo', text: resumenBloque(r) })
       onAplicado()
@@ -165,7 +168,7 @@ export function RecursosEnBloqueModal({ proyectoId, plantillas, suministros, inv
 
       <div role="tablist" style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         {PESTANAS.map((t) => {
-          const cuenta = t.key === 'insumos' ? sum.size : [...inv.keys()].filter((id) => inventario.find((i) => i.id === id)?.categoria === (t.key === 'equipo' ? 'equipo' : 'herramienta')).length
+          const cuenta = t.key === 'insumos' ? sum.size : eq.size
           return (
             <button key={t.key} role="tab" aria-selected={pestana === t.key} onClick={() => { setPestana(t.key); setBusqueda('') }}
               style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--at-line)', cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
@@ -197,22 +200,26 @@ export function RecursosEnBloqueModal({ proyectoId, plantillas, suministros, inv
               )
             })
         ) : (
-          filtra(listaInventario).length === 0
-            ? <p style={{ fontSize: 12.5, color: 'var(--at-ink-3)', margin: '8px 0' }}>{listaInventario.length === 0 ? `No hay ${pestana === 'equipo' ? 'equipo' : 'herramientas'} en el inventario del proyecto (o no tienes permiso para ver Inventario).` : 'Nada con ese nombre.'}</p>
-            : filtra(listaInventario).map((i) => {
-              const e = inv.get(i.id)
+          filtra(listaEquipos).length === 0
+            ? <p style={{ fontSize: 12.5, color: 'var(--at-ink-3)', margin: '8px 0' }}>{listaEquipos.length === 0 ? 'No hay equipos ni herramientas en el proyecto (o no tienes permiso para ver Equipos): regístralos en Operaciones → Equipos.' : 'Nada con ese nombre.'}</p>
+            : filtra(listaEquipos).map((x) => {
+              const e = eq.get(x.id)
+              const cat = categoriaEquipo(x.categoria)
               return (
-                <div key={i.id} style={filaEstilo}>
+                <div key={x.id} style={filaEstilo}>
                   <label style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={!!e} onChange={() => toggle('inv', i.id)} aria-label={`Elegir ${i.nombre}`} />
-                    <span>{i.nombre}{i.estado === 'dado_de_baja' ? <span style={{ color: 'var(--at-ink-3)' }}> · dado de baja</span> : null}</span>
+                    <input type="checkbox" checked={!!e} onChange={() => toggle('eq', x.id)} aria-label={`Elegir ${x.nombre}`} />
+                    <span>
+                      {cat.icon} {x.nombre}
+                      <span style={{ color: 'var(--at-ink-3)' }}> ({cat.label}){x.estado === 'baja' ? ' · de baja' : ''}</span>
+                    </span>
                   </label>
                   {e && accion === 'agregar' && (
                     <>
-                      <input type="number" min={1} step={1} value={e.cantidad} onChange={(ev) => cambiar('inv', i.id, { cantidad: ev.target.value })}
-                        aria-label={`Cantidad de ${i.nombre}`} style={cantidadEstilo} />
+                      <input type="number" min={1} step={1} value={e.cantidad} onChange={(ev) => cambiar('eq', x.id, { cantidad: ev.target.value })}
+                        aria-label={`Cantidad de ${x.nombre}`} style={cantidadEstilo} />
                       <label style={{ display: 'flex', gap: 3, alignItems: 'center', fontSize: 11.5, cursor: 'pointer' }} title="La ejecución no debería iniciarse sin este recurso">
-                        <input type="checkbox" checked={e.obligatoria} onChange={(ev) => cambiar('inv', i.id, { obligatoria: ev.target.checked })} aria-label={`${i.nombre} obligatoria`} />
+                        <input type="checkbox" checked={e.obligatoria} onChange={(ev) => cambiar('eq', x.id, { obligatoria: ev.target.checked })} aria-label={`${x.nombre} obligatoria`} />
                         Obligatoria
                       </label>
                     </>

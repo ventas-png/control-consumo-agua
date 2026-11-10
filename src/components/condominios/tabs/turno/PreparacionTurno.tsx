@@ -83,7 +83,7 @@ export function PreparacionTurno({ persona, prep, errorHerramientas, iniciando, 
             <>
               <div style={seccion}>🧰 Herramientas y equipo</div>
               {prep.herramientas.map(h => item(
-                `herramienta:${h.inventario_id}`,
+                `herramienta:${h.recurso_id}`,
                 <>
                   {h.nombre}{h.cantidad > 1 ? ` ×${h.cantidad}` : ''}
                   {h.obligatoria && <span style={{ marginLeft: '6px', fontSize: '11px', fontWeight: 700, color: 'var(--at-danger)' }}>Obligatoria</span>}

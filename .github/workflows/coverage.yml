@@ -935,6 +935,20 @@ jobs:
           PGPORT_TEST: 55566
         run: supabase/tests/rrhh_catalogos/run.sh
 
+      # 20261122000000: Equipos pasa a Operaciones (junto a Suministros) con cantidad y foto, y
+      # las HERRAMIENTAS y el equipo de las actividades salen de equipos_comunes en vez de
+      # Inventario: la puente admite equipo_id (FK compuesta, exactamente uno con el legado
+      # inventario_id, índice único parcial, trigger propio que sella tenant), la carga masiva
+      # resuelve herramientas/equipo por nombre contra Equipos (de baja, ambiguo, sin permiso =
+      # mensaje claro), aplicar inserta equipo_id, recursos en bloque recibe p_equipos (la firma
+      # anterior se retira antes de la nueva y se re-concede) y el permiso del tab cambia de
+      # categoría. La puente legada a Inventario sigue vigente. CONTROL NEGATIVO: cinco mutantes.
+      - name: Equipos — catálogo operativo y herramientas de las actividades
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55590
+        run: supabase/tests/equipos_herramientas/run.sh
+
       # 20261031000500: el residente registra MASCOTAS y VEHÍCULOS desde el portal y
       # la administración los autoriza (mismo circuito que la solicitud de renta):
       # borrador → pendiente → aprobada/rechazada/baja, escritura del residente solo

@@ -5,7 +5,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const m = vi.hoisted(() => ({ rpc: vi.fn() }))
 vi.mock('../../../lib/supabase', () => ({ supabase: { rpc: m.rpc }, warmUpSupabase: vi.fn() }))
 
-import { aplicarRecursosEnBloque, mensajeErrorBloque, parsearRecursoTexto, resumenBloque } from '../plantillasRecursos'
+import {
+  aplicarRecursosEnBloque, herramientaDeBaja, herramientaId, herramientaNombre, mensajeErrorBloque, parsearRecursoTexto, resumenBloque,
+} from '../plantillasRecursos'
 
 beforeEach(() => { m.rpc.mockReset() })
 
@@ -37,17 +39,28 @@ describe('parsearRecursoTexto (espejo de plantillas_import_partir_recursos)', ()
 describe('aplicarRecursosEnBloque', () => {
   it('manda ids, cantidad (1 por omisión) y obligatoria (false por omisión) a la RPC', async () => {
     m.rpc.mockResolvedValueOnce({ data: { accion: 'agregar', plantillas: 2, recursos: 2, pares: 4, agregados: 3, ya_estaban: 1, quitados: 0, no_estaban: 0 }, error: null })
-    const r = await aplicarRecursosEnBloque('p1', ['a', 'b'], 'agregar', { suministros: [{ id: 's1', cantidad: 2.5 }], inventario: [{ id: 'i1' }] })
+    const r = await aplicarRecursosEnBloque('p1', ['a', 'b'], 'agregar', { suministros: [{ id: 's1', cantidad: 2.5 }], equipos: [{ id: 'e1' }] })
     expect(m.rpc).toHaveBeenCalledWith('plantillas_recursos_en_bloque', {
       p_project_id: 'p1', p_plantilla_ids: ['a', 'b'], p_accion: 'agregar',
-      p_suministros: [{ id: 's1', cantidad: 2.5 }], p_inventario: [{ id: 'i1', cantidad: 1, obligatoria: false }],
+      p_suministros: [{ id: 's1', cantidad: 2.5 }], p_equipos: [{ id: 'e1', cantidad: 1, obligatoria: false }],
     })
     expect(r.agregados).toBe(3)
   })
   it('el error del servidor llega sin el prefijo técnico', async () => {
     m.rpc.mockResolvedValueOnce({ data: null, error: { message: 'PLANTILLAS_BLOQUE_ALCANCE: 1 de las actividades no existen en este proyecto.' } })
-    await expect(aplicarRecursosEnBloque('p1', ['a'], 'quitar', { suministros: [{ id: 's1' }], inventario: [] })).rejects.toThrow('1 de las actividades no existen en este proyecto.')
+    await expect(aplicarRecursosEnBloque('p1', ['a'], 'quitar', { suministros: [{ id: 's1' }], equipos: [] })).rejects.toThrow('1 de las actividades no existen en este proyecto.')
     expect(mensajeErrorBloque('sin prefijo')).toBe('sin prefijo')
+  })
+})
+
+describe('herramienta planificada: equipo hoy, inventario en el legado', () => {
+  it('id, nombre y baja salen del equipo cuando lo hay, y del artículo de inventario en las filas viejas', () => {
+    const nueva = { equipo_id: 'eq1', inventario_id: null, equipo_nombre: 'Hidrolavadora', equipo_estado: 'operativo' }
+    const legada = { equipo_id: null, inventario_id: 'inv1', inventario_nombre: 'Trapeador', inventario_estado: 'dado_de_baja' }
+    expect([herramientaId(nueva), herramientaNombre(nueva), herramientaDeBaja(nueva)]).toEqual(['eq1', 'Hidrolavadora', false])
+    expect([herramientaId(legada), herramientaNombre(legada), herramientaDeBaja(legada)]).toEqual(['inv1', 'Trapeador', true])
+    expect(herramientaDeBaja({ equipo_id: 'eq2', inventario_id: null, equipo_estado: 'baja' })).toBe(true)
+    expect(herramientaDeBaja({ equipo_id: null, inventario_id: 'inv2', inventario_estado: 'disponible' })).toBe(false)
   })
 })
 

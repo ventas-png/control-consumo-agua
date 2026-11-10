@@ -21,6 +21,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: vi.fn(), notify: mocks.notify }))
 vi.mock('../../../shared/PromptDialog', () => ({ openPromptDialog: mocks.openPromptDialog }))
+vi.mock('../../../../domain/shared/storage', () => ({ removeCondominiosMedia: vi.fn(async () => ({ error: null })) }))
 
 const EquiposComunesTab = (await import('../EquiposComunesTab')).default
 
@@ -28,7 +29,7 @@ function bomba(over: Partial<EquipoComun> = {}): EquipoComun {
   return {
     id: 'e1', company_id: 'co1', project_id: 'p1', nombre: 'Bomba principal', categoria: 'bomba',
     marca: 'Pedrollo', modelo: 'CP 200', serial: 'SN-001', ubicacion: 'Cuarto de máquinas',
-    fecha_compra: '2025-01-15', valor_compra: 12000, vida_util_anios: 10, estado: 'operativo',
+    fecha_compra: '2025-01-15', valor_compra: 12000, vida_util_anios: 10, estado: 'operativo', cantidad: 1, foto_url: null,
     ultimo_mantenimiento: null, proximo_mantenimiento: null, notas: null, created_at: '2026-10-01T00:00:00Z', ...over,
   }
 }
@@ -67,8 +68,8 @@ describe('EquiposComunesTab — nuevo equipo en ventana emergente', () => {
     const [tabla, fila] = mocks.createCondominioRow.mock.calls[0] as unknown as Alta
     expect(tabla).toBe('equipos_comunes')
     expect(fila).toMatchObject({
-      company_id: 'co1', project_id: 'p1', nombre: 'Generador diésel', categoria: 'generador',
-      valor_compra: 45000, vida_util_anios: 15, estado: 'operativo', marca: null, serial: null,
+      company_id: 'co1', project_id: 'p1', nombre: 'Generador diésel', categoria: 'generador', cantidad: 1,
+      valor_compra: 45000, vida_util_anios: 15, estado: 'operativo', marca: null, serial: null, foto_url: null,
     })
     expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
     expect(mocks.onRefresh).toHaveBeenCalled()

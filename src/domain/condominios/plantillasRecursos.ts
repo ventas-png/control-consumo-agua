@@ -1,9 +1,10 @@
 // domain/condominios/plantillasRecursos.ts — recursos EN BLOQUE del catálogo de actividades:
 // agregar o quitar insumos, herramientas y equipo a varias actividades a la vez.
 //
-// La escritura la hace el servidor (`plantillas_recursos_en_bloque`, 20261031000200), de forma
-// atómica, bajo la RLS de las puentes y con el mismo permiso que editar una actividad en
-// pantalla. Aquí solo se arma la llamada y se traduce la respuesta.
+// La escritura la hace el servidor (`plantillas_recursos_en_bloque`, 20261031000200; desde
+// 20261122000000 las herramientas y el equipo salen de Equipos: `p_equipos`), de forma atómica,
+// bajo la RLS de las puentes y con el mismo permiso que editar una actividad en pantalla. Aquí
+// solo se arma la llamada y se traduce la respuesta.
 import { supabase } from '../../lib/supabase'
 import type { ResultadoRecursosBloque } from '../../types'
 
@@ -12,9 +13,13 @@ export type AccionBloque = 'agregar' | 'quitar'
 export interface RecursosBloque {
   /** Insumos (suministros_condominio): cantidad decimal > 0 (vacía = 1). */
   suministros: { id: string; cantidad?: number }[]
-  /** Herramientas y equipo (inventario_condominio): cantidad entera > 0 (vacía = 1). */
-  inventario: { id: string; cantidad?: number; obligatoria?: boolean }[]
+  /** Herramientas y equipo (equipos_comunes): cantidad entera > 0 (vacía = 1). */
+  equipos: { id: string; cantidad?: number; obligatoria?: boolean }[]
 }
+
+// Qué recurso (equipo o inventario legado) hay detrás de una herramienta planificada: puro,
+// vive aparte para que la ejecución guiada no cargue Supabase. Se re-exporta por comodidad.
+export { herramientaDeBaja, herramientaId, herramientaNombre } from './herramientasPlantilla'
 
 export const MAX_ACTIVIDADES_BLOQUE = 200
 export const MAX_RECURSOS_BLOQUE = 50
@@ -30,7 +35,7 @@ export async function aplicarRecursosEnBloque(
     p_plantilla_ids: plantillaIds,
     p_accion: accion,
     p_suministros: recursos.suministros.map((s) => ({ id: s.id, cantidad: s.cantidad ?? 1 })),
-    p_inventario: recursos.inventario.map((i) => ({ id: i.id, cantidad: i.cantidad ?? 1, obligatoria: i.obligatoria ?? false })),
+    p_equipos: recursos.equipos.map((e) => ({ id: e.id, cantidad: e.cantidad ?? 1, obligatoria: e.obligatoria ?? false })),
   })
   if (error) throw new Error(mensajeErrorBloque(error.message))
   return data as ResultadoRecursosBloque
