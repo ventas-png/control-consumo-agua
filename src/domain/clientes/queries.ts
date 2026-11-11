@@ -11,20 +11,28 @@ export interface CompanyClienteActivo {
   activo: boolean
 }
 
+/** Cuenta del portal de un cliente: existe, y si la empresa la tiene activa. */
+export interface CuentaPortalCliente {
+  activo: boolean
+}
+
 /**
- * Mapa clienteId → tiene cuenta de portal (app_users.cliente_id presente).
- * RLS acota el tenant; devolvemos solo los que matchean los ids dados.
+ * Mapa clienteId → cuenta del portal (app_users con role = cliente) de los ids
+ * dados. Va por la RPC `clientes_con_cuenta_portal` (20261123000000): leer
+ * app_users directo devolvía vacío para el staff, porque la policy de lectura
+ * sólo abre las filas con su company_id y las cuentas de cliente llevan
+ * company_id NULL a propósito (20260801000400) — por eso la pantalla decía
+ * «Sin cuenta» para todos. La RPC acota a los clientes vinculados a la empresa
+ * del llamador y al permiso de ver Clientes; sólo dice «existe» y «activa».
  */
-export async function fetchClienteAccountMap(clienteIds: string[]): Promise<Record<string, boolean>> {
-  const { data, error } = await supabase
-    .from('app_users')
-    .select('cliente_id')
-    .in('cliente_id', clienteIds)
+export async function fetchClienteAccountMap(clienteIds: string[]): Promise<Record<string, CuentaPortalCliente>> {
+  if (clienteIds.length === 0) return {}
+  const { data, error } = await supabase.rpc('clientes_con_cuenta_portal', { p_cliente_ids: clienteIds })
   reportDegradedQuery('clientes.fetchClienteAccountMap', error)
-  const map: Record<string, boolean> = {}
-  data?.forEach((u: { cliente_id: string | null }) => {
-    if (u.cliente_id) map[u.cliente_id] = true
-  })
+  const map: Record<string, CuentaPortalCliente> = {}
+  for (const row of (data ?? []) as { cliente_id: string | null; activo: boolean | null }[]) {
+    if (row.cliente_id) map[row.cliente_id] = { activo: row.activo ?? true }
+  }
   return map
 }
 

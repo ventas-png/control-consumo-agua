@@ -10,7 +10,7 @@ const h = vi.hoisted(() => {
     builder[m] = () => builder
   }
   builder.then = (resolve: (v: unknown) => void) => resolve(state.result)
-  return { state, builder, rpc: () => builder }
+  return { state, builder, rpc: vi.fn(() => builder) }
 })
 
 vi.mock('../../../lib/supabase', () => ({
@@ -34,7 +34,7 @@ import {
   buscarClienteParaOnboarding,
 } from '../queries'
 
-beforeEach(() => { h.state.result = { data: null, error: null } })
+beforeEach(() => { h.state.result = { data: null, error: null }; h.rpc.mockClear() })
 function setResult(r: unknown) { h.state.result = r }
 
 describe('clientes mutations', () => {
@@ -92,9 +92,15 @@ describe('clientes mutations', () => {
 })
 
 describe('clientes queries', () => {
-  it('fetchClienteAccountMap arma el mapa e ignora cliente_id null', async () => {
-    setResult({ data: [{ cliente_id: 'a' }, { cliente_id: null }, { cliente_id: 'b' }] })
-    expect(await fetchClienteAccountMap(['a', 'b'])).toEqual({ a: true, b: true })
+  it('fetchClienteAccountMap va por la RPC acotada (no por app_users), arma el mapa con «activa» e ignora cliente_id null', async () => {
+    setResult({ data: [{ cliente_id: 'a', activo: true }, { cliente_id: null, activo: true }, { cliente_id: 'b', activo: false }] })
+    expect(await fetchClienteAccountMap(['a', 'b'])).toEqual({ a: { activo: true }, b: { activo: false } })
+    expect(h.rpc).toHaveBeenCalledWith('clientes_con_cuenta_portal', { p_cliente_ids: ['a', 'b'] })
+  })
+
+  it('fetchClienteAccountMap sin ids no consulta nada', async () => {
+    expect(await fetchClienteAccountMap([])).toEqual({})
+    expect(h.rpc).not.toHaveBeenCalled()
   })
 
   it('fetchCompanyClientesActivoMap: activo ausente = true', async () => {
