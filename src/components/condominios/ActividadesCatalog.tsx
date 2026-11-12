@@ -13,10 +13,16 @@
 // Inventario y se muestran igual.
 //
 // GUARDADO: el formulario de la actividad es un BORRADOR (nada persiste hasta
-// "Guardar"); los recursos (insumos/herramientas) viven FUERA del formulario,
-// en el panel expandible de cada tarjeta, y cada cambio ahí se guarda al
-// instante — el panel lo dice. Así cancelar el formulario nunca deja cambios
-// ocultos ya persistidos.
+// "Guardar") y abre en ventana emergente (EditModal) sobre el catálogo, tanto
+// para crear como para editar; cerrarla descarta el borrador. Los recursos
+// (insumos/herramientas) viven FUERA del formulario, en el panel expandible de
+// cada tarjeta, y cada cambio ahí se guarda al instante — el panel lo dice. Así
+// cancelar el formulario nunca deja cambios ocultos ya persistidos.
+//
+// BUSCADOR: con muchas actividades el scroll no alcanza; el cuadro «Buscar
+// actividad» acota las tarjetas por título o descripción sin distinguir
+// mayúsculas ni acentos, y se combina con los filtros de servicio, estado y
+// cargo (también acota «Seleccionar todas»).
 //
 // EN BLOQUE (20261031000200): «⬆️ Carga masiva» crea actividades desde un archivo
 // (con sus recursos por nombre) y las casillas de las tarjetas + «Recursos en
@@ -27,6 +33,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
 import { EmptyState } from '../shared/EmptyState'
+import { EditModal } from '../shared/EditModal'
 import { SelectionToolbar } from '../shared/SelectionToolbar'
 import { useBulkSelection } from '../../hooks/useBulkSelection'
 import { ImportarActividadesModal } from './tabs/ImportarActividadesModal'
@@ -103,6 +110,10 @@ const labelStyle = {
 
 const idDePlantilla = (p: PlantillaTareaCargo) => p.id
 
+/** Para el buscador: minúsculas y sin tildes, así «baño» encuentra «BANO» y viceversa. */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 function blankForm() {
   return {
     cargo: '', titulo: '', descripcion: '', icono: '✅', orden: 0, area_id: '',
@@ -123,6 +134,7 @@ export function ActividadesCatalog({
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(blankForm())
   const [nuevoPaso, setNuevoPaso] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [filtroCargo, setFiltroCargo] = useState<string>('todos')
   const [filtroServicio, setFiltroServicio] = useState<string>(servicioInicial ?? 'todos')
   const [filtroEstado, setFiltroEstado] = useState<'todas' | 'activas' | 'inactivas'>('todas')
@@ -167,13 +179,15 @@ export function ActividadesCatalog({
 
   // ── Filtros y agrupación ───────────────────────────────────────────────────
   const cargosUsados = Array.from(new Set(plantillas.map(p => p.cargo))).sort()
+  const termino = sinAcentos(busqueda)
   const filtradas = useMemo(() => [...plantillas]
+    .filter(p => !termino || sinAcentos(p.titulo).includes(termino) || sinAcentos(p.descripcion).includes(termino))
     .filter(p => filtroCargo === 'todos' || p.cargo === filtroCargo)
     .filter(p => filtroServicio === 'todos'
       || (filtroServicio === 'pendiente' ? !p.servicio : p.servicio === filtroServicio))
     .filter(p => filtroEstado === 'todas' || (filtroEstado === 'activas' ? p.activo : !p.activo))
     .sort((a, b) => a.cargo.localeCompare(b.cargo) || a.orden - b.orden),
-  [plantillas, filtroCargo, filtroServicio, filtroEstado])
+  [plantillas, termino, filtroCargo, filtroServicio, filtroEstado])
 
   // Selección para «Recursos en bloque»: sobre las tarjetas VISIBLES (los filtros
   // acotan «Seleccionar todas»). Solo con permiso de editar.
@@ -210,6 +224,8 @@ export function ActividadesCatalog({
   }
 
   function resetForm() { setForm(blankForm()); setNuevoPaso(''); setEditId(null); setShowForm(false) }
+  /** Cerrar la ventana (Cancelar, ×, Escape, clic fuera) descarta el borrador; mientras guarda no se cierra. */
+  function cerrarForm() { if (saving) return; resetForm() }
 
   async function save() {
     if (!form.cargo.trim()) { notify({ variant: 'error', title: 'Error', text: 'Selecciona el cargo que desempeña la actividad.' }); return }
@@ -510,14 +526,27 @@ export function ActividadesCatalog({
         </div>
       )}
 
-      {/* Form — BORRADOR: nada persiste hasta Guardar */}
+      {/* Form — BORRADOR en ventana emergente: nada persiste hasta Guardar */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editId ? 'Editar actividad' : 'Nueva actividad'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+        <EditModal
+          title={editId ? 'Editar actividad' : 'Nueva actividad'}
+          onClose={cerrarForm}
+          size="lg"
+          fullScreenOnMobile
+          footer={
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={cerrarForm} disabled={saving} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+              <button type="button" onClick={save} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                {saving ? 'Guardando...' : editId ? 'Actualizar' : 'Guardar'}
+              </button>
+            </div>
+          }
+        >
+          {/* auto-fit: dos columnas en escritorio, una sola en el teléfono (hoja a pantalla completa). */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '14px' }}>
             <div>
-              <label style={labelStyle}>Servicio *</label>
-              <select value={form.servicio} onChange={e => setForm(f => ({ ...f, servicio: e.target.value as '' | ServicioOperativo }))} style={inputStyle} aria-label="Servicio de la actividad">
+              <label style={labelStyle} htmlFor="act-servicio">Servicio *</label>
+              <select id="act-servicio" value={form.servicio} autoFocus onChange={e => setForm(f => ({ ...f, servicio: e.target.value as '' | ServicioOperativo }))} style={inputStyle} aria-label="Servicio de la actividad">
                 <option value="">— Selecciona la familia —</option>
                 {SERVICIOS.map(s => <option key={s} value={s}>{SERVICIO_LABEL[s]}</option>)}
               </select>
@@ -528,8 +557,8 @@ export function ActividadesCatalog({
               )}
             </div>
             <div>
-              <label style={labelStyle}>Cargo que la desempeña *</label>
-              <select value={form.cargo} onChange={e => setForm(f => ({ ...f, cargo: e.target.value }))} style={inputStyle} aria-label="Cargo que desempeña la actividad">
+              <label style={labelStyle} htmlFor="act-cargo">Cargo que la desempeña *</label>
+              <select id="act-cargo" value={form.cargo} onChange={e => setForm(f => ({ ...f, cargo: e.target.value }))} style={inputStyle} aria-label="Cargo que desempeña la actividad">
                 <option value="">— Selecciona el cargo —</option>
                 {opcionesCargo.map(o => <option key={o.value} value={o.value}>{o.historico ? `${o.value} (valor histórico)` : o.label}</option>)}
               </select>
@@ -540,18 +569,18 @@ export function ActividadesCatalog({
               )}
             </div>
             <div>
-              <label style={labelStyle}>Título de la actividad *</label>
-              <input value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Limpiar lobby, Revisar bomba..." style={inputStyle} />
+              <label style={labelStyle} htmlFor="act-titulo">Título de la actividad *</label>
+              <input id="act-titulo" value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ej. Limpiar lobby, Revisar bomba..." style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle}>Duración estimada (min){form.servicio === 'limpieza' ? ' *' : ''}</label>
-              <input type="number" min={1} value={form.duracion} onChange={e => setForm(f => ({ ...f, duracion: e.target.value }))} placeholder="Ej. 45" style={inputStyle} />
+              <label style={labelStyle} htmlFor="act-duracion">Duración estimada (min){form.servicio === 'limpieza' ? ' *' : ''}</label>
+              <input id="act-duracion" type="number" min={1} value={form.duracion} onChange={e => setForm(f => ({ ...f, duracion: e.target.value }))} placeholder="Ej. 45" style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle}>Ícono</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1.5px solid var(--at-line)' }}>
+              <div style={labelStyle} id="act-icono-lbl">Ícono</div>
+              <div role="group" aria-labelledby="act-icono-lbl" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1.5px solid var(--at-line)' }}>
                 {ICONOS.map(ic => (
-                  <button key={ic} onClick={() => setForm(f => ({ ...f, icono: ic }))}
+                  <button key={ic} type="button" onClick={() => setForm(f => ({ ...f, icono: ic }))} aria-pressed={form.icono === ic}
                     style={{ width: '34px', height: '34px', fontSize: '18px', borderRadius: '7px', border: '2px solid', borderColor: form.icono === ic ? 'var(--at-warning)' : 'transparent', background: form.icono === ic ? 'var(--at-warning-tint)' : 'transparent', cursor: 'pointer' }}>
                     {ic}
                   </button>
@@ -560,18 +589,18 @@ export function ActividadesCatalog({
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div>
-                <label style={labelStyle}>Área (opcional)</label>
-                <select value={form.area_id} onChange={e => setForm(f => ({ ...f, area_id: e.target.value }))} style={inputStyle}>
+                <label style={labelStyle} htmlFor="act-area">Área (opcional)</label>
+                <select id="act-area" value={form.area_id} onChange={e => setForm(f => ({ ...f, area_id: e.target.value }))} style={inputStyle}>
                   <option value="">Sin área específica</option>
                   {areas.filter(a => a.activo).sort((a, b) => a.orden - b.orden).map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Orden</label>
-                <input type="number" value={form.orden} onChange={e => setForm(f => ({ ...f, orden: parseInt(e.target.value) || 0 }))} min={0} style={inputStyle} />
+                <label style={labelStyle} htmlFor="act-orden">Orden</label>
+                <input id="act-orden" type="number" value={form.orden} onChange={e => setForm(f => ({ ...f, orden: parseInt(e.target.value) || 0 }))} min={0} style={inputStyle} />
               </div>
               <div>
-                <label style={labelStyle}>Evidencias obligatorias al ejecutar</label>
+                <div style={labelStyle}>Evidencias obligatorias al ejecutar</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', color: 'var(--at-ink-2)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={form.requiere_foto} onChange={e => setForm(f => ({ ...f, requiere_foto: e.target.checked }))} />
@@ -589,52 +618,49 @@ export function ActividadesCatalog({
               </div>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Descripción / instrucciones</label>
-              <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Detalle de cómo realizar la actividad..." rows={2}
+              <label style={labelStyle} htmlFor="act-descripcion">Descripción / instrucciones</label>
+              <textarea id="act-descripcion" value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Detalle de cómo realizar la actividad..." rows={2}
                 style={{ ...inputStyle, resize: 'vertical' }} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Instrucciones de seguridad</label>
-              <textarea value={form.instrucciones_seguridad} onChange={e => setForm(f => ({ ...f, instrucciones_seguridad: e.target.value }))} placeholder="EPP requerido, bloqueo de área, manejo de químicos..." rows={2}
+              <label style={labelStyle} htmlFor="act-seguridad">Instrucciones de seguridad</label>
+              <textarea id="act-seguridad" value={form.instrucciones_seguridad} onChange={e => setForm(f => ({ ...f, instrucciones_seguridad: e.target.value }))} placeholder="EPP requerido, bloqueo de área, manejo de químicos..." rows={2}
                 style={{ ...inputStyle, resize: 'vertical' }} />
             </div>
 
             {/* Checklist de pasos */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={labelStyle}>Checklist ({form.checklist.length} paso{form.checklist.length !== 1 ? 's' : ''})</label>
+              <label style={labelStyle} htmlFor="act-paso">Checklist ({form.checklist.length} paso{form.checklist.length !== 1 ? 's' : ''})</label>
               {form.checklist.length > 0 && (
                 <ol style={{ margin: '0 0 8px', paddingLeft: '22px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {form.checklist.map((paso, i) => (
                     <li key={`${i}-${paso}`} style={{ fontSize: '13px', color: 'var(--at-ink-2)' }}>
                       {paso}
-                      <button onClick={() => quitarPaso(i)} aria-label={`Quitar paso ${paso}`}
+                      <button type="button" onClick={() => quitarPaso(i)} aria-label={`Quitar paso ${paso}`}
                         style={{ marginLeft: '8px', padding: '1px 7px', background: 'var(--at-danger-tint)', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '11px', color: 'var(--at-danger)' }}>✕</button>
                     </li>
                   ))}
                 </ol>
               )}
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input value={nuevoPaso} onChange={e => setNuevoPaso(e.target.value)}
+                <input id="act-paso" value={nuevoPaso} onChange={e => setNuevoPaso(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarPaso() } }}
                   placeholder="Ej. Barrer y trapear el piso" style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={agregarPaso} style={{ padding: '9px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>+ Paso</button>
+                <button type="button" onClick={agregarPaso} style={{ padding: '9px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>+ Paso</button>
               </div>
             </div>
             <div style={{ gridColumn: '1 / -1', fontSize: '12px', color: 'var(--at-ink-3)' }}>
               🧰 Los insumos y herramientas se gestionan desde el botón «Recursos» de la tarjeta, una vez guardada la actividad.
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={save} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando...' : editId ? 'Actualizar' : 'Guardar'}
-            </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
-      {/* Filtros: servicio + estado + cargo */}
+      {/* Filtros: buscador + servicio + estado + cargo */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px', alignItems: 'center' }}>
+        <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar actividad…" aria-label="Buscar actividad"
+          style={{ ...inputStyle, flex: '1 1 220px', minWidth: '180px', maxWidth: '360px' }} />
         <select value={filtroServicio} onChange={e => setFiltroServicio(e.target.value)} style={{ ...inputStyle, width: '210px' }} aria-label="Filtrar por servicio">
           <option value="todos">Todos los servicios</option>
           {SERVICIOS.map(s => <option key={s} value={s}>{SERVICIO_LABEL[s]}</option>)}
@@ -679,7 +705,9 @@ export function ActividadesCatalog({
         <EmptyState
           icon="🔍"
           title="Nada con esos filtros"
-          description="Ninguna actividad coincide con el servicio, cargo o estado seleccionados."
+          description={termino
+            ? `Ninguna actividad coincide con «${busqueda.trim()}» y los filtros de servicio, cargo o estado.`
+            : 'Ninguna actividad coincide con el servicio, cargo o estado seleccionados.'}
           compact
         />
       ) : (
