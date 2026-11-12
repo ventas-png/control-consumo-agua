@@ -33,6 +33,18 @@ concurrency:
 permissions:
   contents: read
 
+# Versión mayor de PostgreSQL bajo prueba: la de PRODUCCIÓN (Supabase), no la
+# que traiga la imagen del runner. scripts/ci/postgres-produccion.sh la deja
+# como ÚNICA versión instalada en cada job que levanta un Postgres local; los
+# sandboxes, que toman «la más nueva» de /usr/lib/postgresql/*/bin, ya no
+# tienen otra que elegir. Debe coincidir con la de schema-drift.yml y con la
+# mayor de `postgres` en scripts/schema-drift/huella-produccion.json
+# (src/__tests__/ciPostgresVersion.test.ts lo vigila). Cuando producción suba
+# de mayor: cambiar aquí y allá, recapturar la huella y revisar los asserts que
+# dependen de la versión (p. ej. 23503 → 23001 en FK ON DELETE RESTRICT).
+env:
+  PG_MAJOR: '17'
+
 jobs:
   coverage-gate:
     name: Coverage gate (lógica de negocio crítica)
@@ -150,6 +162,14 @@ jobs:
 
   rls-sandbox:
     name: RLS sandbox de recepción (Postgres desechable)
+    # La versión mayor de PostgreSQL bajo prueba NO depende de la imagen del
+    # runner: el paso `pg` (scripts/ci/postgres-produccion.sh) deja instalada
+    # SÓLO la de producción, $PG_MAJOR (ver `env` al inicio del archivo), y por
+    # eso este job vuelve a ubuntu-latest. Antes el paso tomaba «el Postgres
+    # más nuevo del runner»: cuando ubuntu-latest pasó a 26.04 con PostgreSQL
+    # 18, un FK ON DELETE RESTRICT reportó 23001 en vez de 23503 y
+    # rls-evidencias-asserts.sql falló sin que cambiara nada del repo. #1087
+    # lo fijó a ubuntu-24.04 (PostgreSQL 16) como parche; esto lo reemplaza.
     runs-on: ubuntu-latest
     # SIN gate por secretos, a diferencia de rls-harness: estos runners levantan
     # su propio Postgres y aplican el SQL del repo, así que corren en CADA PR y
@@ -158,18 +178,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Localizar el Postgres del runner
+      # Instala postgresql-$PG_MAJOR si falta, retira cualquier otra versión
+      # mayor y publica la ruta de binarios como `bin`: los sandboxes la reciben
+      # en PGBIN.
+      - name: Fijar PostgreSQL en la versión mayor de producción
         id: pg
-        run: |
-          set -euo pipefail
-          BIN="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | sort -V | tail -1 || true)"
-          if [ -z "$BIN" ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq postgresql
-            BIN="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
-          fi
-          echo "bin=$BIN" >> "$GITHUB_OUTPUT"
-          "$BIN/initdb" --version
+        run: scripts/ci/postgres-produccion.sh "$PG_MAJOR"
 
       - name: Motor de recepción — policies por clase
         env:
