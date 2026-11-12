@@ -13,6 +13,7 @@ import {
 import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { notify, confirm } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
 
 interface Props {
   personal: PersonalCondominio[]
@@ -59,6 +60,10 @@ const blank = (cargo: string, turno: string): Partial<PersonalCondominio> => ({
   user_id: null,
 })
 
+/** Para el buscador: minúsculas y sin tildes, así «perez» encuentra «Pérez» y viceversa. */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 // El índice único (project_id, user_id) de 20260826000000 protege el vínculo
 // aunque el selector ya deshabilite las cuentas tomadas (dos pestañas abiertas,
 // una lista servida antes de que otro admin asignara). Su mensaje crudo es
@@ -76,6 +81,10 @@ function mensajeGuardado(raw: string): string {
 export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId, companyId, moneda, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const cargoInicial = primerActivo(cargos, CARGOS_DEFAULT)
   const turnoInicial = primerActivo(tiposTurno, TURNOS_DEFAULT)
+  // Buscador: con muchos empleados el scroll no alcanza. Acota las tarjetas por
+  // nombre, teléfono, DPI, email o tag, sin distinguir mayúsculas ni acentos, y
+  // se combina con los filtros de estado y cargo.
+  const [busqueda, setBusqueda] = useState('')
   const [filtroCargo, setFiltroCargo] = useState<string>('todos')
   const [filtroEstado, setFiltroEstado] = useState<EstadoPersonal | 'todos'>('activo')
   const [form, setForm] = useState<Partial<PersonalCondominio>>(() => blank(cargoInicial, turnoInicial))
@@ -115,10 +124,13 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
   const ocultasSinAcceso = usuarios.length - asignables.length
   const sinCuenta = personal.filter(p => p.estado === 'activo' && !p.user_id).length
 
+  const termino = sinAcentos(busqueda)
+  const coincide = (p: PersonalCondominio) =>
+    !termino || [p.nombre, p.telefono, p.dpi, p.email, ...(p.tags ?? [])].some(v => sinAcentos(v).includes(termino))
   const filtered = personal.filter(p => {
     if (filtroCargo !== 'todos' && p.cargo !== filtroCargo) return false
     if (filtroEstado !== 'todos' && p.estado !== filtroEstado) return false
-    return true
+    return coincide(p)
   })
 
   const planillaMensual = personal.filter(p => p.estado === 'activo').reduce((s, p) => s + (p.salario ?? 0), 0)
@@ -170,6 +182,8 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
   }
 
   function cancelForm() { setShowForm(false); setEditId(null); setForm(blank(cargoInicial, turnoInicial)); setTagInput('') }
+  /** Cerrar la ventana (Cancelar, ×, Escape, clic fuera) descarta el borrador; mientras guarda no se cierra. */
+  function cerrarForm() { if (saving) return; cancelForm() }
 
   async function handleSave() {
     if (!form.nombre?.trim()) return notify({ variant: 'warning', title: 'Campo requerido', text: 'Ingresa el nombre.' })
@@ -280,26 +294,40 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
             </div>
           )}
         </div>
-        {canCreate && !showForm && (
+        {canCreate && (
           <button onClick={() => setShowForm(true)} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
             + Agregar Personal
           </button>
         )}
       </div>
 
+      {/* Formulario en ventana emergente — BORRADOR: nada persiste hasta Agregar/Actualizar */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1.5px solid var(--at-line)', borderRadius: '12px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '14px', fontWeight: 700 }}>{editId ? 'Editar Empleado' : 'Nuevo Empleado'}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '12px' }}>
+        <EditModal
+          title={editId ? 'Editar Empleado' : 'Nuevo Empleado'}
+          onClose={cerrarForm}
+          size="xl"
+          fullScreenOnMobile
+          footer={
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={cerrarForm} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
+              <button type="button" onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
+              </button>
+            </div>
+          }
+        >
+          {/* min(100%, 190px): en el teléfono (hoja a pantalla completa) una sola columna sin desbordar. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 190px), 1fr))', gap: '12px' }}>
 
             <div style={sectionTitleStyle}>Datos básicos</div>
             <div>
-              <label style={labelStyle}>Nombre *</label>
-              <input style={inputStyle} value={form.nombre ?? ''} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre completo" />
+              <label style={labelStyle} htmlFor="per-nombre">Nombre *</label>
+              <input id="per-nombre" style={inputStyle} autoFocus value={form.nombre ?? ''} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre completo" />
             </div>
             <div>
-              <label style={labelStyle}>Cargo</label>
-              <select style={inputStyle} aria-label="Cargo del empleado" value={form.cargo ?? cargoInicial} onChange={e => setForm(f => ({ ...f, cargo: e.target.value }))}>
+              <label style={labelStyle} htmlFor="per-cargo">Cargo</label>
+              <select id="per-cargo" style={inputStyle} aria-label="Cargo del empleado" value={form.cargo ?? cargoInicial} onChange={e => setForm(f => ({ ...f, cargo: e.target.value }))}>
                 {opcionesCargo.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
               {opcionesCargo.some(o => o.value === form.cargo && (o.inactivo || o.historico)) && (
@@ -309,40 +337,40 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
               )}
             </div>
             <div>
-              <label style={labelStyle}>Turno</label>
-              <select style={inputStyle} aria-label="Turno del empleado" value={form.turno ?? turnoInicial} onChange={e => setForm(f => ({ ...f, turno: e.target.value }))}>
+              <label style={labelStyle} htmlFor="per-turno">Turno</label>
+              <select id="per-turno" style={inputStyle} aria-label="Turno del empleado" value={form.turno ?? turnoInicial} onChange={e => setForm(f => ({ ...f, turno: e.target.value }))}>
                 {opcionesTurno.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Estado</label>
-              <select style={inputStyle} value={form.estado ?? 'activo'} onChange={e => setForm(f => ({ ...f, estado: e.target.value as EstadoPersonal }))}>
+              <label style={labelStyle} htmlFor="per-estado">Estado</label>
+              <select id="per-estado" style={inputStyle} value={form.estado ?? 'activo'} onChange={e => setForm(f => ({ ...f, estado: e.target.value as EstadoPersonal }))}>
                 {Object.entries(ESTADO_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Teléfono</label>
-              <input style={inputStyle} value={form.telefono ?? ''} onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} placeholder="+502 0000-0000" />
+              <label style={labelStyle} htmlFor="per-telefono">Teléfono</label>
+              <input id="per-telefono" style={inputStyle} value={form.telefono ?? ''} onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} placeholder="+502 0000-0000" />
             </div>
             <div>
-              <label style={labelStyle}>Email</label>
-              <input style={inputStyle} type="email" value={form.email ?? ''} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-email">Email</label>
+              <input id="per-email" style={inputStyle} type="email" value={form.email ?? ''} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>DPI / Identificación</label>
-              <input style={inputStyle} value={form.dpi ?? ''} onChange={e => setForm(f => ({ ...f, dpi: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-dpi-identificacion">DPI / Identificación</label>
+              <input id="per-dpi-identificacion" style={inputStyle} value={form.dpi ?? ''} onChange={e => setForm(f => ({ ...f, dpi: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Fecha de ingreso</label>
-              <input style={inputStyle} type="date" value={form.fecha_ingreso ?? ''} onChange={e => setForm(f => ({ ...f, fecha_ingreso: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-fecha-de-ingreso">Fecha de ingreso</label>
+              <input id="per-fecha-de-ingreso" style={inputStyle} type="date" value={form.fecha_ingreso ?? ''} onChange={e => setForm(f => ({ ...f, fecha_ingreso: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>🎂 Fecha de nacimiento</label>
-              <input style={inputStyle} type="date" value={form.fecha_nacimiento ?? ''} onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-fecha-de-nacimiento">🎂 Fecha de nacimiento</label>
+              <input id="per-fecha-de-nacimiento" style={inputStyle} type="date" value={form.fecha_nacimiento ?? ''} onChange={e => setForm(f => ({ ...f, fecha_nacimiento: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Salario mensual ({moneda})</label>
-              <input style={inputStyle} type="number" min="0" step="0.01" value={form.salario ?? ''} onChange={e => setForm(f => ({ ...f, salario: e.target.value ? Number(e.target.value) : undefined }))} placeholder="0.00" />
+              <label style={labelStyle} htmlFor="per-salario-mensual-moneda">Salario mensual ({moneda})</label>
+              <input id="per-salario-mensual-moneda" style={inputStyle} type="number" min="0" step="0.01" value={form.salario ?? ''} onChange={e => setForm(f => ({ ...f, salario: e.target.value ? Number(e.target.value) : undefined }))} placeholder="0.00" />
             </div>
 
             {/* Fotografía */}
@@ -419,16 +447,16 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
             {/* Afiliaciones */}
             <div style={sectionTitleStyle}>Afiliaciones</div>
             <div>
-              <label style={labelStyle}>No. IGSS</label>
-              <input style={inputStyle} value={form.numero_igss ?? ''} onChange={e => setForm(f => ({ ...f, numero_igss: e.target.value }))} placeholder="Seguridad social" />
+              <label style={labelStyle} htmlFor="per-no-igss">No. IGSS</label>
+              <input id="per-no-igss" style={inputStyle} value={form.numero_igss ?? ''} onChange={e => setForm(f => ({ ...f, numero_igss: e.target.value }))} placeholder="Seguridad social" />
             </div>
             <div>
-              <label style={labelStyle}>No. IRTRA</label>
-              <input style={inputStyle} value={form.numero_irtra ?? ''} onChange={e => setForm(f => ({ ...f, numero_irtra: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-no-irtra">No. IRTRA</label>
+              <input id="per-no-irtra" style={inputStyle} value={form.numero_irtra ?? ''} onChange={e => setForm(f => ({ ...f, numero_irtra: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>NIT</label>
-              <input style={inputStyle} value={form.nit ?? ''} onChange={e => setForm(f => ({ ...f, nit: e.target.value }))} placeholder="Identificación tributaria" />
+              <label style={labelStyle} htmlFor="per-nit">NIT</label>
+              <input id="per-nit" style={inputStyle} value={form.nit ?? ''} onChange={e => setForm(f => ({ ...f, nit: e.target.value }))} placeholder="Identificación tributaria" />
             </div>
 
             {/* Contactos de emergencia */}
@@ -439,60 +467,60 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
                   <input style={{ ...miniInput, flex: '2 1 160px' }} value={c.nombre} onChange={e => updContacto(i, { nombre: e.target.value })} placeholder="Nombre" />
                   <input style={{ ...miniInput, flex: '1 1 110px' }} value={c.parentesco ?? ''} onChange={e => updContacto(i, { parentesco: e.target.value })} placeholder="Parentesco" />
                   <input style={{ ...miniInput, flex: '1 1 130px' }} value={c.telefono ?? ''} onChange={e => updContacto(i, { telefono: e.target.value })} placeholder="Teléfono" />
-                  <button onClick={() => rmContacto(i)} style={rmRowStyle}>✕</button>
+                  <button type="button" onClick={() => rmContacto(i)} style={rmRowStyle}>✕</button>
                 </div>
               ))}
-              <button onClick={addContacto} style={{ ...addBtnStyle, alignSelf: 'flex-start' }}>+ Agregar contacto</button>
+              <button type="button" onClick={addContacto} style={{ ...addBtnStyle, alignSelf: 'flex-start' }}>+ Agregar contacto</button>
             </div>
 
             {/* Datos médicos */}
             <div style={sectionTitleStyle}>🩺 Datos médicos</div>
             <div>
-              <label style={labelStyle}>Tipo de sangre</label>
-              <select style={inputStyle} value={form.tipo_sangre ?? ''} onChange={e => setForm(f => ({ ...f, tipo_sangre: e.target.value }))}>
+              <label style={labelStyle} htmlFor="per-tipo-de-sangre">Tipo de sangre</label>
+              <select id="per-tipo-de-sangre" style={inputStyle} value={form.tipo_sangre ?? ''} onChange={e => setForm(f => ({ ...f, tipo_sangre: e.target.value }))}>
                 <option value="">—</option>
                 {TIPOS_SANGRE.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Alergias / condiciones médicas</label>
-              <input style={inputStyle} value={form.alergias ?? ''} onChange={e => setForm(f => ({ ...f, alergias: e.target.value }))} placeholder="Penicilina, asma, diabetes…" />
+            <div style={fullCol}>
+              <label style={labelStyle} htmlFor="per-alergias-condiciones-medicas">Alergias / condiciones médicas</label>
+              <input id="per-alergias-condiciones-medicas" style={inputStyle} value={form.alergias ?? ''} onChange={e => setForm(f => ({ ...f, alergias: e.target.value }))} placeholder="Penicilina, asma, diabetes…" />
             </div>
 
             {/* Datos de contrato */}
             <div style={sectionTitleStyle}>📄 Contrato</div>
             <div>
-              <label style={labelStyle}>Tipo de contrato</label>
-              <select style={inputStyle} value={form.tipo_contrato ?? ''} onChange={e => setForm(f => ({ ...f, tipo_contrato: e.target.value }))}>
+              <label style={labelStyle} htmlFor="per-tipo-de-contrato">Tipo de contrato</label>
+              <select id="per-tipo-de-contrato" style={inputStyle} value={form.tipo_contrato ?? ''} onChange={e => setForm(f => ({ ...f, tipo_contrato: e.target.value }))}>
                 <option value="">—</option>
                 {TIPOS_CONTRATO.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Fin de contrato</label>
-              <input style={inputStyle} type="date" value={form.fecha_fin_contrato ?? ''} onChange={e => setForm(f => ({ ...f, fecha_fin_contrato: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-fin-de-contrato">Fin de contrato</label>
+              <input id="per-fin-de-contrato" style={inputStyle} type="date" value={form.fecha_fin_contrato ?? ''} onChange={e => setForm(f => ({ ...f, fecha_fin_contrato: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Supervisor / jefe directo</label>
-              <input style={inputStyle} value={form.supervisor ?? ''} onChange={e => setForm(f => ({ ...f, supervisor: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-supervisor-jefe-directo">Supervisor / jefe directo</label>
+              <input id="per-supervisor-jefe-directo" style={inputStyle} value={form.supervisor ?? ''} onChange={e => setForm(f => ({ ...f, supervisor: e.target.value }))} />
             </div>
 
             {/* Datos personales */}
             <div style={sectionTitleStyle}>🏠 Datos personales</div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={labelStyle}>Dirección</label>
-              <input style={inputStyle} value={form.direccion ?? ''} onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))} />
+            <div style={fullCol}>
+              <label style={labelStyle} htmlFor="per-direccion">Dirección</label>
+              <input id="per-direccion" style={inputStyle} value={form.direccion ?? ''} onChange={e => setForm(f => ({ ...f, direccion: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Género</label>
-              <select style={inputStyle} value={form.genero ?? ''} onChange={e => setForm(f => ({ ...f, genero: e.target.value }))}>
+              <label style={labelStyle} htmlFor="per-genero">Género</label>
+              <select id="per-genero" style={inputStyle} value={form.genero ?? ''} onChange={e => setForm(f => ({ ...f, genero: e.target.value }))}>
                 <option value="">—</option>
                 {GENEROS.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Estado civil</label>
-              <select style={inputStyle} value={form.estado_civil ?? ''} onChange={e => setForm(f => ({ ...f, estado_civil: e.target.value }))}>
+              <label style={labelStyle} htmlFor="per-estado-civil">Estado civil</label>
+              <select id="per-estado-civil" style={inputStyle} value={form.estado_civil ?? ''} onChange={e => setForm(f => ({ ...f, estado_civil: e.target.value }))}>
                 <option value="">—</option>
                 {ESTADOS_CIVILES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -501,16 +529,16 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
             {/* Datos bancarios */}
             <div style={sectionTitleStyle}>🏦 Datos bancarios (planilla)</div>
             <div>
-              <label style={labelStyle}>Banco</label>
-              <input style={inputStyle} value={form.banco ?? ''} onChange={e => setForm(f => ({ ...f, banco: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-banco">Banco</label>
+              <input id="per-banco" style={inputStyle} value={form.banco ?? ''} onChange={e => setForm(f => ({ ...f, banco: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>No. de cuenta</label>
-              <input style={inputStyle} value={form.numero_cuenta ?? ''} onChange={e => setForm(f => ({ ...f, numero_cuenta: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-no-de-cuenta">No. de cuenta</label>
+              <input id="per-no-de-cuenta" style={inputStyle} value={form.numero_cuenta ?? ''} onChange={e => setForm(f => ({ ...f, numero_cuenta: e.target.value }))} />
             </div>
             <div>
-              <label style={labelStyle}>Tipo de cuenta</label>
-              <select style={inputStyle} value={form.tipo_cuenta ?? ''} onChange={e => setForm(f => ({ ...f, tipo_cuenta: e.target.value }))}>
+              <label style={labelStyle} htmlFor="per-tipo-de-cuenta">Tipo de cuenta</label>
+              <select id="per-tipo-de-cuenta" style={inputStyle} value={form.tipo_cuenta ?? ''} onChange={e => setForm(f => ({ ...f, tipo_cuenta: e.target.value }))}>
                 <option value="">—</option>
                 {TIPOS_CUENTA.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
@@ -526,10 +554,10 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
                   </select>
                   <input style={{ ...miniInput, flex: '1 1 130px' }} value={c.codigo} onChange={e => updCodigo(i, { codigo: e.target.value })} placeholder="Código / No." />
                   <input style={{ ...miniInput, flex: '2 1 150px' }} value={c.descripcion ?? ''} onChange={e => updCodigo(i, { descripcion: e.target.value })} placeholder="Descripción (ej. portón principal)" />
-                  <button onClick={() => rmCodigo(i)} style={rmRowStyle}>✕</button>
+                  <button type="button" onClick={() => rmCodigo(i)} style={rmRowStyle}>✕</button>
                 </div>
               ))}
-              <button onClick={addCodigo} style={{ ...addBtnStyle, alignSelf: 'flex-start' }}>+ Agregar código</button>
+              <button type="button" onClick={addCodigo} style={{ ...addBtnStyle, alignSelf: 'flex-start' }}>+ Agregar código</button>
             </div>
 
             {/* Equipo asignado */}
@@ -541,10 +569,10 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
                   <input style={{ ...miniInput, flex: '0 1 80px' }} type="number" min="1" value={eq.cantidad ?? ''} onChange={e => updEquipo(i, { cantidad: e.target.value ? Number(e.target.value) : undefined })} placeholder="Cant." />
                   <input style={{ ...miniInput, flex: '1 1 130px' }} type="date" value={eq.fecha_entrega ?? ''} onChange={e => updEquipo(i, { fecha_entrega: e.target.value })} />
                   <input style={{ ...miniInput, flex: '2 1 130px' }} value={eq.notas ?? ''} onChange={e => updEquipo(i, { notas: e.target.value })} placeholder="Notas" />
-                  <button onClick={() => rmEquipo(i)} style={rmRowStyle}>✕</button>
+                  <button type="button" onClick={() => rmEquipo(i)} style={rmRowStyle}>✕</button>
                 </div>
               ))}
-              <button onClick={addEquipo} style={{ ...addBtnStyle, alignSelf: 'flex-start' }}>+ Agregar equipo</button>
+              <button type="button" onClick={addEquipo} style={{ ...addBtnStyle, alignSelf: 'flex-start' }}>+ Agregar equipo</button>
             </div>
 
             {/* Tags */}
@@ -554,36 +582,33 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
                 {tags.map(t => (
                   <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px', background: 'var(--at-primary-soft)', color: 'var(--at-primary)', borderRadius: '20px', fontSize: '12px', fontWeight: 600 }}>
                     {t}
-                    <button onClick={() => rmTag(t)} style={{ border: 'none', background: 'transparent', color: 'var(--at-primary)', cursor: 'pointer', fontSize: '13px', lineHeight: 1, padding: 0 }}>×</button>
+                    <button type="button" onClick={() => rmTag(t)} style={{ border: 'none', background: 'transparent', color: 'var(--at-primary)', cursor: 'pointer', fontSize: '13px', lineHeight: 1, padding: 0 }}>×</button>
                   </span>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input style={{ ...inputStyle, flex: 1 }} value={tagInput}
+                <input style={{ ...inputStyle, flex: 1 }} value={tagInput} aria-label="Nuevo tag"
                   onChange={e => setTagInput(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
                   placeholder="Escribe un tag y presiona Enter" />
-                <button onClick={addTag} style={addBtnStyle}>+ Agregar</button>
+                <button type="button" onClick={addTag} style={addBtnStyle}>+ Agregar</button>
               </div>
             </div>
 
             {/* Notas */}
             <div style={fullCol}>
-              <label style={labelStyle}>Notas</label>
-              <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '50px' }} value={form.notas ?? ''} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
+              <label style={labelStyle} htmlFor="per-notas">Notas</label>
+              <textarea id="per-notas" style={{ ...inputStyle, resize: 'vertical', minHeight: '50px' }} value={form.notas ?? ''} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-            <button onClick={cancelForm} style={{ padding: '8px 16px', background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', color: 'var(--at-ink-3)' }}>Cancelar</button>
-            <button onClick={handleSave} disabled={saving} style={{ padding: '8px 16px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Guardando…' : editId ? 'Actualizar' : 'Agregar'}
-            </button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
-      {/* Filtros */}
+      {/* Buscador + filtros */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar empleado…" aria-label="Buscar empleado"
+          style={{ ...inputStyle, width: 'auto', flex: '1 1 200px', minWidth: '170px', maxWidth: '320px', padding: '6px 10px', fontSize: '12.5px' }} />
         {(['todos', 'activo', 'inactivo', 'vacaciones', 'incapacidad'] as const).map(e => (
           <button key={e} onClick={() => setFiltroEstado(e)}
             style={{ padding: '5px 12px', borderRadius: '20px', border: '1.5px solid', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
@@ -604,8 +629,12 @@ export function PersonalTab({ personal, cargos = [], tiposTurno = [], proyectoId
       {/* Cards grid */}
       {filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>👥</div>
-          <p style={{ margin: 0, fontWeight: 600 }}>No hay personal registrado</p>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>{personal.length === 0 ? '👥' : '🔍'}</div>
+          <p style={{ margin: 0, fontWeight: 600 }}>
+            {personal.length === 0
+              ? 'No hay personal registrado'
+              : termino ? `Nadie coincide con «${busqueda.trim()}» y los filtros` : 'Nadie coincide con los filtros'}
+          </p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
