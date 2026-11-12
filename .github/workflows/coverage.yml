@@ -150,7 +150,13 @@ jobs:
 
   rls-sandbox:
     name: RLS sandbox de recepción (Postgres desechable)
-    runs-on: ubuntu-latest
+    # ubuntu-24.04 FIJO, no ubuntu-latest. El paso `pg` usa el Postgres más
+    # nuevo del runner, y ubuntu-latest pasó a 26.04 con PostgreSQL 18
+    # preinstalado (producción corre 17.6). En 18 un FK ON DELETE RESTRICT
+    # reporta 23001 en vez de 23503, y rls-evidencias-asserts.sql falló sin
+    # que cambiara nada del repo. Se sube cuando se fije la misma versión
+    # mayor que producción.
+    runs-on: ubuntu-24.04
     # SIN gate por secretos, a diferencia de rls-harness: estos runners levantan
     # su propio Postgres y aplican el SQL del repo, así que corren en CADA PR y
     # fallan de verdad. Son la única verificación conductual de la RLS de
