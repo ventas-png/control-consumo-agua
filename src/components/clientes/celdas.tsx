@@ -94,10 +94,11 @@ export function ContactoCell({ cliente: c }: { cliente: Cliente }) {
 }
 
 export function CuentaCell({
-  cliente: c, hasAccount, activoEntry, canEdit, onToggleActivo,
+  cliente: c, cuenta, activoEntry, canEdit, onToggleActivo,
 }: {
   cliente: Cliente
-  hasAccount: boolean
+  /** Cuenta del portal del cliente (undefined = no tiene). */
+  cuenta: { activo: boolean } | undefined
   activoEntry: { ccId: string; activo: boolean } | undefined
   canEdit: boolean
   onToggleActivo: (id: string) => void
@@ -114,9 +115,11 @@ export function CuentaCell({
       }}>
         {c.puede_crear_cuenta ? 'Habilitado' : 'Deshabilitado'}
       </span>
-      {hasAccount ? (
+      {cuenta ? (
         <>
-          <span style={{ ...pill, background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' }}>Cuenta activa</span>
+          {cuenta.activo
+            ? <span style={{ ...pill, background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)' }}>Cuenta activa</span>
+            : <span style={{ ...pill, background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)' }} title="La cuenta del portal existe pero está desactivada">Cuenta inactiva</span>}
           {canEdit && activoEntry && (
             <button
               onClick={() => onToggleActivo(c.id)}

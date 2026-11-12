@@ -5,6 +5,7 @@ import type { Cliente, ClienteLookupResult, Unidad } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import {
+  type CuentaPortalCliente,
   fetchClienteAccountMap,
   fetchCompanyClientesActivoMap,
   buscarClienteParaOnboarding,
@@ -72,7 +73,7 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
   const [lookupResult, setLookupResult] = useState<ClienteLookupResult | null>(null)
 
   // Portal account status per cliente
-  const [accountMap, setAccountMap] = useState<Record<string, boolean>>({})
+  const [accountMap, setAccountMap] = useState<Record<string, CuentaPortalCliente>>({})
   // company_clientes activo per cliente
   const [activoMap, setActivoMap] = useState<Record<string, { ccId: string; activo: boolean }>>({})
 
@@ -448,7 +449,7 @@ export function ClientesSection({ clientes, unidades = [], userId, companyId, on
         render: c => (
           <CuentaCell
             cliente={c}
-            hasAccount={!!accountMap[c.id]}
+            cuenta={accountMap[c.id]}
             activoEntry={activoMap[c.id]}
             canEdit={canEdit}
             onToggleActivo={handleToggleActivo}

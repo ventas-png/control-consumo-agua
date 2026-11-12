@@ -24861,6 +24861,13 @@ export type Database = {
           template_key: string
         }[]
       }
+      clientes_con_cuenta_portal: {
+        Args: { p_cliente_ids: string[] }
+        Returns: {
+          activo: boolean
+          cliente_id: string
+        }[]
+      }
       company_has_feature: {
         Args: { p_company_id: string; p_feature_code: string }
         Returns: boolean
