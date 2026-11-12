@@ -113,6 +113,17 @@ concurrency:
 permissions:
   contents: read
 
+# Versión mayor de PostgreSQL con la que se reconstruyen M y R: la MISMA en la
+# que se captura P (`postgres` en scripts/schema-drift/huella-produccion.json).
+# Si difieren, el catálogo cambia por la versión y no por el esquema —18 guarda
+# los NOT NULL como filas de pg_constraint y movería todos los grupos
+# /constraints—. scripts/ci/postgres-produccion.sh la deja como única versión
+# instalada en el runner; debe coincidir con la de coverage.yml
+# (src/__tests__/ciPostgresVersion.test.ts lo vigila). Al subir producción de
+# mayor: cambiar aquí y en coverage.yml, y recapturar la huella.
+env:
+  PG_MAJOR: '17'
+
 jobs:
   # ══════════════════════════════════════════════════════════════════════════
   # VERIFICAR — que el auditor sirva
@@ -131,12 +142,14 @@ jobs:
   # primer error.
   verificar:
     name: Pruebas del auditor
-    # ubuntu-24.04 FIJO, no ubuntu-latest: la huella de producción se captura
-    # en PostgreSQL 17 y ubuntu-latest pasó a 26.04 con PostgreSQL 18, que
-    # guarda los NOT NULL como filas de pg_constraint. Reconstruir con 18
-    # mueve todos los grupos /constraints («quitar un NOT NULL movió 2
-    # grupos» en --verificar-huella, y cientos de DRIFT NUEVO falsos).
-    runs-on: ubuntu-24.04
+    # La versión mayor de PostgreSQL la fija el paso de abajo
+    # (scripts/ci/postgres-produccion.sh, $PG_MAJOR), no la imagen del runner,
+    # y por eso vuelve a ubuntu-latest. Cuando ubuntu-latest pasó a 26.04 con
+    # PostgreSQL 18 —que guarda los NOT NULL como filas de pg_constraint— la
+    # reconstrucción movió todos los grupos /constraints («quitar un NOT NULL
+    # movió 2 grupos» en --verificar-huella, y cientos de DRIFT NUEVO falsos);
+    # #1087 lo fijó a ubuntu-24.04 como parche, y esto lo reemplaza.
+    runs-on: ubuntu-latest
     outputs:
       base: ${{ steps.base.outputs.ref }}
     steps:
@@ -150,13 +163,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Comprobar que hay servidor de Postgres (no sólo psql)
-        run: |
-          set -euo pipefail
-          if ! ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1; then
-            sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
-          fi
-          ls -d /usr/lib/postgresql/*/bin | tail -1
+      - name: Fijar PostgreSQL en la versión mayor de producción
+        run: scripts/ci/postgres-produccion.sh "$PG_MAJOR"
 
       # ── M: qué se compara como «rama base» ─────────────────────────────
       #
@@ -303,8 +311,8 @@ jobs:
   veredicto:
     name: Auditar drift en tres vías (offline, sin credenciales)
     needs: verificar
-    # Mismo runner que `verificar`, por la misma razón (ver arriba).
-    runs-on: ubuntu-24.04
+    # Mismo runner y mismo PostgreSQL que `verificar`, por la misma razón.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
@@ -314,13 +322,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Comprobar que hay servidor de Postgres (no sólo psql)
-        run: |
-          set -euo pipefail
-          if ! ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1; then
-            sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
-          fi
-          ls -d /usr/lib/postgresql/*/bin | tail -1
+      - name: Fijar PostgreSQL en la versión mayor de producción
+        run: scripts/ci/postgres-produccion.sh "$PG_MAJOR"
 
       - name: Auditar drift en tres vías (offline, sin credenciales)
         env:
