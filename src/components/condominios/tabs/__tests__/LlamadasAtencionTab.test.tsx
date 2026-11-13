@@ -211,3 +211,25 @@ describe('LlamadasAtencionTab — acuse en persona, anular, PDF', () => {
 eliminarExigeSuPermiso('Llamadas de atención', p => render(
   <LlamadasAtencionTab llamadas={[pendiente]} personal={personal} proyectoId="p1" companyId="co1" canCreate canChangeStatus {...p} onRefresh={() => {}} />,
 ), /^Eliminar Llegada tarde$/, mocks.deleteCondominioRow, 'llamadas_atencion_personal', 'll1')
+
+describe('LlamadasAtencionTab — buscador', () => {
+  const carta = (nombre: RegExp) => screen.queryByRole('button', { name: nombre })
+  const buscador = () => screen.getByRole('searchbox', { name: 'Buscar empleado o asunto' })
+
+  it('acota por empleado o asunto sin distinguir mayúsculas ni acentos', () => {
+    renderTab()
+    expect(carta(/Ver carta de Elena/)).toBeTruthy()
+    expect(carta(/Ver carta de Pedro/)).toBeTruthy()
+    fireEvent.change(buscador(), { target: { value: 'pédro' } })
+    expect(carta(/Ver carta de Pedro/)).toBeTruthy()
+    expect(carta(/Ver carta de Elena/)).toBeNull()
+    fireEvent.change(buscador(), { target: { value: 'LLEGADA' } })
+    expect(carta(/Ver carta de Elena/)).toBeTruthy()
+    expect(carta(/Ver carta de Pedro/)).toBeNull()
+    fireEvent.change(buscador(), { target: { value: 'nadie' } })
+    expect(screen.getByText('Ninguna coincide con «nadie» y el filtro.')).toBeTruthy()
+    fireEvent.change(buscador(), { target: { value: '' } })
+    expect(carta(/Ver carta de Elena/)).toBeTruthy()
+    expect(carta(/Ver carta de Pedro/)).toBeTruthy()
+  })
+})

@@ -40,6 +40,10 @@ const BLANK = {
   fecha_hechos: hoyLocalISO(), motivo: '', descripcion: '', fundamento: '', dias_suspension: '',
 }
 
+/** Para el buscador: minúsculas y sin tildes, así «perez» encuentra «Pérez» y viceversa (igual que Personal y Plantillas). */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 const inp: CSSProperties = { width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: 'var(--at-ink)', background: 'var(--at-surface-2)', boxSizing: 'border-box' }
 const lbl: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--at-ink-3)', display: 'block', marginBottom: '3px' }
 
@@ -71,9 +75,10 @@ export default function LlamadasAtencionTab({ llamadas, personal, cargos = [], p
   )
   const empleadoElegido = personalActivo.find(p => p.id === form.personal_id)
 
+  const termino = sinAcentos(busqueda)
   const lista = llamadas.filter(l =>
     (!filtroEstado || l.estado === filtroEstado) &&
-    (!busqueda || l.empleado_nombre.toLowerCase().includes(busqueda.toLowerCase()) || l.motivo.toLowerCase().includes(busqueda.toLowerCase())),
+    (!termino || sinAcentos(l.empleado_nombre).includes(termino) || sinAcentos(l.motivo).includes(termino)),
   )
   const detail = selected ? llamadas.find(l => l.id === selected) ?? null : null
 
@@ -172,7 +177,7 @@ export default function LlamadasAtencionTab({ llamadas, personal, cargos = [], p
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar empleado o asunto…" aria-label="Buscar empleado o asunto"
+          <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="🔍 Buscar empleado o asunto…" aria-label="Buscar empleado o asunto"
             style={{ ...inp, width: 'auto', minWidth: 200 }} />
           <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value as EstadoLlamadaAtencion | '')} aria-label="Filtrar por estado" style={{ ...inp, width: 'auto' }}>
             <option value="">Todos los estados</option>
@@ -271,7 +276,9 @@ export default function LlamadasAtencionTab({ llamadas, personal, cargos = [], p
 
       {/* Lista */}
       {lista.length === 0 ? (
-        <EmptyState icon="⚠️" title="Sin llamadas de atención" description={llamadas.length ? 'Ninguna coincide con el filtro.' : 'Las cartas que emitas quedan aquí con su acuse de recibido.'} />
+        <EmptyState icon="⚠️" title="Sin llamadas de atención"
+          description={!llamadas.length ? 'Las cartas que emitas quedan aquí con su acuse de recibido.'
+            : termino ? `Ninguna coincide con «${busqueda.trim()}» y el filtro.` : 'Ninguna coincide con el filtro.'} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {lista.map(l => {
