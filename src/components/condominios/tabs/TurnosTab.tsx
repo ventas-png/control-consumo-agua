@@ -86,6 +86,10 @@ const card: CSSProperties = {
   borderRadius: 10, padding: 14,
 }
 
+/** Para el buscador: minúsculas y sin tildes, así «perez» encuentra «Pérez» y viceversa (igual que Personal y Plantillas). */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 const formJornadaVacio = {
   nombre: '', codigo: '', turno: 'manana' as TurnoTipo,
   hora_inicio: '06:00', hora_fin: '14:00', minutos_descanso: '0',
@@ -124,6 +128,11 @@ interface DiaEnEdicion { fecha: string; personalId: string }
  * hay en `bloques_turno` y, donde no hay nada, lo que las reglas predicen (ver
  * `celdaDe` en domain/condominios/turnos.ts). Por eso se puede abrir un mes del
  * año que viene sin haber generado nada.
+ *
+ * Un solo buscador sirve a las tres vistas: acota las filas del calendario, las
+ * reglas y las jornadas por nombre (y cargo, empleado o código, según la vista)
+ * sin distinguir mayúsculas ni acentos. Filtra lo que se PINTA, no lo que se
+ * calcula: el resumen del mes y «Generar» siguen siendo de todo el personal.
  */
 export default function TurnosTab({
   plantillas, asignaciones, bloques, ausencias, diasNoLaborables, excepciones, personal,
@@ -131,6 +140,7 @@ export default function TurnosTab({
 }: Props) {
   const hoy = hoyLocalISO()
   const [vista, setVista] = useState<Vista>('calendario')
+  const [busqueda, setBusqueda] = useState('')
   const [cursor, setCursor] = useState(() => {
     const [y, m] = hoy.split('-').map(Number)
     return { year: y, month: m - 1 }
@@ -303,6 +313,20 @@ export default function TurnosTab({
     () => Object.fromEntries(plantillas.map(p => [p.id, p])) as Record<string, PlantillaHorario>,
     [plantillas],
   )
+
+  // ── Buscador ──────────────────────────────────────────────────────────────
+  const termino = sinAcentos(busqueda)
+  const coincide = (...campos: (string | null | undefined)[]) =>
+    !termino || campos.some(c => sinAcentos(c).includes(termino))
+  const empleadosVisibles = empleados.filter(e => coincide(e.nombre, e.cargo))
+  const asignacionesVisibles = asignaciones.filter(r => {
+    const j = plantillaPorId[r.plantilla_horario_id]
+    return coincide(r.nombre, r.personal_nombre, j?.nombre, j?.codigo)
+  })
+  const plantillasVisibles = plantillas.filter(j => coincide(j.nombre, j.codigo))
+  const placeholderBusqueda = vista === 'calendario'
+    ? 'Buscar empleado…'
+    : vista === 'reglas' ? 'Buscar regla, empleado o jornada…' : 'Buscar jornada…'
 
   // ── Jornadas ──────────────────────────────────────────────────────────────
 
@@ -643,8 +667,13 @@ export default function TurnosTab({
         value={vista}
         onChange={setVista}
         ariaLabel="Vistas de asignación de turnos"
-        marginBottom={16}
+        marginBottom={12}
       />
+
+      {/* Buscador compartido por las tres vistas */}
+      <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+        placeholder={`🔍 ${placeholderBusqueda}`} aria-label="Buscar en asignación de turnos"
+        style={{ ...inp, width: 'min(100%, 320px)', marginBottom: 14 }} />
 
       {/* ── Calendario ── */}
       {vista === 'calendario' && (
@@ -727,6 +756,8 @@ export default function TurnosTab({
               title="No hay personal activo en este condominio"
               description="Registrá al personal en la pestaña Personal para poder asignarle turnos."
             />
+          ) : empleadosVisibles.length === 0 ? (
+            <EmptyState icon="🔍" compact title={`Nadie coincide con «${busqueda.trim()}»`} description="Se busca por nombre y cargo. Borrá la búsqueda para ver a todo el personal." />
           ) : (
             <div className="turnos-scroll">
               <div className="turnos-grid">
@@ -742,7 +773,7 @@ export default function TurnosTab({
                   </div>
                 </div>
 
-                {empleados.map(emp => {
+                {empleadosVisibles.map(emp => {
                   const porFecha = Object.fromEntries((mes[emp.id] ?? []).map(c => [c.fecha, c]))
                   const horasEmp = (mes[emp.id] ?? []).reduce((a, c) => a + (horasDeCelda(c) ?? 0), 0)
                   return (
@@ -888,9 +919,11 @@ export default function TurnosTab({
               title="Sin reglas de asignación"
               description="Una regla dice «a Pérez le toca el nocturno de lunes a viernes, de septiembre a diciembre». A partir de ahí el calendario se llena solo."
             />
+          ) : asignacionesVisibles.length === 0 ? (
+            <EmptyState icon="🔍" compact title={`Ninguna regla coincide con «${busqueda.trim()}»`} description="Se busca por nombre de la regla, empleado y jornada." />
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
-              {asignaciones.map(r => {
+              {asignacionesVisibles.map(r => {
                 const plantilla = plantillaPorId[r.plantilla_horario_id]
                 return (
                   <div key={r.id} style={{ ...card, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', opacity: r.activa ? 1 : 0.6 }}>
@@ -956,9 +989,11 @@ export default function TurnosTab({
               title="Sin jornadas definidas"
               description="Empezá por las que ya usa el condominio: diurna, nocturna, fin de semana. Cada una lleva su hora de entrada, de salida y su descanso."
             />
+          ) : plantillasVisibles.length === 0 ? (
+            <EmptyState icon="🔍" compact title={`Ninguna jornada coincide con «${busqueda.trim()}»`} description="Se busca por nombre y código." />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 10 }}>
-              {plantillas.map(p => (
+              {plantillasVisibles.map(p => (
                 <div key={p.id} style={{ ...card, borderLeft: `4px solid ${p.color ?? 'var(--at-primary)'}`, opacity: p.activo ? 1 : 0.6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 8 }}>
                     <div>
@@ -1001,6 +1036,7 @@ export default function TurnosTab({
           subtitle="El horario con nombre que reutilizan las reglas de asignación"
           onClose={() => setModalJornada(null)}
           size="sm"
+          fullScreenOnMobile
           footer={
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setModalJornada(null)} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', color: 'var(--at-ink)' }}>Cancelar</button>
@@ -1014,7 +1050,7 @@ export default function TurnosTab({
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
               <div>
                 <label style={lbl} htmlFor="jornada-nombre">Nombre *</label>
-                <input id="jornada-nombre" style={inp} placeholder="Nocturno de garita" value={formJornada.nombre}
+                <input id="jornada-nombre" style={inp} placeholder="Nocturno de garita" autoFocus value={formJornada.nombre}
                   onChange={e => setFormJornada(p => ({ ...p, nombre: e.target.value }))} />
               </div>
               <div>
@@ -1186,6 +1222,7 @@ export default function TurnosTab({
           subtitle="A quién le toca, con qué jornada y cada cuánto"
           onClose={() => setModalRegla(null)}
           size="md"
+          fullScreenOnMobile
           footer={
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setModalRegla(null)} style={{ padding: '8px 16px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', color: 'var(--at-ink)' }}>Cancelar</button>
@@ -1199,7 +1236,7 @@ export default function TurnosTab({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div>
                 <label style={lbl} htmlFor="regla-empleado">Empleado *</label>
-                <select id="regla-empleado" style={inp} value={formRegla.personal_id}
+                <select id="regla-empleado" style={inp} autoFocus value={formRegla.personal_id}
                   onChange={e => setFormRegla(p => ({ ...p, personal_id: e.target.value }))}>
                   <option value="">Elegir…</option>
                   {empleados.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
