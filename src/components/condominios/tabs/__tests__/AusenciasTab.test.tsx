@@ -210,3 +210,55 @@ eliminarExigeSuPermiso('Días no laborables', p => {
   renderTab(p)
   fireEvent.click(screen.getByRole('tab', { name: /Días no laborables/ }))
 }, /^Eliminar$/, mocks.deleteCondominioRow, 'dias_no_laborables', 'd1')
+
+describe('AusenciasTab — buscador compartido por las dos vistas', () => {
+  const buscador = () => screen.getByRole('searchbox', { name: 'Buscar en ausencias y calendario laboral' })
+  const otra = ausencia({ id: 'a2', personal_id: 'emp2', personal_nombre: 'Pedro Pérez', tipo: 'incapacidad', estado: 'aprobada', motivo: 'Cirugía programada' })
+  const navidad: DiaNoLaborable = { ...feriado, id: 'd2', fecha: '2026-12-25', nombre: 'Navidad', tipo: 'festivo_nacional' }
+
+  it('acota las ausencias por empleado, tipo o motivo sin distinguir acentos, y se combina con el estado', () => {
+    renderTab({ ausencias: [ausencia(), otra] })
+    expect(screen.getByText('Lucía Conserje')).toBeTruthy()
+    expect(screen.getByText('Pedro Pérez')).toBeTruthy()
+
+    fireEvent.change(buscador(), { target: { value: 'perez' } })
+    expect(screen.queryByText('Lucía Conserje')).toBeNull()
+    expect(screen.getByText('Pedro Pérez')).toBeTruthy()
+
+    fireEvent.change(buscador(), { target: { value: 'CIRUGIA' } })
+    expect(screen.getByText('Pedro Pérez')).toBeTruthy()
+    fireEvent.change(buscador(), { target: { value: 'vacaciones' } })
+    expect(screen.getByText('Lucía Conserje')).toBeTruthy()
+    expect(screen.queryByText('Pedro Pérez')).toBeNull()
+
+    // Pedro está aprobada: con el chip «Solicitada» la búsqueda no lo devuelve.
+    fireEvent.change(buscador(), { target: { value: 'pedro' } })
+    fireEvent.click(screen.getByText('Solicitada'))
+    expect(screen.getByText('Nada coincide con «pedro»')).toBeTruthy()
+    fireEvent.click(screen.getByText('Todas'))
+    expect(screen.getByText('Pedro Pérez')).toBeTruthy()
+
+    fireEvent.change(buscador(), { target: { value: '' } })
+    expect(screen.getByText('Lucía Conserje')).toBeTruthy()
+    expect(screen.getByText('Pedro Pérez')).toBeTruthy()
+  })
+
+  it('en el calendario laboral acota por nombre, tipo o fecha, y la búsqueda sigue al cambiar de vista', () => {
+    renderTab({ diasNoLaborables: [feriado, navidad] })
+    fireEvent.change(buscador(), { target: { value: 'navidad' } })
+    fireEvent.click(screen.getByRole('tab', { name: /Días no laborables/ }))
+    expect(screen.getByText('Navidad')).toBeTruthy()
+    expect(screen.queryByText('Día de todos los santos')).toBeNull()
+
+    fireEvent.change(buscador(), { target: { value: 'asueto' } })
+    expect(screen.getByText('Día de todos los santos')).toBeTruthy()
+    expect(screen.queryByText('Navidad')).toBeNull()
+
+    fireEvent.change(buscador(), { target: { value: '2026-12' } })
+    expect(screen.getByText('Navidad')).toBeTruthy()
+
+    fireEvent.change(buscador(), { target: { value: 'zzz' } })
+    expect(screen.getByText('Ningún día coincide con «zzz»')).toBeTruthy()
+    expect(screen.getByText('+ Agregar día')).toBeTruthy()
+  })
+})
