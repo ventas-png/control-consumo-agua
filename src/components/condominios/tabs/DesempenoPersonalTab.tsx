@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import type {
   BloqueTurno, TareaBloque, RevisionTarea,
   RondaSeguridad, VisitaControl, PersonalCondominio,
@@ -41,9 +41,20 @@ function medalla(rank: number): string {
   return `#${rank + 1}`
 }
 
+const campoBusqueda: CSSProperties = {
+  flex: '1 1 200px', minWidth: 160, maxWidth: 320,
+  padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 8, fontSize: 13,
+  background: 'var(--at-surface)', color: 'var(--at-ink)', fontFamily: 'inherit',
+}
+
+/** Para el buscador: sin acentos ni mayúsculas, para que «lopez» encuentre «López». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visitasControl, personal, cargos = [], tiposTurno = [] }: Props) {
   const [periodo, setPeriodo] = useState<Periodo>('30')
   const [filtroCargo, setFiltroCargo] = useState('')
+  const [busqueda, setBusqueda] = useState('')
 
   // Corte de calendario: `bloques.fecha` es una columna `date`, así que el
   // límite debe ser un día LOCAL. Con `toISOString().slice(0,10)` era el día
@@ -133,6 +144,17 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
       })
   }, [personal, filtroCargo, bloquesEnPeriodo, tareas, revisiones, rondasEnPeriodo, visitasControl])
 
+  // El buscador acota las TARJETAS, no el ranking ni los KPI: quien va en
+  // segundo lugar conserva su 🥈 aunque sea la única tarjeta a la vista, y
+  // «Personal activo» sigue contando a todos los del período.
+  const termino = sinAcentos(busqueda)
+  const visibles = stats
+    .map((s, rank) => ({ s, rank }))
+    .filter(({ s }) => !termino || [
+      s.persona.nombre, s.persona.cargo, etiquetaCargo(s.persona.cargo, cargos),
+      s.persona.turno, etiquetaTurno(s.persona.turno, tiposTurno),
+    ].some(c => sinAcentos(c).includes(termino)))
+
   const totalBloques    = bloquesEnPeriodo.filter(b => b.estado === 'completado' || b.estado === 'incompleto').length
   const avgGlobal       = stats.length ? Math.round(stats.reduce((a, s) => a + s.avgScore, 0) / stats.length) : 0
   const rondasTotal     = rondasEnPeriodo.length
@@ -145,7 +167,9 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
           <h2 style={{ margin: '0 0 3px', fontSize: '17px', fontWeight: 800, color: 'var(--at-ink)' }}>Desempeño del Personal</h2>
           <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-3)' }}>Rendimiento por colaborador en el período seleccionado</p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            placeholder="🔍 Buscar colaborador…" aria-label="Buscar colaborador" style={campoBusqueda} />
           {(['7', '30', '90'] as Periodo[]).map(p => (
             <button key={p} onClick={() => setPeriodo(p)}
               style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', border: '1.5px solid',
@@ -201,9 +225,15 @@ export function DesempenoPersonalTab({ bloques, tareas, revisiones, rondas, visi
           <p style={{ fontWeight: 600, color: 'var(--at-ink-3)', fontSize: '14px' }}>Sin datos de desempeño en este período</p>
           <p style={{ fontSize: '13px' }}>Los datos aparecen una vez que el personal registre turnos o rondas.</p>
         </div>
+      ) : visibles.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '36px 16px', color: 'var(--at-ink-3)' }}>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)', fontSize: '14px', margin: '0 0 4px' }}>Nadie coincide con «{busqueda.trim()}» en este período</p>
+          <p style={{ fontSize: '13px', margin: 0 }}>Se busca por nombre, cargo y turno. Los indicadores de arriba siguen siendo los de todo el personal.</p>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {stats.map((s, i) => {
+          {visibles.map(({ s, rank: i }) => {
             const score = s.avgScore || (s.rondasTotal > 0 ? Math.round(s.rondasCompletadas / s.rondasTotal * 100) : 0)
             return (
               <div key={s.persona.id} style={{ background: 'var(--at-surface)', border: `1.5px solid ${i < 3 ? 'var(--at-primary-soft-2)' : 'var(--at-line)'}`, borderRadius: '14px', padding: '16px 18px' }}>
