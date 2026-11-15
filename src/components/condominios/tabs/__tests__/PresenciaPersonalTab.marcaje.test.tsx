@@ -10,7 +10,7 @@
 // «arregle» el marcaje pasándole `new Date()` desde el navegador, la asistencia
 // vuelve a ser lo que el dispositivo diga que es.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import type {
   BloqueTurno, MiFichaPresencia, PausaPresencia, PersonalCondominio, PresenciaPersonal, TipoPausa,
 } from '../../../../types'
@@ -967,5 +967,60 @@ describe('el balance de un día con varios marcajes', () => {
     const lineas = await screen.findAllByText(/Contra la jornada/)
     expect(lineas).toHaveLength(2)
     for (const l of lineas) expect(l.textContent).toContain('las horas se suman')
+  })
+})
+
+describe('consulta — buscador y registro manual en ventana emergente', () => {
+  const buscador = () => screen.getByRole('searchbox', { name: 'Buscar empleado' })
+  const kpiTotal = () => screen.getByText('Total').previousElementSibling?.textContent
+
+  it('el buscador acota las filas del día por nombre, cargo u observación sin distinguir acentos; los contadores siguen siendo del día', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    montar([filaDelDia(), filaDelDia({ id: 'r2', nombre: 'Ana López', cargo: 'conserje', observaciones: 'Llegó en moto' })])
+    expect(await screen.findByText('Marco Sical')).toBeTruthy()
+    expect(screen.getByText('Ana López')).toBeTruthy()
+    expect(kpiTotal()).toBe('2')
+
+    fireEvent.change(buscador(), { target: { value: 'lopez' } })
+    expect(screen.queryByText('Marco Sical')).toBeNull()
+    expect(screen.getByText('Ana López')).toBeTruthy()
+    expect(kpiTotal()).toBe('2')
+
+    fireEvent.change(buscador(), { target: { value: 'MOTO' } })
+    expect(screen.getByText('Ana López')).toBeTruthy()
+    fireEvent.change(buscador(), { target: { value: 'guardia' } })
+    expect(screen.getByText('Marco Sical')).toBeTruthy()
+    expect(screen.queryByText('Ana López')).toBeNull()
+
+    fireEvent.change(buscador(), { target: { value: 'nadie' } })
+    expect(screen.getByText(/Nadie coincide con «nadie»/)).toBeTruthy()
+    fireEvent.change(buscador(), { target: { value: '' } })
+    expect(screen.getByText('Marco Sical')).toBeTruthy()
+    expect(screen.getByText('Ana López')).toBeTruthy()
+  })
+
+  it('«+ Registrar persona» abre una ventana emergente con la fecha consultada; Guardar crea el registro y la cierra; al reabrir sale en blanco y Cancelar la cierra', async () => {
+    mocks.fetchMiFichaPresencia.mockResolvedValue({ ficha: null, error: null })
+    montar()
+    await screen.findByText(/Sin registros para/)
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Registrar persona' }))
+    const ventana = screen.getByRole('dialog', { name: 'Registrar asistencia' })
+    expect((within(ventana).getByLabelText('Fecha') as HTMLInputElement).value).toBe(HOY)
+    fireEvent.change(within(ventana).getByLabelText('Empleado *'), { target: { value: 'per-1' } })
+    fireEvent.change(within(ventana).getByLabelText('Hora entrada'), { target: { value: '06:00' } })
+    fireEvent.click(within(ventana).getByRole('button', { name: '✅ Guardar' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledWith('presencia_personal',
+      expect.objectContaining({ personal_id: 'per-1', nombre: 'Marco Sical', cargo: 'guardia', fecha: HOY, hora_entrada: '06:00' })))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // El botón ya no alterna a «Cancelar»: sigue diciendo lo mismo, y la ventana trae el suyo.
+    fireEvent.click(screen.getByRole('button', { name: '+ Registrar persona' }))
+    const otra = screen.getByRole('dialog', { name: 'Registrar asistencia' })
+    expect((within(otra).getByLabelText('Empleado *') as HTMLSelectElement).value).toBe('')
+    fireEvent.click(within(otra).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1)
   })
 })

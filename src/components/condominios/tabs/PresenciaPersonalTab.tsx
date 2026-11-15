@@ -12,6 +12,7 @@ import {
 import { openPromptDialog } from '../../shared/PromptDialog'
 import { formatHoras } from '../../../domain/condominios/turnos'
 import { notify } from '../../shared/Dialog'
+import { EditModal } from '../../shared/EditModal'
 import MarcajeTurno from './presencia/MarcajeTurno'
 import './presencia/presencia.css'
 import { SecureImage } from '../../shared/SecureImage'
@@ -58,9 +59,23 @@ const ESTADOS_PRESENCIA: { value: EstadoPresencia; label: string; color: string;
  */
 type ModoPresencia = 'resolviendo' | 'elegir' | 'marcar' | 'consulta'
 
+/** Para el buscador: minúsculas y sin tildes, así «perez» encuentra «Pérez» y viceversa (igual que Personal y Plantillas). */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+/** El registro manual en blanco, con la fecha del día que se está consultando. */
+const formVacio = (fecha: string) => ({
+  personal_id: '', nombre: '', cargo: '', fecha,
+  hora_entrada: '', hora_salida: '', estado: 'presente' as EstadoPresencia, observaciones: '',
+})
+
 export default function PresenciaPersonalTab({ registros, personal, bloques, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const hoy = hoyLocalISO()
   const [fechaFiltro, setFechaFiltro] = useState(hoy)
+  // Buscador: con muchos marcajes el scroll no alcanza. Acota las filas del día por
+  // nombre, cargo u observación sin distinguir mayúsculas ni acentos; los contadores
+  // siguen siendo del día entero.
+  const [busqueda, setBusqueda] = useState('')
   const [mostrarForm, setMostrarForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [modo, setModo] = useState<ModoPresencia>('resolviendo')
@@ -91,18 +106,12 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
     return () => { vivo = false }
   }, [proyectoId])
 
-  const [form, setForm] = useState({
-    personal_id: '',
-    nombre: '',
-    cargo: '',
-    fecha: hoy,
-    hora_entrada: '',
-    hora_salida: '',
-    estado: 'presente' as EstadoPresencia,
-    observaciones: '',
-  })
+  const [form, setForm] = useState(() => formVacio(hoy))
 
   const registrosDia = useMemo(() => registros.filter(r => r.fecha === fechaFiltro), [registros, fechaFiltro])
+  const termino = sinAcentos(busqueda)
+  const coincide = (...campos: (string | null | undefined)[]) => !termino || campos.some(c => sinAcentos(c).includes(termino))
+  const registrosVisibles = registrosDia.filter(r => coincide(r.nombre, r.cargo, r.observaciones))
 
   // Las pausas viven en su propia tabla y se piden aparte, por los ids que ya
   // están en pantalla. No por fecha: la cena de un turno nocturno cae DESPUÉS
@@ -185,6 +194,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
     () => balance.filter(d => d.hallazgos.includes('sin_marcaje')),
     [balance],
   )
+  const sinCubrirVisibles = sinCubrir.filter(d => coincide(d.nombre))
 
   /** Las pausas de un marcaje, en el orden en que ocurrieron. */
   const pausasDe = useMemo(() => {
@@ -251,10 +261,14 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ personal_id: '', nombre: '', cargo: '', fecha: hoy, hora_entrada: '', hora_salida: '', estado: 'presente', observaciones: '' })
-    setMostrarForm(false)
+    cerrarForm()
     onRefresh()
   }
+
+  /** «+ Registrar persona»: la ventana abre en blanco, con la fecha que se está consultando. */
+  function abrirForm() { setForm(formVacio(fechaFiltro)); setMostrarForm(true) }
+  /** Cerrar la ventana (Cancelar, ×, Escape, clic fuera) descarta lo tecleado; mientras guarda no se cierra. */
+  function cerrarForm() { if (saving) return; setMostrarForm(false); setForm(formVacio(fechaFiltro)) }
 
   async function actualizarEstado(id: string, estado: EstadoPresencia) {
     const { error } = await updateCondominioRow('presencia_personal', id, { estado })
@@ -528,6 +542,9 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--at-ink-2)' }}>Fecha</span>
           <input type="date" value={fechaFiltro} onChange={e => setFechaFiltro(e.target.value)} style={campo} />
         </label>
+        <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar empleado…" aria-label="Buscar empleado"
+          style={{ ...campo, flex: '1 1 180px', minWidth: 160, maxWidth: 320 }} />
         <div className="presencia-cabecera-acciones">
           {miFicha && (
             <button onClick={() => setModo('marcar')}
@@ -544,10 +561,9 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
             </button>
           )}
           {canCreate && (
-            <button onClick={() => setMostrarForm(!mostrarForm)}
-              aria-expanded={mostrarForm}
+            <button onClick={abrirForm}
               style={{ ...btnCabecera, background: 'var(--at-accent)', color: 'white', border: 'none' }}>
-              {mostrarForm ? '✕ Cancelar' : '+ Registrar persona'}
+              + Registrar persona
             </button>
           )}
         </div>
@@ -619,10 +635,27 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
         </div>
       )}
 
-      {/* Formulario */}
+      {/* Registro manual en ventana emergente: la lista del día sigue a la vista detrás. */}
       {mostrarForm && (
-        <div style={{ background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-          <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>Registrar asistencia</div>
+        <EditModal
+          title="Registrar asistencia"
+          subtitle="Para quien no marcó desde su cuenta: queda registrado como ingreso manual"
+          onClose={cerrarForm}
+          size="md"
+          fullScreenOnMobile
+          footer={
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={cerrarForm} disabled={saving}
+                style={{ ...btnCabecera, background: 'var(--at-surface-2)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line-strong)' }}>
+                Cancelar
+              </button>
+              <button type="button" onClick={guardar} disabled={saving}
+                style={{ padding: '10px 20px', minHeight: 44, background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 14, fontWeight: 600, opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Guardando…' : '✅ Guardar'}
+              </button>
+            </div>
+          }
+        >
           <div className="presencia-form-grid">
             <div>
               <label style={lbl} htmlFor="presencia-empleado">Empleado *</label>
@@ -630,6 +663,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
                 <select
                   id="presencia-empleado"
                   style={inp}
+                  autoFocus
                   value={form.personal_id}
                   onChange={e => {
                     const emp = activos.find(p => p.id === e.target.value)
@@ -645,7 +679,7 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
                   {activos.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.cargo}</option>)}
                 </select>
               ) : (
-                <input style={inp} placeholder="Juan Pérez" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+                <input id="presencia-empleado" style={inp} autoFocus placeholder="Juan Pérez" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
               )}
               {activos.length > 0 && (
                 <div style={{ fontSize: 10.5, color: 'var(--at-ink-3)', marginTop: 3 }}>
@@ -658,33 +692,29 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
               <input id="presencia-cargo" style={inp} placeholder="Guardia, Conserje…" value={form.cargo} onChange={e => setForm(p => ({ ...p, cargo: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>Fecha</label>
-              <input type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
+              <label style={lbl} htmlFor="presencia-form-fecha">Fecha</label>
+              <input id="presencia-form-fecha" type="date" style={inp} value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>Estado</label>
-              <select style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoPresencia }))}>
+              <label style={lbl} htmlFor="presencia-estado">Estado</label>
+              <select id="presencia-estado" style={inp} value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value as EstadoPresencia }))}>
                 {ESTADOS_PRESENCIA.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={lbl}>Hora entrada</label>
-              <input type="time" style={inp} value={form.hora_entrada} onChange={e => setForm(p => ({ ...p, hora_entrada: e.target.value }))} />
+              <label style={lbl} htmlFor="presencia-entrada">Hora entrada</label>
+              <input id="presencia-entrada" type="time" style={inp} value={form.hora_entrada} onChange={e => setForm(p => ({ ...p, hora_entrada: e.target.value }))} />
             </div>
             <div>
-              <label style={lbl}>Hora salida</label>
-              <input type="time" style={inp} value={form.hora_salida} onChange={e => setForm(p => ({ ...p, hora_salida: e.target.value }))} />
+              <label style={lbl} htmlFor="presencia-salida">Hora salida</label>
+              <input id="presencia-salida" type="time" style={inp} value={form.hora_salida} onChange={e => setForm(p => ({ ...p, hora_salida: e.target.value }))} />
             </div>
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <label style={lbl}>Observaciones</label>
-            <input style={inp} placeholder="Opcional" value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
+          <div>
+            <label style={lbl} htmlFor="presencia-observaciones">Observaciones</label>
+            <input id="presencia-observaciones" style={inp} placeholder="Opcional" value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} />
           </div>
-          <button onClick={guardar} disabled={saving}
-            style={{ padding: '10px 20px', minHeight: 44, background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 9, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
-            {saving ? 'Guardando…' : '✅ Guardar'}
-          </button>
-        </div>
+        </EditModal>
       )}
 
       {/* Los turnos planificados que nadie marcó no tienen fila en la lista: sin
@@ -710,14 +740,14 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
           Calculando el balance contra la jornada…
         </div>
       )}
-      {sinCubrir.length > 0 && (
+      {sinCubrirVisibles.length > 0 && (
         <div style={{
           background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)',
           borderRadius: 12, padding: '12px 14px', marginBottom: 12, fontSize: 13,
         }}>
           <strong style={{ color: 'var(--at-warning)' }}>Turnos planificados sin marcaje</strong>
           <div style={{ marginTop: 6, color: 'var(--at-ink-2)', display: 'grid', gap: 4, overflowWrap: 'anywhere' }}>
-            {sinCubrir.map(d => (
+            {sinCubrirVisibles.map(d => (
               <div key={`${d.personal_id}-${d.fecha}`}>
                 {d.nombre}
                 {d.turno_inicio && d.turno_fin && (
@@ -736,9 +766,13 @@ export default function PresenciaPersonalTab({ registros, personal, bloques, pro
         <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
           Sin registros para {fechaFiltro}
         </div>
+      ) : registrosVisibles.length === 0 ? (
+        <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '40px 0', fontSize: 13 }}>
+          Nadie coincide con «{busqueda.trim()}» el {fechaFiltro}. Se busca por nombre, cargo y observación.
+        </div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
-          {registrosDia.map(r => {
+          {registrosVisibles.map(r => {
             const susPausas = pausasDe.get(r.id) ?? []
             // El desglose vive en el dominio y es gemelo de lo que hace
             // `calcular_horas_personal` en SQL, incluido tratar `fin <= inicio`
