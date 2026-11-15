@@ -114,6 +114,20 @@ export function resumenParte(texto: string | null | undefined, nFotos: number): 
   return partes.length ? partes.join(' · ') : null
 }
 
+/**
+ * El texto «Inconvenientes» del servicio a partir de sus ítems, con la MISMA regla que
+ * hk_inconvenientes_texto en la base (que es quien lo escribe en servicios_housekeeping):
+ * ninguno → null; uno → su descripción tal cual (vacía → null); varios → lista numerada
+ * por posición, «(sin descripción)» para los vacíos. Sirve para el menú, el PDF y el
+ * WhatsApp sin esperar a recargar el servicio.
+ */
+export function textoInconvenientes(items: readonly { descripcion: string }[]): string | null {
+  const ds = items.map(i => i.descripcion.trim())
+  if (ds.length === 0) return null
+  if (ds.length === 1) return ds[0] || null
+  return ds.map((d, i) => `${i + 1}. ${d || '(sin descripción)'}`).join('\n')
+}
+
 /** «HM-001 · Ana Pérez · 08/11 → 12/11» para la tarjeta y el selector. */
 export function etiquetaReserva(r: Pick<ReservaSTRResumen, 'codigo_confirmacion' | 'huesped_nombre' | 'fecha_entrada' | 'fecha_salida'>
   | Pick<ReservaSTRVinculable, 'codigo_confirmacion' | 'huesped_nombre' | 'fecha_entrada' | 'fecha_salida'>): string {

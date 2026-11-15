@@ -14,7 +14,7 @@ import { compressImage } from '../../lib/imageCompress'
 import { buildUploadPath, validateFileMagic } from '../../lib/fileValidation'
 import { BUCKET_HOUSEKEEPING } from '../shared/buckets'
 import { uploadMedia } from '../shared/storage'
-import type { FaseFotoHousekeeping, FotoHousekeeping } from '../../types'
+import type { FaseFotoHousekeeping, FotoHousekeeping, InconvenienteHousekeeping } from '../../types'
 
 /** Tope por fase; lo impone también la BD (hk_fotos_preparar). */
 export const MAX_FOTOS_POR_FASE = 20
@@ -30,7 +30,7 @@ export function cupoDisponible(actuales: number, nuevas: number, max = MAX_FOTOS
   return Math.max(0, Math.min(nuevas, max - actuales))
 }
 
-const COLS = 'id, servicio_id, fase, path, created_at, creado_por'
+const COLS = 'id, servicio_id, fase, path, created_at, creado_por, inconveniente_id'
 
 export async function listarFotosServicio(servicioId: string): Promise<{ data: FotoHousekeeping[]; error: string | null }> {
   const { data, error } = await supabase
@@ -42,8 +42,10 @@ export async function listarFotosServicio(servicioId: string): Promise<{ data: F
 /** Valida, comprime a JPEG (1280 px), sube al bucket y registra la fila. */
 export async function subirFotoServicio(args: {
   projectId: string; servicioId: string; fase: FaseFotoHousekeeping; file: File
+  /** Fase «inconvenientes»: a qué inconveniente pertenece la foto (la base exige que sea del mismo servicio). */
+  inconvenienteId?: string | null
 }): Promise<{ data: FotoHousekeeping | null; error: string | null }> {
-  const { projectId, servicioId, fase, file } = args
+  const { projectId, servicioId, fase, file, inconvenienteId } = args
   const magic = await validateFileMagic(file, 'image')
   if (!magic.ok) return { data: null, error: magic.reason }
 
@@ -62,7 +64,7 @@ export async function subirFotoServicio(args: {
 
   const { data, error } = await supabase
     .from('servicio_housekeeping_fotos')
-    .insert({ servicio_id: servicioId, fase, path })
+    .insert({ servicio_id: servicioId, fase, path, ...(inconvenienteId ? { inconveniente_id: inconvenienteId } : {}) })
     .select(COLS).single()
   // Si falla el INSERT el objeto queda sin fila (ver cabecera): lo retira el barrido de huérfanos.
   if (error) return { data: null, error: error.message }
@@ -113,4 +115,55 @@ export async function eliminarServicioConEvidencias(servicioId: string): Promise
 export async function descargarFotoServicio(path: string): Promise<Blob | null> {
   const { data, error } = await supabase.storage.from(BUCKET_HOUSEKEEPING).download(path)
   return error ? null : data
+}
+
+// ── Inconvenientes por ítem (20261124000000) ────────────────────────────────
+// Cada inconveniente es una fila con su descripción; sus fotos son las de la fase
+// «inconvenientes» con su `inconveniente_id`. La base asigna `orden`, sella empresa,
+// proyecto y autor, y reescribe el texto `inconvenientes` del servicio (lo que leen el
+// correo del informe y el resumen de WhatsApp). Borrar pasa por RPC: se lleva sus fotos
+// a la cola de limpieza con la misma autorización que una foto suelta.
+
+/** Tope por servicio; lo impone también la BD (hk_inconvenientes_preparar). */
+export const MAX_INCONVENIENTES_POR_SERVICIO = 30
+
+const COLS_INC = 'id, servicio_id, orden, descripcion, created_at, updated_at, creado_por'
+
+export async function listarInconvenientes(servicioId: string): Promise<{ data: InconvenienteHousekeeping[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from('servicio_housekeeping_inconvenientes').select(COLS_INC)
+    .eq('servicio_id', servicioId).order('orden', { ascending: true })
+  return { data: (data ?? []) as InconvenienteHousekeeping[], error: error?.message ?? null }
+}
+
+/** Crea el siguiente inconveniente del servicio (orden, empresa, proyecto y autor los pone la base). */
+export async function crearInconveniente(servicioId: string, descripcion = ''): Promise<{ data: InconvenienteHousekeeping | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from('servicio_housekeeping_inconvenientes')
+    .insert({ servicio_id: servicioId, descripcion })
+    .select(COLS_INC).single()
+  if (error) return { data: null, error: error.message }
+  return { data: data as InconvenienteHousekeeping, error: null }
+}
+
+export async function actualizarInconveniente(id: string, descripcion: string): Promise<{ error: string | null }> {
+  const { data, error } = await supabase
+    .from('servicio_housekeeping_inconvenientes')
+    .update({ descripcion })
+    .eq('id', id)
+    .select('id')
+  if (error) return { error: error.message }
+  // La RLS deja un UPDATE ajeno en 0 filas sin error: eso también es «no se guardó».
+  if (!data || data.length === 0) return { error: 'El inconveniente ya no existe o no tienes acceso.' }
+  return { error: null }
+}
+
+/** Elimina el inconveniente y sus fotos (RPC autorizada). Devuelve cuántos archivos quedaron encolados. */
+export async function eliminarInconveniente(id: string): Promise<{ error: string | null; fotosEncoladas: number; limpieza: EstadoLimpieza }> {
+  const { data, error } = await supabase.rpc('hk_eliminar_inconveniente', { p_inconveniente_id: id })
+  if (error) return { error: error.message, fotosEncoladas: 0, limpieza: 'ok' }
+  if (typeof data !== 'number') {
+    return { error: 'No se pudo confirmar la eliminación del inconveniente (respuesta inesperada del servidor)', fotosEncoladas: 0, limpieza: 'ok' }
+  }
+  return { error: null, fotosEncoladas: data, limpieza: data > 0 ? await pedirLimpiezaArchivos() : 'ok' }
 }

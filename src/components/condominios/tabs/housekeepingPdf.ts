@@ -1,6 +1,7 @@
 // Informe PDF de un servicio de housekeeping: estado de la unidad al ingresar,
-// inconvenientes encontrados, cómo quedó, quién lo hizo, horas dedicadas y la
-// reserva STR vinculada (si la hay). Pensado para mandarse por WhatsApp (Web
+// inconvenientes encontrados (uno por uno, cada uno con su descripción y sus
+// fotos), cómo quedó, quién lo hizo, horas dedicadas y la reserva STR vinculada
+// (si la hay). Pensado para mandarse por WhatsApp (Web
 // Share con archivo) o descargarse.
 //
 // Peso: las fotos ya están a 1280 px en el bucket; para el PDF se bajan a 900 px
@@ -8,7 +9,7 @@
 // documentos de WhatsApp. jsPDF se importa al generar, no al abrir la pestaña.
 import { descargarFotoServicio } from '../../../domain/condominios/housekeepingEvidencias'
 import { etiquetaReserva, horasDedicadas } from '../../../domain/condominios/housekeepingFlujo'
-import type { FaseFotoHousekeeping, FotoHousekeeping, ServicioHousekeeping } from '../../../types'
+import type { FaseFotoHousekeeping, FotoHousekeeping, InconvenienteHousekeeping, ServicioHousekeeping } from '../../../types'
 
 const MAX_LADO_PDF = 900
 const CALIDAD_PDF = 0.7
@@ -16,6 +17,8 @@ const CALIDAD_PDF = 0.7
 export interface DatosInformeHK {
   servicio: ServicioHousekeeping
   fotos: FotoHousekeeping[]
+  /** Inconvenientes por ítem; sin ellos se imprime el texto del servicio y la bolsa de fotos de la fase. */
+  inconvenientes?: InconvenienteHousekeeping[]
   tipoLabel: string
   estadoLabel: string
   /** Nombres ya resueltos (la BD guarda uuids). */
@@ -88,14 +91,14 @@ export async function generarInformeHousekeepingPdf(d: DatosInformeHK): Promise<
   for (const l of resto) texto(l)
   y += 3
 
-  const bloque = async (titulo: string, textoLibre: string | null | undefined, fase: FaseFotoHousekeeping, vacio: string) => {
+  const seccion = (titulo: string) => {
     salto(20)
     doc.setDrawColor(180); doc.line(M, y, PW - M, y); y += 5
     texto(titulo, 12, true)
-    texto(textoLibre?.trim() ? textoLibre : vacio)
-    const delFase = d.fotos.filter(f => f.fase === fase)
-    const vivas = delFase.filter(f => f.path)
-    const depuradas = delFase.length - vivas.length
+  }
+  const cuadricula = async (lista: FotoHousekeeping[]) => {
+    const vivas = lista.filter(f => f.path)
+    const depuradas = lista.length - vivas.length
     const COLS = 3, GAP = 3, CELL_W = (CW - GAP * (COLS - 1)) / COLS, CELL_H = CELL_W * 0.75
     for (let i = 0; i < vivas.length; i++) {
       const col = i % COLS
@@ -112,11 +115,39 @@ export async function generarInformeHousekeepingPdf(d: DatosInformeHK): Promise<
       if (col === COLS - 1 || i === vivas.length - 1) y += CELL_H + GAP
     }
     if (depuradas > 0) texto(`${depuradas} foto(s) depurada(s) por política de retención (90 días).`, 8)
+  }
+  const bloque = async (titulo: string, textoLibre: string | null | undefined, fase: FaseFotoHousekeeping, vacio: string) => {
+    seccion(titulo)
+    texto(textoLibre?.trim() ? textoLibre : vacio)
+    await cuadricula(d.fotos.filter(f => f.fase === fase))
     y += 2
   }
 
   await bloque('Estado al ingresar', s.hallazgos_ingreso, 'ingreso', 'Sin observaciones registradas.')
-  await bloque('Inconvenientes encontrados', s.inconvenientes, 'inconvenientes', 'Ninguno registrado.')
+
+  // Inconvenientes: uno por uno, cada uno con su descripción y SUS fotos. Sin ítems
+  // (servicio anterior) se imprime el texto del servicio y la bolsa de fotos de la fase.
+  seccion('Inconvenientes encontrados')
+  const items = d.inconvenientes ?? []
+  const fotosInc = d.fotos.filter(f => f.fase === 'inconvenientes')
+  if (items.length === 0) {
+    texto(s.inconvenientes?.trim() ? s.inconvenientes : fotosInc.length ? 'Sin descripción.' : 'Ninguno registrado.')
+    await cuadricula(fotosInc)
+  } else {
+    for (const [i, it] of items.entries()) {
+      texto(`Inconveniente ${i + 1}`, 11, true)
+      texto(it.descripcion.trim() || '(sin descripción)')
+      await cuadricula(fotosInc.filter(f => f.inconveniente_id === it.id))
+      y += 1
+    }
+    const sueltas = fotosInc.filter(f => !f.inconveniente_id || !items.some(it => it.id === f.inconveniente_id))
+    if (sueltas.length > 0) {
+      texto('Otras fotos de inconvenientes', 11, true)
+      await cuadricula(sueltas)
+    }
+  }
+  y += 2
+
   await bloque('Resultado del servicio', s.observaciones_cierre, 'cierre', 'Sin observaciones registradas.')
 
   const n = doc.getNumberOfPages()

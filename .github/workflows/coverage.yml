@@ -902,6 +902,19 @@ jobs:
           PGPORT_TEST: 55563
         run: supabase/tests/housekeeping_flujo/run.sh
 
+      # 20261124000000: los inconvenientes de housekeeping se reportan uno por
+      # uno, cada uno con su descripción y sus fotos. La base asigna el orden y
+      # sella empresa/proyecto/creado_por, exige que la foto apunte a un
+      # inconveniente del MISMO servicio y sólo en su fase, deriva el texto
+      # `inconvenientes` del servicio (para el correo y WhatsApp), borra por RPC
+      # con autorización (fotos a la cola) y migra los datos anteriores.
+      # CONTROL NEGATIVO: tres mutantes (mismo servicio, autorización, derivado).
+      - name: Housekeeping — inconvenientes por ítem (descripción y fotos propias)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55591
+        run: supabase/tests/housekeeping_inconvenientes/run.sh
+
       # 20261031000100: carga masiva de reservas STR desde una plantilla propia.
       # Vista previa validada en el SERVIDOR (unidad por nombre del proyecto, fechas,
       # horas, personas, catálogos, montos, código repetido = error, solape = aviso,

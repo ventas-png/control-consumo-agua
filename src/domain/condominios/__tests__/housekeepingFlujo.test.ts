@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import {
   clasificarDestinatario, construirEnlaceWhatsApp, esAdminDeTransiciones, etiquetaReserva, fechaHoraReal, filtrarReservas,
   formatearDuracion, horaReal, horasDedicadas, mensajeErrorFlujo, minutosDedicados, reservasDeUnidad, resumenParte, resumenTextoInforme,
-  sugerirReservas, transicionPermitida,
+  sugerirReservas, textoInconvenientes, transicionPermitida,
 } from '../housekeepingFlujo'
 import type { ReservaSTRVinculable } from '../../../types'
 
@@ -163,5 +163,17 @@ describe('destinatario y WhatsApp', () => {
       'Inconvenientes: ninguno',
       'Resultado: sin observaciones',
     ])
+  })
+})
+
+describe('textoInconvenientes (la misma regla que hk_inconvenientes_texto en la base)', () => {
+  it('ninguno → null; uno → su descripción tal cual (vacía → null)', () => {
+    expect(textoInconvenientes([])).toBeNull()
+    expect(textoInconvenientes([{ descripcion: '  Grifo roto  ' }])).toBe('Grifo roto')
+    expect(textoInconvenientes([{ descripcion: '   ' }])).toBeNull()
+  })
+  it('varios → lista numerada por posición, «(sin descripción)» para los vacíos', () => {
+    expect(textoInconvenientes([{ descripcion: 'Grifo roto' }, { descripcion: '' }, { descripcion: 'Vidrio quebrado' }]))
+      .toBe('1. Grifo roto\n2. (sin descripción)\n3. Vidrio quebrado')
   })
 })

@@ -5,7 +5,10 @@
 //   Menú                      tras «Iniciar servicio» (o desde la tarjeta): muestra qué hay
 //                             registrado en cada parte y ofrece:
 //   · Estado al ingresar      cómo se encontró la unidad + fotos `ingreso`.
-//   · Reportar inconvenientes daños, faltantes o averías + fotos `inconvenientes`.
+//   · Reportar inconvenientes UNO POR UNO: cada inconveniente con su descripción y sus
+//                             fotos (`inconvenientes` + inconveniente_id). Se agregan y se
+//                             quitan al momento (la base asigna el orden y deriva el texto
+//                             del servicio); las descripciones se guardan con los textos.
 //   · Resultado del servicio  cómo quedó + fotos `cierre`; «Guardar y dar por finalizado»
 //                             mueve el servicio a completado: la base sella completado_en
 //                             (la hora REAL de finalización) y las horas dedicadas salen de
@@ -30,18 +33,19 @@ import { useUsuariosMap } from '../../../domain/usuarios/queries'
 import { updateCondominioRow, updateCondominioRowAfectando } from '../../../domain/condominios/tabMutations'
 import { BUCKET_HOUSEKEEPING } from '../../../domain/shared/buckets'
 import {
-  MAX_FOTOS_POR_FASE, cupoDisponible, eliminarFotoServicio, listarFotosServicio, subirFotoServicio,
+  MAX_FOTOS_POR_FASE, MAX_INCONVENIENTES_POR_SERVICIO, actualizarInconveniente, crearInconveniente, cupoDisponible,
+  eliminarFotoServicio, eliminarInconveniente, listarFotosServicio, listarInconvenientes, subirFotoServicio,
 } from '../../../domain/condominios/housekeepingEvidencias'
 import {
   clasificarDestinatario, construirEnlaceWhatsApp, fechaHoraReal, horaReal, horasDedicadas, mensajeErrorFlujo, resumenParte,
-  resumenTextoInforme,
+  resumenTextoInforme, textoInconvenientes,
 } from '../../../domain/condominios/housekeepingFlujo'
 import { notificarInformeHousekeeping } from '../../../domain/condominios/housekeepingReservas'
 import { compartirOdescargarPdf, generarInformeHousekeepingPdf } from './housekeepingPdf'
 import { lineaResponsablePdf, type EstadoResponsable } from '../../../domain/condominios/housekeepingResponsable'
 import { ResponsableLinea } from './ResponsableSelector'
-import { HousekeepingFaseFotos } from './HousekeepingFaseFotos'
-import type { FaseFotoHousekeeping, FotoHousekeeping, ServicioHousekeeping } from '../../../types'
+import { HousekeepingFaseFotos, claveSubida } from './HousekeepingFaseFotos'
+import type { FaseFotoHousekeeping, FotoHousekeeping, InconvenienteHousekeeping, ServicioHousekeeping } from '../../../types'
 
 /** Pantalla del flujo guiado: el menú o una de sus tres partes. */
 export type VistaHK = 'menu' | 'ingreso' | 'inconvenientes' | 'resultado'
@@ -83,16 +87,22 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
   const [vista, setVista] = useState<VistaHK>(vistaInicial)
   const [fotos, setFotos] = useState<FotoHousekeeping[]>([])
   const [hallazgos, setHallazgos] = useState(servicio.hallazgos_ingreso ?? '')
-  const [inconvenientes, setInconvenientes] = useState(servicio.inconvenientes ?? '')
   const [cierre, setCierre] = useState(servicio.observaciones_cierre ?? '')
+  // Inconvenientes por ítem: las filas (orden lo da la base) y lo tecleado en cada una.
+  const [items, setItems] = useState<InconvenienteHousekeeping[]>([])
+  const [descripciones, setDescripciones] = useState<Record<string, string>>({})
+  const [agregandoItem, setAgregandoItem] = useState(false)
+  const [quitandoItem, setQuitandoItem] = useState<string | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [finalizando, setFinalizando] = useState(false)
-  const [subiendo, setSubiendo] = useState<FaseFotoHousekeeping | null>(null)
+  const [subiendo, setSubiendo] = useState<string | null>(null)
   const [generando, setGenerando] = useState(false)
   const [visor, setVisor] = useState<string | null>(null)
   // Lo último que se guardó (o lo que traía el servicio): contra esto se decide si hay
   // cambios pendientes, sin esperar a que el padre recargue.
-  const guardado = useRef({ hallazgos: servicio.hallazgos_ingreso ?? '', inconvenientes: servicio.inconvenientes ?? '', cierre: servicio.observaciones_cierre ?? '' })
+  const guardado = useRef<{ hallazgos: string; cierre: string; items: Record<string, string> }>({
+    hallazgos: servicio.hallazgos_ingreso ?? '', cierre: servicio.observaciones_cierre ?? '', items: {},
+  })
   const cerrando = useRef(false)
 
   // Un servicio completado o cancelado no se edita desde aquí (reabrir es cosa de dueño/admin
@@ -102,28 +112,84 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
   const enProceso = servicio.estado === 'en_proceso'
 
   const cargar = useCallback(async () => {
-    const { data, error } = await listarFotosServicio(servicio.id)
-    if (error) notify({ variant: 'error', title: 'No se pudieron cargar las fotos', text: error })
-    else setFotos(data)
+    const [f, i] = await Promise.all([listarFotosServicio(servicio.id), listarInconvenientes(servicio.id)])
+    if (f.error) notify({ variant: 'error', title: 'No se pudieron cargar las fotos', text: f.error })
+    else setFotos(f.data)
+    if (i.error) notify({ variant: 'error', title: 'No se pudieron cargar los inconvenientes', text: i.error })
+    else {
+      const d = Object.fromEntries(i.data.map(x => [x.id, x.descripcion]))
+      setItems(i.data)
+      setDescripciones(d)
+      guardado.current.items = d
+    }
   }, [servicio.id])
   useEffect(() => { void cargar() }, [cargar])
 
   const nombre = (id?: string | null) => (id ? (mapa.get(id)?.full_name?.trim() || `Usuario ${id.slice(0, 8)}`) : undefined)
-  const sucio = hallazgos.trim() !== guardado.current.hallazgos.trim()
-    || inconvenientes.trim() !== guardado.current.inconvenientes.trim()
-    || cierre.trim() !== guardado.current.cierre.trim()
+  /** Los ítems con lo que hay tecleado ahora mismo (la fila trae lo guardado). */
+  const itemsActuales = items.map(i => ({ ...i, descripcion: descripciones[i.id] ?? i.descripcion }))
+  // El mismo texto que la base deriva y escribe en servicios_housekeeping.inconvenientes.
+  const textoInc = textoInconvenientes(itemsActuales)
+  const itemsSucios = items.filter(i => (descripciones[i.id] ?? '').trim() !== (guardado.current.items[i.id] ?? '').trim())
+  const textosSucios = hallazgos.trim() !== guardado.current.hallazgos.trim() || cierre.trim() !== guardado.current.cierre.trim()
+  const sucio = textosSucios || itemsSucios.length > 0
 
   async function guardarTexto(): Promise<boolean> {
     if (!editable || !sucio) return true
     setGuardando(true)
-    const { error } = await updateCondominioRow('servicios_housekeeping', servicio.id, {
-      hallazgos_ingreso: hallazgos.trim() || null, inconvenientes: inconvenientes.trim() || null, observaciones_cierre: cierre.trim() || null,
+    try {
+      if (textosSucios) {
+        // El texto «inconvenientes» ya no se manda: lo deriva la base de los ítems.
+        const { error } = await updateCondominioRow('servicios_housekeeping', servicio.id, {
+          hallazgos_ingreso: hallazgos.trim() || null, observaciones_cierre: cierre.trim() || null,
+        })
+        if (error) { notify({ variant: 'error', title: 'Error al guardar', text: error.message }); return false }
+        guardado.current.hallazgos = hallazgos
+        guardado.current.cierre = cierre
+      }
+      for (const it of itemsSucios) {
+        const { error } = await actualizarInconveniente(it.id, (descripciones[it.id] ?? '').trim())
+        if (error) { notify({ variant: 'error', title: 'Error al guardar', text: error }); return false }
+        guardado.current.items[it.id] = descripciones[it.id] ?? ''
+      }
+      onRefresh()
+      return true
+    } finally { setGuardando(false) }
+  }
+
+  /** «＋ Agregar inconveniente»: crea la fila al momento (para poder colgarle fotos). */
+  async function agregarInconveniente() {
+    if (items.length >= MAX_INCONVENIENTES_POR_SERVICIO) {
+      notify({ variant: 'warning', title: 'Límite de inconvenientes', text: `Máximo ${MAX_INCONVENIENTES_POR_SERVICIO} por servicio.` }); return
+    }
+    setAgregandoItem(true)
+    const { data, error } = await crearInconveniente(servicio.id)
+    setAgregandoItem(false)
+    if (error || !data) { notify({ variant: 'error', title: 'No se pudo agregar el inconveniente', text: error ?? '' }); return }
+    setItems(prev => [...prev, data])
+    setDescripciones(prev => ({ ...prev, [data.id]: data.descripcion }))
+    guardado.current.items[data.id] = data.descripcion
+  }
+
+  /** «Quitar»: el inconveniente y sus fotos, por RPC (misma autorización que una foto). */
+  async function quitarInconveniente(it: InconvenienteHousekeeping, numero: number) {
+    const nFotosItem = fotos.filter(f => f.inconveniente_id === it.id).length
+    const r = await confirm({
+      title: `¿Quitar el inconveniente ${numero}?`,
+      text: nFotosItem ? `Se eliminan también sus ${nFotosItem} foto${nFotosItem === 1 ? '' : 's'}.` : 'Se quita de la lista del servicio.',
+      icon: 'warning', variant: 'danger', confirmText: 'Quitar',
     })
-    setGuardando(false)
-    if (error) { notify({ variant: 'error', title: 'Error al guardar', text: error.message }); return false }
-    guardado.current = { hallazgos, inconvenientes, cierre }
+    if (!r.isConfirmed) return
+    setQuitandoItem(it.id)
+    const { error, limpieza } = await eliminarInconveniente(it.id)
+    setQuitandoItem(null)
+    if (error) return notify({ variant: 'error', title: 'No se pudo quitar el inconveniente', text: error })
+    setItems(prev => prev.filter(x => x.id !== it.id))
+    setFotos(prev => prev.filter(f => f.inconveniente_id !== it.id))
+    setDescripciones(prev => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== it.id)))
+    delete guardado.current.items[it.id]
+    if (limpieza === 'pendiente') notify({ variant: 'info', title: 'Inconveniente quitado', text: 'Sus fotos se retirarán del almacenamiento en segundo plano.' })
     onRefresh()
-    return true
   }
 
   /** «Guardar y regresar»: guarda los textos y vuelve al menú (en solo lectura, solo vuelve). */
@@ -155,13 +221,13 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
     return () => window.removeEventListener('keydown', onKey)
   }, [visor])
 
-  async function agregar(fase: FaseFotoHousekeeping, files: File[]) {
+  async function agregar(fase: FaseFotoHousekeeping, files: File[], inconvenienteId?: string | null) {
     const actuales = fotos.filter(f => f.fase === fase).length
     const caben = cupoDisponible(actuales, files.length)
-    if (caben < files.length) notify({ variant: 'warning', title: 'Límite de fotos', text: `Máximo ${MAX_FOTOS_POR_FASE} por fase; se subirán ${caben}.` })
-    setSubiendo(fase)
+    if (caben < files.length) notify({ variant: 'warning', title: 'Límite de fotos', text: `Máximo ${MAX_FOTOS_POR_FASE} por fase${fase === 'inconvenientes' ? ' (entre todos los inconvenientes)' : ''}; se subirán ${caben}.` })
+    setSubiendo(claveSubida(fase, inconvenienteId))
     for (const file of files.slice(0, caben)) {
-      const { data, error } = await subirFotoServicio({ projectId, servicioId: servicio.id, fase, file })
+      const { data, error } = await subirFotoServicio({ projectId, servicioId: servicio.id, fase, file, inconvenienteId })
       if (error || !data) { notify({ variant: 'error', title: 'No se pudo subir la foto', text: error ?? '' }); break }
       setFotos(prev => [...prev, data])
     }
@@ -176,12 +242,12 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
   }
 
   function servicioActual(): ServicioHousekeeping {
-    return { ...servicio, hallazgos_ingreso: hallazgos, inconvenientes, observaciones_cierre: cierre }
+    return { ...servicio, hallazgos_ingreso: hallazgos, inconvenientes: textoInc, observaciones_cierre: cierre }
   }
 
   async function generarPdf(s: ServicioHousekeeping): Promise<Blob> {
     return generarInformeHousekeepingPdf({
-      servicio: s, fotos, tipoLabel, estadoLabel: s.estado === 'completado' ? 'Completado' : estadoLabel,
+      servicio: s, fotos, inconvenientes: itemsActuales, tipoLabel, estadoLabel: s.estado === 'completado' ? 'Completado' : estadoLabel,
       iniciadoPor: nombre(s.iniciado_por), completadoPor: nombre(s.completado_por),
       responsableLinea: lineaResponsablePdf(responsableEstado, nombre),
       evidenciasPor: [...new Set(fotos.map(f => f.creado_por).filter((id): id is string => !!id))].map(id => nombre(id)!),
@@ -268,10 +334,17 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
     } finally { setFinalizando(false) }
   }
 
-  const textoDe: Record<ParteHK, string> = { ingreso: hallazgos, inconvenientes, resultado: cierre }
+  const textoDe: Record<ParteHK, string> = { ingreso: hallazgos, inconvenientes: textoInc ?? '', resultado: cierre }
   const nFotos = (fase: FaseFotoHousekeeping) => fotos.filter(f => f.fase === fase).length
+  /** «2 inconvenientes · 3 fotos» en el menú; sin ítems, lo que diga la fase de fotos. */
+  const resumenInconvenientes = () => {
+    const n = nFotos('inconvenientes')
+    if (items.length === 0) return resumenParte(null, n)
+    return [`${items.length} inconveniente${items.length === 1 ? '' : 's'}`, n > 0 ? `${n} ${n === 1 ? 'foto' : 'fotos'}` : null].filter(Boolean).join(' · ')
+  }
+  const fotosSueltas = fotos.filter(f => f.fase === 'inconvenientes' && !f.inconveniente_id)
   const parteActual = PARTES.find(p => p.vista === vista) ?? null
-  const ocupado = guardando || finalizando || subiendo !== null
+  const ocupado = guardando || finalizando || subiendo !== null || agregandoItem || quitandoItem !== null
 
   const botonVolver = (estilo: CSSProperties) => (
     <button type="button" onClick={() => void volverAlMenu()} disabled={ocupado} style={{ ...estilo, opacity: ocupado ? 0.6 : 1 }}>
@@ -304,9 +377,9 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
               <h4 style={{ margin: '0 0 10px', fontSize: 13 }}>{editable ? '¿Qué deseas registrar?' : 'Evidencia del servicio'}</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {PARTES.map(p => {
-                  const resumen = resumenParte(textoDe[p.vista], nFotos(p.fase))
+                  const resumen = p.vista === 'inconvenientes' ? resumenInconvenientes() : resumenParte(textoDe[p.vista], nFotos(p.fase))
                   const descripcion = p.vista === 'ingreso' ? 'Cómo encontraste la unidad y fotos al ingresar'
-                    : p.vista === 'inconvenientes' ? 'Daños, faltantes o averías que hay que reportar, con sus fotos'
+                    : p.vista === 'inconvenientes' ? 'Daños, faltantes o averías, uno por uno, cada uno con su descripción y sus fotos'
                     : editable && enProceso ? 'Cómo quedó la unidad, fotos al terminar y dar por finalizado' : 'Cómo quedó la unidad y fotos al terminar'
                   return (
                     <button key={p.vista} type="button" onClick={() => setVista(p.vista)} aria-label={p.titulo} style={btnParte}>
@@ -355,12 +428,48 @@ export function HousekeepingServicioPasos({ servicio, projectId, tipoLabel, esta
               )}
 
               {vista === 'inconvenientes' && (
-                <div style={{ marginTop: 14, padding: 12, border: '1.5px solid var(--at-warning-border, var(--at-line))', borderRadius: 10, background: 'var(--at-warning-tint)' }}>
-                  <h5 style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600 }}>Inconvenientes encontrados</h5>
-                  <textarea style={area} value={inconvenientes} readOnly={!editable} onChange={e => setInconvenientes(e.target.value)} aria-label="Inconvenientes encontrados"
-                    placeholder="Daños, faltantes, averías o situaciones que hay que reportar…" />
-                  <HousekeepingFaseFotos titulo="Fotos de los inconvenientes" ayuda="las que hagan falta" fase="inconvenientes" fotos={fotos} canEdit={editable}
-                    subiendo={subiendo} onAgregar={agregar} onEliminar={eliminar} onVer={setVisor} />
+                <div data-testid="fase-inconvenientes" style={{ marginTop: 14 }}>
+                  <p style={{ margin: '0 0 10px', fontSize: 12.5, color: 'var(--at-ink-3)' }}>
+                    Un inconveniente por cada daño, faltante o avería, con su descripción y sus fotos.
+                    {' '}{nFotos('inconvenientes')}/{MAX_FOTOS_POR_FASE} fotos en total.
+                  </p>
+                  {itemsActuales.length === 0 && (
+                    <div style={{ padding: 14, border: '1.5px dashed var(--at-line-strong)', borderRadius: 10, textAlign: 'center', fontSize: 13, color: 'var(--at-ink-3)' }}>
+                      {editable ? 'Sin inconvenientes todavía. Si encontraste daños, faltantes o averías, agrega el primero.' : 'Sin inconvenientes reportados.'}
+                    </div>
+                  )}
+                  {itemsActuales.map((it, idx) => (
+                    <section key={it.id} aria-label={`Inconveniente ${idx + 1}`}
+                      style={{ marginTop: 10, padding: 12, border: '1.5px solid var(--at-warning-border, var(--at-line))', borderRadius: 10, background: 'var(--at-warning-tint)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <h5 style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>⚠️ Inconveniente {idx + 1}</h5>
+                        {editable && (
+                          <button type="button" onClick={() => void quitarInconveniente(it, idx + 1)} disabled={ocupado} aria-label={`Quitar inconveniente ${idx + 1}`}
+                            style={{ ...btn, padding: '4px 10px', minHeight: 30, fontSize: 12, color: 'var(--at-danger)', opacity: ocupado ? 0.6 : 1 }}>
+                            {quitandoItem === it.id ? 'Quitando…' : '🗑 Quitar'}
+                          </button>
+                        )}
+                      </div>
+                      <textarea style={{ ...area, minHeight: 72, marginTop: 6 }} value={descripciones[it.id] ?? ''} readOnly={!editable}
+                        onChange={e => setDescripciones(prev => ({ ...prev, [it.id]: e.target.value }))}
+                        aria-label={`Descripción del inconveniente ${idx + 1}`}
+                        placeholder="Qué pasó: daño, faltante, avería o situación que hay que reportar…" />
+                      <HousekeepingFaseFotos titulo={`Fotos del inconveniente ${idx + 1}`} ayuda="las que hagan falta" fase="inconvenientes" inconvenienteId={it.id}
+                        fotos={fotos} canEdit={editable} subiendo={subiendo} onAgregar={agregar} onEliminar={eliminar} onVer={setVisor} />
+                    </section>
+                  ))}
+                  {fotosSueltas.length > 0 && (
+                    <div style={{ marginTop: 10, padding: '0 12px 12px', border: '1.5px dashed var(--at-line)', borderRadius: 10 }}>
+                      <HousekeepingFaseFotos titulo="Fotos sin inconveniente asignado" ayuda="anteriores a esta versión" fase="inconvenientes" inconvenienteId={null}
+                        fotos={fotos} canEdit={false} subiendo={subiendo} onAgregar={agregar} onEliminar={eliminar} onVer={setVisor} />
+                    </div>
+                  )}
+                  {editable && (
+                    <button type="button" onClick={() => void agregarInconveniente()} disabled={ocupado || items.length >= MAX_INCONVENIENTES_POR_SERVICIO}
+                      style={{ ...btn, marginTop: 12, width: '100%', borderStyle: 'dashed', opacity: ocupado ? 0.6 : 1 }}>
+                      {agregandoItem ? 'Agregando…' : items.length === 0 ? '＋ Agregar inconveniente' : '＋ Agregar otro inconveniente'}
+                    </button>
+                  )}
                 </div>
               )}
 
