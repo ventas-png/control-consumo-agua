@@ -64,6 +64,10 @@ const inp: CSSProperties = {
 }
 const lbl: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', marginBottom: 3, display: 'block' }
 
+/** Para el buscador: minúsculas y sin tildes, así «perez» encuentra «Pérez» y viceversa (igual que Personal y Plantillas). */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 const formAusenciaVacio = {
   personal_id: '', tipo: 'vacaciones' as TipoAusencia,
   fecha_inicio: hoyLocalISO(), fecha_fin: hoyLocalISO(),
@@ -88,6 +92,10 @@ const formDiaVacio = {
  * Ambas alimentan la generación de turnos: `generar_bloques_turno()` se salta
  * los días cubiertos por una ausencia APROBADA y los no laborables, salvo que
  * la regla declare cubrirlos.
+ *
+ * Un solo buscador sirve a las dos vistas: acota las ausencias por empleado,
+ * tipo o motivo y los días por nombre, tipo o fecha, sin distinguir mayúsculas
+ * ni acentos, y se combina con el filtro de estado. Los KPIs no se acotan.
  */
 export default function AusenciasTab({
   ausencias, diasNoLaborables, personal, proyectoId, companyId, userId,
@@ -96,6 +104,7 @@ export default function AusenciasTab({
   const hoy = hoyLocalISO()
   const [vista, setVista] = useState<Vista>('ausencias')
   const [filtroEstado, setFiltroEstado] = useState<EstadoAusencia | 'todas'>('todas')
+  const [busqueda, setBusqueda] = useState('')
   const [saving, setSaving] = useState(false)
   const [modalAusencia, setModalAusencia] = useState<AusenciaPersonal | 'nueva' | null>(null)
   const [modalDia, setModalDia] = useState<DiaNoLaborable | 'nuevo' | null>(null)
@@ -107,9 +116,18 @@ export default function AusenciasTab({
     [personal],
   )
 
+  const termino = sinAcentos(busqueda)
   const visibles = useMemo(
-    () => filtroEstado === 'todas' ? ausencias : ausencias.filter(a => a.estado === filtroEstado),
-    [ausencias, filtroEstado],
+    () => ausencias.filter(a =>
+      (filtroEstado === 'todas' || a.estado === filtroEstado)
+      && (!termino || [a.personal_nombre ?? nombrePorId[a.personal_id], TIPOS_AUSENCIA.find(t => t.value === a.tipo)?.label, a.motivo]
+        .some(v => sinAcentos(v).includes(termino)))),
+    [ausencias, filtroEstado, termino, nombrePorId],
+  )
+  const diasVisibles = useMemo(
+    () => diasNoLaborables.filter(d =>
+      !termino || [d.nombre, TIPOS_DIA.find(t => t.value === d.tipo)?.label, d.fecha].some(v => sinAcentos(v).includes(termino))),
+    [diasNoLaborables, termino],
   )
 
   const kpis = useMemo(() => ({
@@ -257,8 +275,14 @@ export default function AusenciasTab({
         value={vista}
         onChange={setVista}
         ariaLabel="Vistas de ausencias y calendario laboral"
-        marginBottom={16}
+        marginBottom={12}
       />
+
+      {/* Buscador compartido por las dos vistas */}
+      <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+        placeholder={vista === 'ausencias' ? '🔍 Buscar empleado, tipo o motivo…' : '🔍 Buscar día, tipo o fecha…'}
+        aria-label="Buscar en ausencias y calendario laboral"
+        style={{ ...inp, width: 'min(100%, 320px)', marginBottom: 14 }} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 16 }}>
         {[
@@ -301,11 +325,14 @@ export default function AusenciasTab({
 
           {visibles.length === 0 ? (
             <EmptyState
-              icon="🌴"
-              title={ausencias.length === 0 ? 'Sin ausencias registradas' : 'Nada con ese filtro'}
+              icon={ausencias.length === 0 ? '🌴' : '🔍'}
+              compact={ausencias.length > 0}
+              title={ausencias.length === 0
+                ? 'Sin ausencias registradas'
+                : termino ? `Nada coincide con «${busqueda.trim()}»` : 'Nada con ese filtro'}
               description={ausencias.length === 0
                 ? 'Registrá vacaciones, permisos, incapacidades y suspensiones con su rango de fechas: el calendario de turnos deja de asignar esos días automáticamente.'
-                : 'Probá con otro estado.'}
+                : termino ? 'Se busca por empleado, tipo y motivo, dentro del estado elegido.' : 'Probá con otro estado.'}
             />
           ) : (
             <div style={{ display: 'grid', gap: 8 }}>
@@ -391,9 +418,11 @@ export default function AusenciasTab({
               title="Sin días no laborables registrados"
               description="Cargá los festivos del año y los asuetos locales. A partir de ahí, quien cubra uno de esos días verá sus horas computadas con el recargo que corresponda."
             />
+          ) : diasVisibles.length === 0 ? (
+            <EmptyState icon="🔍" compact title={`Ningún día coincide con «${busqueda.trim()}»`} description="Se busca por nombre, tipo y fecha." />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
-              {diasNoLaborables.map(d => (
+              {diasVisibles.map(d => (
                 <div key={d.id} style={{
                   background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 10,
                   padding: 12, borderLeft: `4px solid ${d.paga_recargo ? 'var(--at-warning)' : 'var(--at-line-strong)'}`,
