@@ -2,6 +2,10 @@
 // cierre): miniaturas seguras, botón de agregar (cámara nativa o selector) y eliminar. El tope
 // por fase lo impone también la base (hk_fotos_preparar). Extraído de HousekeepingEvidencias
 // para que el flujo por pasos lo reutilice tres veces.
+//
+// Con `inconvenienteId` pinta sólo las fotos de ESE inconveniente (fase «inconvenientes», una
+// cuadrícula por ítem) y sube las nuevas con su id; el tope de 20 sigue siendo el de la fase
+// entera, compartido entre los inconvenientes del servicio.
 import { useRef } from 'react'
 import { SecureImage } from '../../shared/SecureImage'
 import { BUCKET_HOUSEKEEPING } from '../../../domain/shared/buckets'
@@ -15,28 +19,47 @@ export interface FaseFotosProps {
   fase: FaseFotoHousekeeping
   fotos: FotoHousekeeping[]
   canEdit: boolean
-  subiendo: FaseFotoHousekeeping | null
-  onAgregar: (fase: FaseFotoHousekeeping, files: File[]) => void
+  /** Clave de lo que se está subiendo (ver `claveSubida`); null = nada. */
+  subiendo: string | null
+  onAgregar: (fase: FaseFotoHousekeeping, files: File[], inconvenienteId?: string | null) => void
   onEliminar: (f: FotoHousekeeping) => void
   onVer: (path: string) => void
+  /**
+   * Sólo las fotos de este inconveniente (`null` = las de la fase que no tienen ninguno,
+   * anteriores a 20261124000000). Sin la prop, todas las de la fase.
+   */
+  inconvenienteId?: string | null
 }
 
-export function HousekeepingFaseFotos({ titulo, ayuda, fase, fotos, canEdit, subiendo, onAgregar, onEliminar, onVer }: FaseFotosProps) {
+/** Qué se está subiendo: la fase, o la fase y el inconveniente. */
+export function claveSubida(fase: FaseFotoHousekeeping, inconvenienteId?: string | null): string {
+  return inconvenienteId === undefined ? fase : `${fase}:${inconvenienteId ?? 'sueltas'}`
+}
+
+export function HousekeepingFaseFotos({ titulo, ayuda, fase, fotos, canEdit, subiendo, onAgregar, onEliminar, onVer, inconvenienteId }: FaseFotosProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const lista = fotos.filter(f => f.fase === fase)
-  const lleno = lista.length >= MAX_FOTOS_POR_FASE
+  const porItem = inconvenienteId !== undefined
+  const delaFase = fotos.filter(f => f.fase === fase)
+  const lista = porItem ? delaFase.filter(f => (f.inconveniente_id ?? null) === inconvenienteId) : delaFase
+  // El cupo es de la fase entera, aunque se pinte un inconveniente a la vez.
+  const lleno = delaFase.length >= MAX_FOTOS_POR_FASE
+  const clave = claveSubida(fase, inconvenienteId)
+  const sufijo = porItem ? `-item-${inconvenienteId ?? 'sueltas'}` : ''
 
   async function abrirSelector() {
     if (!isNative()) { inputRef.current?.click(); return }
     const { takeNativePhoto } = await import('../../../lib/nativeCamera')
     const file = await takeNativePhoto(true)
-    if (file) onAgregar(fase, [file])
+    if (file) onAgregar(fase, [file], inconvenienteId)
   }
 
   return (
-    <div data-testid={`fase-${fase}`}>
+    <div data-testid={`fase-${fase}${sufijo}`}>
       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--at-ink-2)', margin: '10px 0 6px' }}>
-        {titulo} <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>({lista.length}/{MAX_FOTOS_POR_FASE}) · {ayuda}</span>
+        {titulo}{' '}
+        <span style={{ fontWeight: 400, color: 'var(--at-ink-3)' }}>
+          ({porItem ? lista.length : `${lista.length}/${MAX_FOTOS_POR_FASE}`}) · {ayuda}
+        </span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8 }}>
         {lista.map(f => (
@@ -62,13 +85,13 @@ export function HousekeepingFaseFotos({ titulo, ayuda, fase, fotos, canEdit, sub
           <button type="button" onClick={abrirSelector} disabled={subiendo !== null} aria-label={`Agregar fotos: ${titulo}`}
             style={{ paddingBottom: '75%', position: 'relative', border: '2px dashed var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', background: 'var(--at-surface-2)' }}>
             <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', fontSize: 11, color: 'var(--at-ink-3)' }}>
-              {subiendo === fase ? 'Subiendo…' : <><span style={{ fontSize: 20 }}>📷</span>Agregar</>}
+              {subiendo === clave ? 'Subiendo…' : <><span style={{ fontSize: 20 }}>📷</span>Agregar</>}
             </span>
           </button>
         )}
       </div>
-      <input ref={inputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} data-testid={`input-fotos-${fase}`}
-        onChange={e => { const fs = Array.from(e.target.files ?? []); if (fs.length) onAgregar(fase, fs); e.target.value = '' }} />
+      <input ref={inputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} data-testid={`input-fotos-${fase}${sufijo}`}
+        onChange={e => { const fs = Array.from(e.target.files ?? []); if (fs.length) onAgregar(fase, fs, inconvenienteId); e.target.value = '' }} />
     </div>
   )
 }

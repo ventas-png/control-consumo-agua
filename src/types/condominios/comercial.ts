@@ -191,5 +191,23 @@ export interface FotoHousekeeping {
   path: string | null
   created_at: string
   creado_por?: string | null
+  /** Sólo en la fase «inconvenientes»: a cuál de los inconvenientes del servicio pertenece (20261124000000). */
+  inconveniente_id?: string | null
+}
+
+/**
+ * Un inconveniente reportado en el servicio (20261124000000): su propia descripción y sus
+ * propias fotos (las de la fase «inconvenientes» con este `inconveniente_id`). El texto
+ * `inconvenientes` del servicio lo deriva la base a partir de estos.
+ */
+export interface InconvenienteHousekeeping {
+  id: string
+  servicio_id: string
+  /** Posición al crearlo (la asigna la base). El número que ve la persona sale de la posición en la lista, no de aquí. */
+  orden: number
+  descripcion: string
+  created_at: string
+  updated_at?: string
+  creado_por?: string | null
 }
 

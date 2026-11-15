@@ -6,13 +6,17 @@
 // no» no hace nada; un servicio completado se abre en solo lectura con «Notificar informe».
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
-import type { FotoHousekeeping, ServicioHousekeeping } from '../../../../types'
+import type { FotoHousekeeping, InconvenienteHousekeeping, ServicioHousekeeping } from '../../../../types'
 
 const mocks = vi.hoisted(() => ({
   updateCondominioRow: vi.fn(async (_t: string, _id: string, _p: Record<string, unknown>) => ({ error: null as null | { message: string } })),
   updateCondominioRowAfectando: vi.fn(async (_t: string, _id: string, _p: Record<string, unknown>) => ({ error: null as null | { message: string; code?: string } })),
   listarFotosServicio: vi.fn(async (_id: string) => ({ data: [] as FotoHousekeeping[], error: null as string | null })),
   subirFotoServicio: vi.fn(), eliminarFotoServicio: vi.fn(),
+  listarInconvenientes: vi.fn(async (_id: string) => ({ data: [] as InconvenienteHousekeeping[], error: null as string | null })),
+  crearInconveniente: vi.fn(async (_id: string) => ({ data: null as InconvenienteHousekeeping | null, error: null as string | null })),
+  actualizarInconveniente: vi.fn(async (_id: string, _d: string) => ({ error: null as string | null })),
+  eliminarInconveniente: vi.fn(async (_id: string) => ({ error: null as string | null, fotosEncoladas: 0, limpieza: 'ok' as const })),
   notificarInformeHousekeeping: vi.fn(async (_id: string, _o: unknown) => ({ data: { encolados: 2, destinatarios: ['d@x.test', 'a@x.test'], extra: false }, error: null as string | null })),
   openPromptDialog: vi.fn(async (_o: unknown) => null as Record<string, string> | null),
   generarPdf: vi.fn(async () => new Blob(['pdf'])),
@@ -26,6 +30,8 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({ updateCondominio
 vi.mock('../../../../domain/condominios/housekeepingEvidencias', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../domain/condominios/housekeepingEvidencias')>()),
   listarFotosServicio: mocks.listarFotosServicio, subirFotoServicio: mocks.subirFotoServicio, eliminarFotoServicio: mocks.eliminarFotoServicio,
+  listarInconvenientes: mocks.listarInconvenientes, crearInconveniente: mocks.crearInconveniente,
+  actualizarInconveniente: mocks.actualizarInconveniente, eliminarInconveniente: mocks.eliminarInconveniente,
 }))
 vi.mock('../../../../domain/condominios/housekeepingReservas', () => ({ notificarInformeHousekeeping: mocks.notificarInformeHousekeeping }))
 vi.mock('../../../../domain/usuarios/queries', () => ({ useUsuariosMap: () => ({ mapa: new Map([['u2', { full_name: 'Beto López' }]]) }) }))
@@ -48,10 +54,14 @@ function abrir(s: ServicioHousekeeping, props: Partial<Parameters<typeof Houseke
 }
 const menu = () => screen.getByRole('navigation', { name: 'Partes del servicio' })
 const boton = (nombre: string) => screen.getByRole('button', { name: nombre })
+const item = (id: string, orden: number, descripcion: string): InconvenienteHousekeeping => ({ id, servicio_id: 's1', orden, descripcion, created_at: '' })
+const foto = (id: string, inconveniente_id: string | null = null): FotoHousekeeping => ({ id, servicio_id: 's1', fase: 'inconvenientes', path: `p1/s1/${id}.jpg`, created_at: '', inconveniente_id })
 
 beforeEach(() => {
   Object.values(mocks).forEach(m => m.mockClear())
   mocks.listarFotosServicio.mockResolvedValue({ data: [], error: null })
+  mocks.listarInconvenientes.mockResolvedValue({ data: [], error: null })
+  mocks.actualizarInconveniente.mockResolvedValue({ error: null })
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
   mocks.updateCondominioRowAfectando.mockResolvedValue({ error: null })
   mocks.openPromptDialog.mockResolvedValue(null)
@@ -80,7 +90,7 @@ describe('HousekeepingServicioPasos — menú del flujo guiado', () => {
     expect(screen.getByText(/▶️ Inició/).textContent).toMatch(/Beto López · \d{2}\/\d{2}\/\d{2}, \d{2}:\d{2}/)
   })
 
-  it('«Evidenciar estado al ingresar»: texto + fotos de ingreso; «Guardar y regresar» manda los tres textos y vuelve al menú con el resumen', async () => {
+  it('«Evidenciar estado al ingresar»: texto + fotos de ingreso; «Guardar y regresar» manda los textos (el de inconvenientes lo deriva la base) y vuelve al menú con el resumen', async () => {
     const { onRefresh } = abrir(servicio())
     fireEvent.click(boton('Evidenciar estado al ingresar'))
     expect(screen.queryByRole('navigation')).toBeNull()
@@ -88,21 +98,74 @@ describe('HousekeepingServicioPasos — menú del flujo guiado', () => {
     expect(screen.queryByTestId('fase-inconvenientes')).toBeNull()
     fireEvent.change(screen.getByLabelText('Estado al ingresar'), { target: { value: 'Polvo en repisas' } })
     fireEvent.click(screen.getByText('💾 Guardar y regresar'))
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('servicios_housekeeping', 's1', { hallazgos_ingreso: 'Polvo en repisas', inconvenientes: null, observaciones_cierre: null }))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('servicios_housekeeping', 's1', { hallazgos_ingreso: 'Polvo en repisas', observaciones_cierre: null }))
     expect(onRefresh).toHaveBeenCalled()
     expect(mocks.updateCondominioRowAfectando).not.toHaveBeenCalled()   // guardar no cambia el estado
     expect(await screen.findByRole('navigation', { name: 'Partes del servicio' })).toBeTruthy()
     expect(within(menu()).getByText('✓ Con observaciones')).toBeTruthy()
   })
 
-  it('«Reportar inconvenientes»: su texto y sus fotos; «← Regresar» también guarda', async () => {
+  it('«Reportar inconvenientes»: cada inconveniente con su descripción y SUS fotos; «← Regresar» guarda las descripciones por ítem, no un texto del servicio', async () => {
+    mocks.listarInconvenientes.mockResolvedValueOnce({ data: [item('i1', 1, 'Grifo roto'), item('i2', 2, 'Vidrio quebrado')], error: null })
+    mocks.listarFotosServicio.mockResolvedValueOnce({ data: [foto('a', 'i1'), foto('b', 'i1'), foto('c', 'i2')], error: null })
     abrir(servicio())
+    expect(await within(menu()).findByText('✓ 2 inconvenientes · 3 fotos')).toBeTruthy()
     fireEvent.click(boton('Reportar inconvenientes'))
     expect(screen.getByTestId('fase-inconvenientes')).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Inconvenientes encontrados'), { target: { value: 'Grifo roto' } })
+    const inc1 = screen.getByRole('region', { name: 'Inconveniente 1' })
+    const inc2 = screen.getByRole('region', { name: 'Inconveniente 2' })
+    expect((within(inc1).getByLabelText('Descripción del inconveniente 1') as HTMLTextAreaElement).value).toBe('Grifo roto')
+    expect((within(inc2).getByLabelText('Descripción del inconveniente 2') as HTMLTextAreaElement).value).toBe('Vidrio quebrado')
+    // Las fotos van con su inconveniente: 2 en el 1, 1 en el 2.
+    expect(within(inc1).getAllByRole('button', { name: 'Ver foto' })).toHaveLength(2)
+    expect(within(inc2).getAllByRole('button', { name: 'Ver foto' })).toHaveLength(1)
+    expect(screen.queryByLabelText('Inconvenientes encontrados')).toBeNull()
+
+    fireEvent.change(within(inc1).getByLabelText('Descripción del inconveniente 1'), { target: { value: 'Grifo de la cocina roto' } })
     fireEvent.click(boton('Regresar al menú'))
-    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledWith('servicios_housekeeping', 's1', expect.objectContaining({ inconvenientes: 'Grifo roto' })))
+    await waitFor(() => expect(mocks.actualizarInconveniente).toHaveBeenCalledWith('i1', 'Grifo de la cocina roto'))
+    expect(mocks.actualizarInconveniente).toHaveBeenCalledTimes(1)   // el 2 no cambió
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()         // el texto del servicio lo deriva la base
     expect(await screen.findByRole('navigation', { name: 'Partes del servicio' })).toBeTruthy()
+  })
+
+  it('«＋ Agregar otro inconveniente» crea la fila al momento; sus fotos suben con su id; «Quitar» confirma, llama a la RPC y retira el ítem con sus fotos', async () => {
+    mocks.listarInconvenientes.mockResolvedValueOnce({ data: [item('i1', 1, 'Grifo roto')], error: null })
+    mocks.crearInconveniente.mockResolvedValueOnce({ data: item('i2', 2, ''), error: null })
+    mocks.subirFotoServicio.mockResolvedValueOnce({ data: foto('nueva', 'i2'), error: null })
+    mocks.eliminarInconveniente.mockResolvedValueOnce({ error: null, fotosEncoladas: 1, limpieza: 'ok' })
+    abrir(servicio(), { vistaInicial: 'inconvenientes' })
+    await screen.findByRole('region', { name: 'Inconveniente 1' })
+    expect(screen.queryByText(/Sin inconvenientes todavía/)).toBeNull()
+
+    fireEvent.click(boton('＋ Agregar otro inconveniente'))
+    const inc2 = await screen.findByRole('region', { name: 'Inconveniente 2' })
+    expect(mocks.crearInconveniente).toHaveBeenCalledWith('s1')
+
+    const entrada = within(inc2).getByTestId('input-fotos-inconvenientes-item-i2') as HTMLInputElement
+    fireEvent.change(entrada, { target: { files: [new File(['x'], 'b.jpg', { type: 'image/jpeg' })] } })
+    await waitFor(() => expect(mocks.subirFotoServicio).toHaveBeenCalledWith(expect.objectContaining({ servicioId: 's1', fase: 'inconvenientes', inconvenienteId: 'i2' })))
+    expect(await within(inc2).findByRole('button', { name: 'Ver foto' })).toBeTruthy()
+
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: true })
+    fireEvent.click(within(inc2).getByRole('button', { name: 'Quitar inconveniente 2' }))
+    await waitFor(() => expect(mocks.eliminarInconveniente).toHaveBeenCalledWith('i2'))
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({ confirmText: 'Quitar', text: expect.stringMatching(/1 foto/) }))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Inconveniente 2' })).toBeNull())
+    expect(screen.getByRole('region', { name: 'Inconveniente 1' })).toBeTruthy()
+  })
+
+  it('sin inconvenientes invita a agregar el primero; en solo lectura no hay agregar ni quitar y las descripciones no se editan', async () => {
+    abrir(servicio(), { vistaInicial: 'inconvenientes' })
+    expect(await screen.findByText(/Sin inconvenientes todavía/)).toBeTruthy()
+    expect(boton('＋ Agregar inconveniente')).toBeTruthy()
+    cleanup()
+    mocks.listarInconvenientes.mockResolvedValueOnce({ data: [item('i1', 1, 'Grifo roto')], error: null })
+    abrir(servicio({ estado: 'completado', completado_por: 'u2', completado_en: '2026-10-15T17:30:00Z' }), { vistaInicial: 'inconvenientes', estadoLabel: 'Completado' })
+    const inc1 = await screen.findByRole('region', { name: 'Inconveniente 1' })
+    expect((within(inc1).getByLabelText('Descripción del inconveniente 1') as HTMLTextAreaElement).readOnly).toBe(true)
+    expect(screen.queryByRole('button', { name: /Agregar/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Quitar/ })).toBeNull()
   })
 
   it('sin cambios, regresar no guarda nada', async () => {
