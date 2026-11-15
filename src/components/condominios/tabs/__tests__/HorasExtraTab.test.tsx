@@ -97,3 +97,48 @@ describe('HorasExtraTab — horario normal y horas extras', () => {
     expect(screen.queryByText('Exportar')).toBeNull()
   })
 })
+
+describe('HorasExtraTab — buscador por empleado', () => {
+  const dos = [
+    fila(),
+    fila({ personal_id: 'emp2', nombre: 'María López', cargo: 'conserje', horas_ordinarias: 100, horas_extra: 5 }),
+  ]
+  const buscador = () => screen.getByRole('searchbox', { name: 'Buscar empleado' })
+  const visibles = () => ['Pedro Guardia', 'María López'].filter(n => screen.queryByText(n))
+
+  it('acota la tabla por nombre o cargo sin distinguir mayúsculas ni acentos; los totales del mes no cambian', async () => {
+    mocks.fetchHorasPersonal.mockResolvedValue(dos)
+    render(<HorasExtraTab proyectoId="p1" />)
+    await screen.findByText('María López')
+    expect(visibles()).toEqual(['Pedro Guardia', 'María López'])
+    // 168 + 100 ordinarias: el KPI es del mes completo, busque lo que se busque.
+    expect(screen.getByText('268h')).toBeTruthy()
+
+    fireEvent.change(buscador(), { target: { value: 'lopez' } })
+    expect(visibles()).toEqual(['María López'])
+    expect(screen.getByText('268h')).toBeTruthy()
+
+    // «guardia» es el cargo de Pedro (y parte de su nombre); María es conserje.
+    fireEvent.change(buscador(), { target: { value: 'GUARDIA' } })
+    expect(visibles()).toEqual(['Pedro Guardia'])
+    fireEvent.change(buscador(), { target: { value: 'conserje' } })
+    expect(visibles()).toEqual(['María López'])
+
+    fireEvent.change(buscador(), { target: { value: 'zzz' } })
+    expect(visibles()).toEqual([])
+    expect(screen.getByText(/Nadie coincide con «zzz» en/)).toBeTruthy()
+    expect(screen.getByText('268h')).toBeTruthy()
+
+    fireEvent.change(buscador(), { target: { value: '' } })
+    expect(visibles()).toEqual(['Pedro Guardia', 'María López'])
+  })
+
+  it('con el mes vacío manda el estado vacío de siempre, no el del buscador', async () => {
+    mocks.fetchHorasPersonal.mockResolvedValue([])
+    render(<HorasExtraTab proyectoId="p1" />)
+    await screen.findByText(/Sin jornada registrada en/)
+    fireEvent.change(buscador(), { target: { value: 'pedro' } })
+    expect(screen.getByText(/Sin jornada registrada en/)).toBeTruthy()
+    expect(screen.queryByText(/Nadie coincide/)).toBeNull()
+  })
+})
