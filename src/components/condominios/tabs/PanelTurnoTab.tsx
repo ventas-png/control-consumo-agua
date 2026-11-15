@@ -1,5 +1,5 @@
 import { hoyLocalISO, sumarDiasCalendario } from '../../../lib/format'
-import { useMemo, type ReactNode} from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   Visitante, TicketMantenimiento, TareaCondominio,
   ReservaAmenidad, PolizaSeguro, ContratoProveedor,
@@ -23,6 +23,18 @@ function semaforo(val: number, verde: number, amarillo: number): string {
   return val <= verde ? 'var(--at-success)' : val <= amarillo ? 'var(--at-warning)' : 'var(--at-danger)'
 }
 
+const campoBusqueda: CSSProperties = {
+  flex: '1 1 200px', minWidth: 160, maxWidth: 320,
+  padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 8, fontSize: 13,
+  background: 'var(--at-surface)', color: 'var(--at-ink)', fontFamily: 'inherit',
+}
+
+/** Para el buscador: sin acentos ni mayúsculas, para que «lopez» encuentre «López». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+const sinCoincidencias: CSSProperties = { fontSize: 12, color: 'var(--at-ink-3)', fontStyle: 'italic' }
+
 export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reservas, polizas, contratosProveedores, inspecciones, vencimientosExtra, cuotas }: Props) {
   const hoy = hoyLocalISO()
   const en7 = sumarDiasCalendario(hoy, 7) ?? hoy
@@ -41,6 +53,19 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
     ...vencimientosExtra.filter(v => !v.renovado && v.fecha_vencimiento >= hoy && v.fecha_vencimiento <= en7).map(v => ({ titulo: v.titulo, fecha: v.fecha_vencimiento, icon: '⏳' })),
   ].sort((a, b) => a.fecha.localeCompare(b.fecha)), [polizas, contratosProveedores, inspecciones, vencimientosExtra, hoy, en7])
 
+  // El buscador acota las LISTAS de los bloques (quién está dentro, qué ticket,
+  // qué tarea, qué reserva, qué vence), no los contadores: el turno sigue
+  // teniendo los mismos pendientes aunque se esté buscando a una persona.
+  const [busqueda, setBusqueda] = useState('')
+  const termino = sinAcentos(busqueda)
+  const coincide = (...campos: (string | null | undefined)[]) => !termino || campos.some(c => sinAcentos(c).includes(termino))
+  const activosVisibles = activos.filter(v => coincide(v.nombre, v.unidad_nombre))
+  const ticketsVisibles = ticketsUrgentes.filter(t => coincide(t.titulo, t.prioridad, t.unidad_nombre))
+  const tareasVisibles = tareasHoy.filter(t => coincide(t.titulo, t.estado))
+  const reservasVisibles = reservasHoy.filter(r => coincide(r.amenidad_nombre, r.unidad_nombre))
+  const vencVisibles = vencProximos.filter(v => coincide(v.titulo))
+  const nadie = (que: string) => `${que} coincide con «${busqueda.trim()}»`
+
   function Bloque({ titulo, icon, count, color, children }: { titulo: string; icon: string; count: number; color: string; children: ReactNode }) {
     return (
       <div style={{ background: 'var(--at-surface)', border: `1px solid ${tint(color, 20)}`, borderRadius: 12, padding: 14, borderLeft: `4px solid ${color}` }}>
@@ -56,8 +81,10 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
   return (
     <div style={{ padding: 16 }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--at-ink)' }}>Panel de turno — vista operativa en tiempo real</div>
+        <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar visitante, unidad, ticket…" aria-label="Buscar en el panel" style={campoBusqueda} />
         <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>📅 {hoy} · 🕐 {hora}</div>
       </div>
 
@@ -82,15 +109,17 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
         <Bloque titulo="Visitantes dentro" icon="🚪" count={activos.length} color={semaforo(activos.length, 10, 30)}>
           {activos.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Ningún visitante registrado actualmente</div>
+          ) : activosVisibles.length === 0 ? (
+            <div style={sinCoincidencias}>{nadie('Ningún visitante dentro')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
-              {activos.slice(0, 8).map(v => (
+              {activosVisibles.slice(0, 8).map(v => (
                 <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: 'var(--at-success-tint)', borderRadius: 6 }}>
                   <span style={{ fontWeight: 600 }}>{v.nombre}</span>
                   <span style={{ color: 'var(--at-ink-3)' }}>{v.unidad_nombre} · {v.hora_entrada?.slice(11, 16)}</span>
                 </div>
               ))}
-              {activos.length > 8 && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', textAlign: 'center' }}>+{activos.length - 8} más</div>}
+              {activosVisibles.length > 8 && <div style={{ fontSize: 11, color: 'var(--at-ink-3)', textAlign: 'center' }}>+{activosVisibles.length - 8} más</div>}
             </div>
           )}
         </Bloque>
@@ -99,9 +128,11 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
         <Bloque titulo="Tickets urgentes / alta prioridad" icon="🔧" count={ticketsUrgentes.length} color={semaforo(ticketsUrgentes.length, 0, 2)}>
           {ticketsUrgentes.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Sin tickets pendientes de alta prioridad ✓</div>
+          ) : ticketsVisibles.length === 0 ? (
+            <div style={sinCoincidencias}>{nadie('Ningún ticket urgente')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
-              {ticketsUrgentes.slice(0, 6).map(t => (
+              {ticketsVisibles.slice(0, 6).map(t => (
                 <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: 'var(--at-danger-tint)', borderRadius: 6 }}>
                   <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{t.titulo}</span>
                   <span style={{ color: t.prioridad === 'urgente' ? 'var(--at-danger)' : 'var(--at-warning)', fontWeight: 700, marginLeft: 6, flexShrink: 0 }}>{t.prioridad}</span>
@@ -115,9 +146,11 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
         <Bloque titulo="Tareas para hoy" icon="✅" count={tareasHoy.length} color={semaforo(tareasHoy.length, 2, 5)}>
           {tareasHoy.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>No hay tareas con vencimiento hoy</div>
+          ) : tareasVisibles.length === 0 ? (
+            <div style={sinCoincidencias}>{nadie('Ninguna tarea de hoy')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
-              {tareasHoy.map(t => (
+              {tareasVisibles.map(t => (
                 <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: 'var(--at-warning-tint)', borderRadius: 6 }}>
                   <span style={{ flex: 1 }}>{t.titulo}</span>
                   <span style={{ color: 'var(--at-warning)', fontWeight: 700, flexShrink: 0, marginLeft: 6 }}>{t.estado}</span>
@@ -131,9 +164,11 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
         <Bloque titulo="Reservas de amenidades hoy" icon="🏊" count={reservasHoy.length} color="var(--at-primary)">
           {reservasHoy.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--at-ink-3)' }}>Sin reservas para hoy</div>
+          ) : reservasVisibles.length === 0 ? (
+            <div style={sinCoincidencias}>{nadie('Ninguna reserva de hoy')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
-              {reservasHoy.map(r => (
+              {reservasVisibles.map(r => (
                 <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 8px', background: 'var(--at-primary-tint)', borderRadius: 6 }}>
                   <span style={{ fontWeight: 600 }}>{r.amenidad_nombre ?? '—'}</span>
                   <span style={{ color: 'var(--at-primary)' }}>{r.hora_inicio} – {r.hora_fin} · {r.unidad_nombre}</span>
@@ -148,8 +183,11 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
       {vencProximos.length > 0 && (
         <div style={{ background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning-border)', borderRadius: 12, padding: 14, marginTop: 12 }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--at-warning)' }}>⏳ Vencimientos en los próximos 7 días ({vencProximos.length})</div>
+          {vencVisibles.length === 0 ? (
+            <div style={sinCoincidencias}>{nadie('Ningún vencimiento próximo')}</div>
+          ) : (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {vencProximos.map((v, i) => (
+            {vencVisibles.map((v, i) => (
               <div key={i} style={{ padding: '4px 10px', background: 'var(--at-surface)', border: '1px solid var(--at-warning-border)', borderRadius: 8, fontSize: 11 }}>
                 <span style={{ marginRight: 4 }}>{v.icon}</span>
                 <strong>{v.titulo}</strong>
@@ -157,6 +195,7 @@ export default function PanelTurnoTab({ visitantes, tickets, tareasCond, reserva
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
     </div>
