@@ -1018,3 +1018,64 @@ eliminarExigeSuPermiso('Turnos (reglas)', p => {
   renderTab(p)
   fireEvent.click(screen.getByText(/^Reglas/))
 }, /^Eliminar la regla$/, mocks.deleteCondominioRow, 'asignaciones_turno', 'r1')
+
+describe('TurnosTab — buscador compartido por las tres vistas', () => {
+  const buscador = () => screen.getByRole('searchbox', { name: 'Buscar en asignación de turnos' })
+  const otra: PersonalCondominio = { ...empleado, id: 'emp2', nombre: 'Ana López', cargo: 'conserje' } as PersonalCondominio
+  const diurna: PlantillaHorario = { ...plantilla, id: 'ph2', nombre: 'Diurno', codigo: 'D', turno: 'manana', hora_inicio: '06:00', hora_fin: '14:00', cruza_medianoche: false }
+  const kpiTurnos = () => screen.getByText('Turnos del mes').previousElementSibling?.textContent
+
+  it('en el calendario acota las filas por empleado sin distinguir acentos; el resumen del mes no se acota', () => {
+    renderTab({ personal: [empleado, otra] })
+    expect(screen.getByText('Pedro Guardia')).toBeTruthy()
+    expect(screen.getByText('Ana López')).toBeTruthy()
+    const turnosDelMes = kpiTurnos()
+    expect(turnosDelMes).not.toBe('0')
+
+    fireEvent.change(buscador(), { target: { value: 'lopez' } })
+    expect(screen.queryByText('Pedro Guardia')).toBeNull()
+    expect(screen.getByText('Ana López')).toBeTruthy()
+    // Los turnos son de Pedro: si el resumen se acotara con la búsqueda, caería a cero.
+    expect(kpiTurnos()).toBe(turnosDelMes)
+
+    fireEvent.change(buscador(), { target: { value: 'nadie' } })
+    expect(screen.getByText('Nadie coincide con «nadie»')).toBeTruthy()
+    fireEvent.change(buscador(), { target: { value: '' } })
+    expect(screen.getByText('Pedro Guardia')).toBeTruthy()
+    expect(screen.getByText('Ana López')).toBeTruthy()
+  })
+
+  it('en Reglas acota por nombre de la regla, empleado o jornada, y la búsqueda sigue al cambiar de vista', () => {
+    renderTab({
+      personal: [empleado, otra],
+      plantillas: [plantilla, diurna],
+      asignaciones: [regla(), regla({ id: 'r2', nombre: null, personal_id: 'emp2', personal_nombre: 'Ana López', plantilla_horario_id: 'ph2' })],
+    })
+    fireEvent.change(buscador(), { target: { value: 'PÉREZ' } })
+    fireEvent.click(screen.getByText(/^Reglas/))
+    expect(screen.getByText('Ninguna regla coincide con «PÉREZ»')).toBeTruthy()
+
+    fireEvent.change(buscador(), { target: { value: 'ana' } })
+    expect(screen.queryByText('Pedro · nocturno L-V')).toBeNull()
+    expect(screen.getByText('Ana López · Diurno')).toBeTruthy()
+
+    // Por la jornada: «nocturno» está en el nombre de la regla de Pedro y «diurno» en la jornada de Ana.
+    fireEvent.change(buscador(), { target: { value: 'diurno' } })
+    expect(screen.getByText('Ana López · Diurno')).toBeTruthy()
+    expect(screen.queryByText('Pedro · nocturno L-V')).toBeNull()
+  })
+
+  it('en Jornadas acota por nombre o código', () => {
+    renderTab({ plantillas: [plantilla, diurna] })
+    fireEvent.click(screen.getByText(/^Jornadas/))
+    expect(screen.getByText('Nocturno')).toBeTruthy()
+    expect(screen.getByText('Diurno')).toBeTruthy()
+    fireEvent.change(buscador(), { target: { value: 'noct' } })
+    expect(screen.getByText('Nocturno')).toBeTruthy()
+    expect(screen.queryByText('Diurno')).toBeNull()
+    fireEvent.change(buscador(), { target: { value: 'zzz' } })
+    expect(screen.getByText('Ninguna jornada coincide con «zzz»')).toBeTruthy()
+    // «+ Nueva jornada» sigue disponible aunque la búsqueda no deje nada.
+    expect(screen.getByText('+ Nueva jornada')).toBeTruthy()
+  })
+})
