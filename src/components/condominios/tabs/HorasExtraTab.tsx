@@ -21,6 +21,15 @@ const td: CSSProperties = {
   textAlign: 'right', padding: '8px 10px', fontSize: 12.5,
   color: 'var(--at-ink-2)', borderBottom: '1px solid var(--at-table-row-border)', whiteSpace: 'nowrap',
 }
+const campoBusqueda: CSSProperties = {
+  flex: '1 1 180px', minWidth: 160, maxWidth: 320,
+  padding: '7px 10px', border: '1px solid var(--at-line-strong)', borderRadius: 8, fontSize: 13,
+  background: 'var(--at-surface)', color: 'var(--at-ink)', fontFamily: 'inherit',
+}
+
+/** Para el buscador: sin acentos ni mayúsculas, para que «lopez» encuentre «López». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 
 /**
  * Horario normal y horas extras laboradas y computadas.
@@ -45,6 +54,7 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
   const [filas, setFilas] = useState<HorasPersonal[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [busqueda, setBusqueda] = useState('')
 
   const rango = useMemo(() => rangoMes(cursor.year, cursor.month), [cursor])
 
@@ -80,6 +90,14 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
   /** ¿Alguien pausó algo en el período? Decide si la tabla separa las columnas. */
   const hayPausas = useMemo(() => filas.some(f => Number(f.horas_descanso || 0) > 0), [filas])
 
+  // El buscador acota la TABLA, no los totales ni la exportación: el mes es el
+  // mes, y lo que se busca es a una persona dentro de él. Se mantiene al cambiar
+  // de mes para poder seguir a la misma persona de un período al otro.
+  const termino = sinAcentos(busqueda)
+  const filasVisibles = termino
+    ? filas.filter(f => sinAcentos(f.nombre).includes(termino) || sinAcentos(f.cargo).includes(termino))
+    : filas
+
   const periodo = `${MESES[cursor.month]} ${cursor.year}`
 
   return (
@@ -98,6 +116,8 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
             style={{ padding: '6px 12px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: 8, cursor: 'pointer', color: 'var(--at-ink)' }}
           >›</button>
         </div>
+        <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar empleado…" aria-label="Buscar empleado" style={campoBusqueda} />
         {filas.length > 0 && (
           <ExportButton
             data={filas}
@@ -161,6 +181,13 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
           title={`Sin jornada registrada en ${periodo}`}
           description="Aquí se cruzan los turnos asignados con la asistencia marcada. Necesita al menos una de las dos cosas: turnos generados en Asignación de turnos, o entradas y salidas en Presencia."
         />
+      ) : filasVisibles.length === 0 ? (
+        <EmptyState
+          compact
+          icon="🔍"
+          title={`Nadie coincide con «${busqueda.trim()}» en ${periodo}`}
+          description="Se busca por nombre y cargo. Los totales de arriba siguen siendo los del mes completo."
+        />
       ) : (
         <div className="table-scroll-wrapper" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 880 }}>
@@ -185,7 +212,7 @@ export default function HorasExtraTab({ proyectoId, proyectoNombre }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filas.map(f => (
+              {filasVisibles.map(f => (
                 <tr key={f.personal_id}>
                   <td style={{ ...td, textAlign: 'left' }}>
                     <div style={{ fontWeight: 600, color: 'var(--at-ink)' }}>{f.nombre}</div>
