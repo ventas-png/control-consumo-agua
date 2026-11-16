@@ -19,7 +19,7 @@ interface Props {
   /** Tier minimo requerido (default 'Bundle Completo'). */
   requiredPlan?: string
   /** Plan code para Stripe Checkout (default 'bundle'). */
-  targetPlanCode?: 'agua_only' | 'condominios_only' | 'bundle'
+  targetPlanCode?: 'agua_only' | 'condominios_only' | 'bundle' | 'rentas_only' | 'agua_rentas' | 'condominios_rentas' | 'suite'
   /** Billing cycle para Stripe Checkout. */
   billingCycle?: 'monthly' | 'yearly'
   /** Handler custom al hacer click. Override del flujo Stripe. */

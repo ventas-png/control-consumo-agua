@@ -2,25 +2,33 @@ import { useState } from 'react'
 import { Icon } from './icons'
 import type { Copy } from './i18n'
 
-// Pricing model:
-//   single module (agua OR condos): $10 activation incl. 1 project, $1/unit primary
-//   bundle (agua + condos):         $15 activation incl. 1 project, $1/unit primary
-//   each additional project:        $10 + $0.80/unit
+// Pricing model (espejo de billing_plans + plan_code_por_modulos, 20261126000000):
+//   módulos: Agua, Condominios, Rentas — se eligen uno o varios
+//   activación (incluye 1 proyecto): 1 módulo $10, 2 módulos $15, 3 módulos $20
+//   $1/unidad del proyecto principal; cada proyecto adicional $10 + $0.80/unidad
 // Result is a monthly total.
+
+/** Activación mensual en USD según cuántos módulos se contratan. */
+export function activacionPorModulos(n: number): number {
+  return n >= 3 ? 20 : n === 2 ? 15 : 10
+}
 export function PricingSection({ t, onCta }: { t: Copy; onCta: () => void }) {
-  const [mod, setMod] = useState('bundle')
+  // Por defecto Agua + Condominios (el bundle de siempre). Siempre queda al menos uno.
+  const [mods, setMods] = useState<string[]>(['agua', 'condos'])
+  const toggleMod = (id: string) => setMods(prev =>
+    prev.includes(id) ? (prev.length > 1 ? prev.filter(m => m !== id) : prev) : [...prev, id])
   const [projects, setProjects] = useState(2)
   const [primaryUnits, setPrimaryUnits] = useState(48)
   const [extraUnits, setExtraUnits] = useState(36)
 
-  const activation = mod === 'bundle' ? 15 : 10
+  const activation = activacionPorModulos(mods.length)
   const extraProjectsCount = Math.max(0, projects - 1)
   const extraProjectsCost = extraProjectsCount * 10
   const primaryCost = primaryUnits * 1
   const extraUnitsCost = extraUnits * 0.8
   const total = activation + primaryCost + extraProjectsCost + extraUnitsCost
   const totalStr = total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const activeLabel = t.pricing.modules.find((m) => m.id === mod)?.label ?? ''
+  const activeLabel = t.pricing.modules.filter((m) => mods.includes(m.id)).map((m) => m.label).join(' + ')
 
   return (
     <section className="pricing" id="pricing">
@@ -37,12 +45,13 @@ export function PricingSection({ t, onCta }: { t: Copy; onCta: () => void }) {
               <span className="pr-label">{t.pricing.module}</span>
               <div className="pr-mods">
                 {t.pricing.modules.map((m) => (
-                  <button key={m.id} className={'pr-mod ' + (mod === m.id ? 'active' : '')} onClick={() => setMod(m.id)}>
+                  <button key={m.id} type="button" aria-pressed={mods.includes(m.id)}
+                    className={'pr-mod ' + (mods.includes(m.id) ? 'active' : '')} onClick={() => toggleMod(m.id)}>
                     {m.badge && <span className="pr-mod-badge">{m.badge}</span>}
                     <span className="pr-mod-icon">
                       {m.id === 'agua' ? <Icon.drop size={18} /> :
                         m.id === 'condos' ? <Icon.building size={18} /> :
-                          <span className="pr-stack"><Icon.drop size={14} /><Icon.building size={14} /></span>}
+                          <Icon.calendar size={18} />}
                     </span>
                     <strong>{m.label}</strong>
                     <span className="pr-mod-desc">{m.desc}</span>

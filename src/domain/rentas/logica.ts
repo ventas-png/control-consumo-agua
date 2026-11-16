@@ -248,6 +248,9 @@ export function mensajeErrorRentas(e: unknown, porDefecto: string): string {
   if (!texto) return porDefecto
   if (texto.includes('rentas_propiedades_unidad_uq')) return 'Esa unidad ya está registrada como propiedad en renta.'
   if (texto.includes('rentas_contratos_vigente_uq')) return 'La propiedad ya tiene un contrato vigente. Finalízalo antes de registrar otro.'
+  if (texto.includes('plan_limit_reached')) {
+    return 'La empresa alcanzó su límite de unidades. Las propiedades independientes cuentan como unidades: pide ampliar el límite para registrar más.'
+  }
   if (/row-level security|permission denied/i.test(texto)) return 'No tienes permiso para hacer este cambio.'
   const m = /^RENTAS_[A-Z_]+:\s*(.+)$/.exec(texto)
   if (m) return m[1].charAt(0).toUpperCase() + m[1].slice(1)

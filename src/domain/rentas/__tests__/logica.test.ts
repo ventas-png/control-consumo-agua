@@ -185,6 +185,7 @@ describe('mensajeErrorRentas', () => {
     expect(mensajeErrorRentas(new Error('duplicate key value violates unique constraint "rentas_propiedades_unidad_uq"'), 'x')).toMatch(/ya está registrada/)
     expect(mensajeErrorRentas(new Error('duplicate key value violates unique constraint "rentas_contratos_vigente_uq"'), 'x')).toMatch(/contrato vigente/)
     expect(mensajeErrorRentas(new Error('new row violates row-level security policy for table "rentas_reservas"'), 'x')).toMatch(/No tienes permiso/)
+    expect(mensajeErrorRentas(new Error('plan_limit_reached: max_units = 50'), 'x')).toMatch(/límite de unidades/)
     expect(mensajeErrorRentas(null, 'Intenta de nuevo.')).toBe('Intenta de nuevo.')
   })
 })

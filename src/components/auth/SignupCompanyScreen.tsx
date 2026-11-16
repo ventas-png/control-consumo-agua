@@ -40,6 +40,7 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
   const [moneda, setMoneda] = useState('gtq')
   const [servicioAgua, setServicioAgua] = useState(false)
   const [servicioCondominios, setServicioCondominios] = useState(false)
+  const [servicioRentas, setServicioRentas] = useState(false)
   // Click-wrap obligatorio (RGPD/CCPA): desmarcado por defecto. Bloquea el envío.
   const [acceptedLegal, setAcceptedLegal] = useState(false)
 
@@ -59,7 +60,7 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
 
   function validateStep2(): string | null {
     if (!companyName.trim()) return 'Ingresa el nombre de tu empresa.'
-    if (!servicioAgua && !servicioCondominios) return 'Selecciona al menos un módulo (agua o condominios).'
+    if (!servicioAgua && !servicioCondominios && !servicioRentas) return 'Selecciona al menos un módulo (agua, condominios o rentas).'
     if (!acceptedLegal) return 'Debes leer y aceptar los Términos de Servicio, la Política de Privacidad y el Anexo DPA para continuar.'
     return null
   }
@@ -97,6 +98,7 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
         default_currency: moneda,
         servicio_agua: servicioAgua,
         servicio_condominios: servicioCondominios,
+        servicio_rentas: servicioRentas,
         // Evidencia click-wrap: el backend la valida y registra (versión + IP +
         // timestamp + user-agent) en legal_acceptances.
         legal_accepted: acceptedLegal,
@@ -114,6 +116,7 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
       trackFunnel(FUNNEL.companySignedUp, {
         servicio_agua: servicioAgua,
         servicio_condominios: servicioCondominios,
+        servicio_rentas: servicioRentas,
       })
       setSuccess(true)
     } catch {
@@ -231,7 +234,7 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
 
             <div className="signup-modules">
               <p className="signup-modules-title">¿Qué quieres administrar?</p>
-              <p className="signup-modules-sub">Puedes activar el otro módulo más tarde.</p>
+              <p className="signup-modules-sub">Elige uno o varios. Puedes pedir que te activen los demás más tarde.</p>
               <label className={`signup-module-card ${servicioCondominios ? 'selected' : ''}`}>
                 <input type="checkbox" checked={servicioCondominios} onChange={e => setServicioCondominios(e.target.checked)} />
                 <div>
@@ -244,6 +247,13 @@ export function SignupCompanyScreen({ onBack, onSignedUp }: Props) {
                 <div>
                   <strong>💧 Control de agua</strong>
                   <span>Lecturas, cobros, rutas, tarifas, clientes</span>
+                </div>
+              </label>
+              <label className={`signup-module-card ${servicioRentas ? 'selected' : ''}`}>
+                <input type="checkbox" checked={servicioRentas} onChange={e => setServicioRentas(e.target.checked)} />
+                <div>
+                  <strong>🏘️ Manejo de rentas</strong>
+                  <span>Propiedades, reservas, contratos e inventario</span>
                 </div>
               </label>
             </div>

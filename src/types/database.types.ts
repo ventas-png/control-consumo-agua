@@ -1618,6 +1618,7 @@ export type Database = {
           id: string
           includes_agua: boolean
           includes_condominios: boolean
+          includes_rentas: boolean
           is_active: boolean
           max_projects: number | null
           max_units: number | null
@@ -1647,6 +1648,7 @@ export type Database = {
           id?: string
           includes_agua?: boolean
           includes_condominios?: boolean
+          includes_rentas?: boolean
           is_active?: boolean
           max_projects?: number | null
           max_units?: number | null
@@ -1676,6 +1678,7 @@ export type Database = {
           id?: string
           includes_agua?: boolean
           includes_condominios?: boolean
+          includes_rentas?: boolean
           is_active?: boolean
           max_projects?: number | null
           max_units?: number | null
@@ -26463,6 +26466,7 @@ export type Database = {
           project_count: number
           servicio_agua: boolean
           servicio_condominios: boolean
+          servicio_rentas: boolean
           subscription_status: string
           suspended_at: string
           suspended_reason: string
@@ -26902,6 +26906,10 @@ export type Database = {
       resolver_vehiculo: {
         Args: { p_aprobar: boolean; p_comentario?: string; p_tag_codigo?: string; p_tag_tipo?: string; p_vehiculo_id: string }
         Returns: undefined
+      }
+      plan_code_por_modulos: {
+        Args: { p_agua: boolean; p_condominios: boolean; p_rentas: boolean }
+        Returns: string
       }
       rentas_propiedad_accesible: {
         Args: { p_propiedad: string }

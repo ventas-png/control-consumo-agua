@@ -5,19 +5,37 @@
 // código del billing plan solo se traduce a etiqueta legible.
 
 /** Etiqueta del badge de módulos según los servicios activos de la empresa. */
-export function moduleBadgeLabel(servicioAgua: boolean, servicioCondominios: boolean): string {
-  if (servicioAgua && servicioCondominios) return 'Agua + Condominios'
-  if (servicioAgua) return 'Agua'
-  if (servicioCondominios) return 'Condominios'
-  return 'Sin módulos'
+export function moduleBadgeLabel(servicioAgua: boolean, servicioCondominios: boolean, servicioRentas = false): string {
+  const modulos = [servicioAgua && 'Agua', servicioCondominios && 'Condominios', servicioRentas && 'Rentas'].filter(Boolean)
+  return modulos.length > 0 ? modulos.join(' + ') : 'Sin módulos'
 }
 
-/** Etiqueta legible del código de billing plan (agua_only/condominios_only/bundle). */
+/**
+ * Código del billing plan que corresponde a una combinación de módulos, o null
+ * si no hay ninguno. ESPEJO de la función SQL `plan_code_por_modulos`
+ * (migración 20261126000000): 1 módulo $10, 2 módulos $15, 3 módulos $20.
+ */
+export function planCodePorModulos(agua: boolean, condominios: boolean, rentas: boolean): string | null {
+  if (agua && condominios && rentas) return 'suite'
+  if (agua && condominios) return 'bundle'
+  if (agua && rentas) return 'agua_rentas'
+  if (condominios && rentas) return 'condominios_rentas'
+  if (agua) return 'agua_only'
+  if (condominios) return 'condominios_only'
+  if (rentas) return 'rentas_only'
+  return null
+}
+
+/** Etiqueta legible del código de billing plan (los tres de siempre + las combinaciones con Rentas). */
 export function planCodeLabel(planCode: string | null): string {
   switch (planCode) {
     case 'agua_only': return 'Solo Agua'
     case 'condominios_only': return 'Solo Condominios'
     case 'bundle': return 'Bundle Completo'
+    case 'rentas_only': return 'Solo Rentas'
+    case 'agua_rentas': return 'Agua + Rentas'
+    case 'condominios_rentas': return 'Condominios + Rentas'
+    case 'suite': return 'Suite Completa'
     case null: return 'Sin suscripción'
     default: return planCode
   }

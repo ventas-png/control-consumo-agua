@@ -55,6 +55,8 @@ export interface SignupCompanyPayload {
   default_currency?: string
   servicio_agua: boolean
   servicio_condominios: boolean
+  /** Manejo de Rentas (tercer módulo del plan). Opcional: ausente = no contratado. */
+  servicio_rentas?: boolean
   legal_accepted: boolean
 }
 

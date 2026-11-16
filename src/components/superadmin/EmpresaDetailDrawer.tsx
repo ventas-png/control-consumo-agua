@@ -30,6 +30,7 @@ import { ToggleSwitch } from './ToggleSwitch'
 import { subscriptionBadge } from './EmpresasTable'
 import {
   moduleBadgeLabel,
+  planCodePorModulos,
   planCodeLabel,
   formatUsdCents,
   purgeEligibleAt,
@@ -258,24 +259,36 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
     }
   }
 
-  async function toggleServicio(campo: 'servicio_agua' | 'servicio_condominios', nuevoValor: boolean) {
+  // Encender o apagar un módulo mueve el plan de la empresa (trigger
+  // trg_companies_modulos_plan): 1 módulo $10, 2 módulos $15, 3 módulos $20.
+  // El plan que se muestra se recalcula aquí con el mismo criterio (el listado
+  // tarda hasta 15 min en refrescar) y el desglose se vuelve a pedir.
+  async function toggleServicio(campo: 'servicio_agua' | 'servicio_condominios' | 'servicio_rentas', nuevoValor: boolean) {
     const { error } = await updateEmpresaCampo(emp.id, { [campo]: nuevoValor })
     if (error) {
-      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
-    } else {
-      patch({ [campo]: nuevoValor } as Partial<EmpresaSuperadminRow>)
-      onChanged()
+      // La base explica el rechazo (p. ej. MODULOS_PLAN_STRIPE: la empresa ya se factura por Stripe).
+      const motivo = /^MODULOS_[A-Z_]+:\s*(.+)$/.exec(error)?.[1]
+      notify({
+        variant: 'error', title: 'No se pudo cambiar el módulo',
+        text: motivo ? motivo.charAt(0).toUpperCase() + motivo.slice(1) : 'No se pudo actualizar el servicio.',
+        duration: motivo ? 0 : undefined,
+      })
+      return
     }
-  }
-
-  async function toggleRentas(nuevoValor: boolean) {
-    const { error } = await updateEmpresaCampo(emp.id, { servicio_rentas: nuevoValor })
-    if (error) {
-      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
-    } else {
-      qc.setQueryData(['superadmin', 'servicio_rentas', emp.id], nuevoValor)
-      onChanged()
+    const modulos = {
+      servicio_agua: emp.servicio_agua, servicio_condominios: emp.servicio_condominios,
+      servicio_rentas: servicioRentas === true, [campo]: nuevoValor,
     }
+    const plan = planCodePorModulos(modulos.servicio_agua, modulos.servicio_condominios, modulos.servicio_rentas)
+    patch({
+      ...(campo === 'servicio_rentas' ? {} : { [campo]: nuevoValor }),
+      servicio_rentas: modulos.servicio_rentas,
+      // Sin suscripción viva no hay plan que mover; sin módulos se conserva el último.
+      ...(plan && emp.plan_code ? { plan_code: plan } : {}),
+    } as Partial<EmpresaSuperadminRow>)
+    if (campo === 'servicio_rentas') qc.setQueryData(['superadmin', 'servicio_rentas', emp.id], nuevoValor)
+    void qc.invalidateQueries({ queryKey: superadminKeys.empresaBilling(emp.id) })
+    onChanged()
   }
 
   async function suspender() {
@@ -374,7 +387,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
       title={emp.nombre}
       subtitle={
         <span style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <StatusBadge tone="neutral">{moduleBadgeLabel(emp.servicio_agua, emp.servicio_condominios)}</StatusBadge>
+          <StatusBadge tone="neutral">{moduleBadgeLabel(emp.servicio_agua, emp.servicio_condominios, servicioRentas === true)}</StatusBadge>
           {!emp.activa && <StatusBadge tone="danger" dot>Suspendida</StatusBadge>}
           {emp.nit && <span>NIT: {emp.nit}</span>}
         </span>
@@ -417,7 +430,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
                   value={formatUsdCents(billing.extra_projects_subtotal)}
                 />
                 <BreakdownRow
-                  label={`Unidades proyectos adicionales (${billing.extra_units_count})`}
+                  label={`Unidades proyectos adicionales${servicioRentas ? ' y propiedades en renta independientes' : ''} (${billing.extra_units_count})`}
                   value={formatUsdCents(billing.extra_units_subtotal)}
                 />
                 <tr>
@@ -501,6 +514,9 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
 
         {/* ── Módulos contratados ── */}
         <Section title="Módulos">
+          <p style={{ margin: '0 0 10px', fontSize: '12.5px', color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
+            Los módulos definen el plan: 1 módulo $10 de activación, 2 módulos $15 y los 3 $20. Al encender o apagar uno, el plan y el total mensual de la empresa cambian.
+          </p>
           <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
             <ToggleSwitch
               checked={emp.servicio_agua}
@@ -518,7 +534,7 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
             {servicioRentas !== null && (
               <ToggleSwitch
                 checked={servicioRentas}
-                onChange={v => void toggleRentas(v)}
+                onChange={v => void toggleServicio('servicio_rentas', v)}
                 label="Manejo de Rentas"
                 onLabelColor="var(--at-primary)"
               />

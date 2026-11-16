@@ -74,12 +74,12 @@ export const COPY = {
     pricing: {
       eyebrow: 'Precio sin sorpresas',
       title: 'Pagas por lo que usas. Configurable al detalle.',
-      sub: 'Activa un módulo o el bundle, define tus proyectos y unidades. El cobro se ajusta automáticamente cada mes.',
-      module: 'Módulo',
+      sub: 'Elige uno o varios módulos, define tus proyectos y unidades. El cobro se ajusta automáticamente cada mes.',
+      module: 'Módulos (elige uno o varios)',
       modules: [
-        { id: 'agua', label: 'Solo Agua', desc: 'Lecturas, calidad y facturación', badge: '' },
-        { id: 'condos', label: 'Solo Condominios', desc: 'Cuotas, reservas y tickets', badge: '' },
-        { id: 'bundle', label: 'Bundle Completo', desc: 'Agua + Condominios', badge: 'Más popular' },
+        { id: 'agua', label: 'Agua', desc: 'Lecturas, calidad y facturación', badge: '' },
+        { id: 'condos', label: 'Condominios', desc: 'Cuotas, reservas y tickets', badge: '' },
+        { id: 'rentas', label: 'Rentas', desc: 'Propiedades, reservas, contratos e inventario', badge: 'Nuevo' },
       ],
       projects_label: 'Proyectos / condominios',
       units_label: 'Unidades totales (apartamentos, locales, casas)',
@@ -122,7 +122,7 @@ export const COPY = {
       items: [
         { q: '¿Necesito instalar medidores IoT?', a: 'No es obligatorio. Puedes registrar lecturas manuales desde la app móvil. Si más adelante instalas medidores compatibles, conectan automáticamente.' },
         { q: '¿Cómo funciona el cobro por unidad?', a: 'Cada proyecto tiene una activación mensual fija más $1 por unidad en el proyecto principal y $0.80 por unidad en proyectos adicionales. La calculadora arriba te muestra el total exacto.' },
-        { q: '¿Puedo empezar solo con un módulo?', a: 'Sí. Activa Agua o Condominios por separado a $10/mes de activación. Cuando necesites el otro, lo agregas y pasas a Bundle por $15.' },
+        { q: '¿Puedo empezar solo con un módulo?', a: 'Sí. Activa Agua, Condominios o Rentas por separado a $10/mes de activación. Con dos módulos la activación es de $15 y con los tres, $20.' },
         { q: '¿Qué pasa con mis datos si cancelo?', a: 'Exportas todo a Excel y PDF en cualquier momento. Mantenemos tu información 90 días después de cancelar por si decides volver.' },
         { q: '¿Tienen integraciones con bancos?', a: 'Sí, pasarelas de pago locales más conciliación de transferencias bancarias por archivo o API según el banco.' },
         { q: '¿En qué idiomas y monedas trabajan?', a: 'Español y English. Cualquier moneda local — la configuras por proyecto.' },
@@ -268,12 +268,12 @@ export const COPY = {
     pricing: {
       eyebrow: 'Pricing without surprises',
       title: 'Pay for what you use. Configurable in detail.',
-      sub: 'Activate a module or the bundle, set your projects and units. Billing auto-adjusts each month.',
-      module: 'Module',
+      sub: 'Pick one or more modules, set your projects and units. Billing auto-adjusts each month.',
+      module: 'Modules (pick one or more)',
       modules: [
-        { id: 'agua', label: 'Water only', desc: 'Readings, quality, billing', badge: '' },
-        { id: 'condos', label: 'Condos only', desc: 'Dues, bookings, tickets', badge: '' },
-        { id: 'bundle', label: 'Full bundle', desc: 'Water + Condos', badge: 'Most popular' },
+        { id: 'agua', label: 'Water', desc: 'Readings, quality, billing', badge: '' },
+        { id: 'condos', label: 'Condos', desc: 'Dues, bookings, tickets', badge: '' },
+        { id: 'rentas', label: 'Rentals', desc: 'Properties, bookings, leases, inventory', badge: 'New' },
       ],
       projects_label: 'Projects / condos',
       units_label: 'Total units (apartments, shops, houses)',
@@ -316,7 +316,7 @@ export const COPY = {
       items: [
         { q: 'Do I need IoT meters?', a: 'Not required. Log readings manually from the mobile app. If you install compatible IoT meters later, they connect automatically.' },
         { q: 'How does per-unit pricing work?', a: 'Each project has a fixed monthly activation plus $1 per unit on the primary project and $0.80 per unit on additional projects. The calculator above shows your exact total.' },
-        { q: 'Can I start with one module?', a: 'Yes. Activate Water or Condos separately at $10/mo. When you need the other, add it and switch to Bundle at $15.' },
+        { q: 'Can I start with one module?', a: 'Yes. Activate Water, Condos or Rentals separately at $10/mo. Two modules are $15 and all three are $20.' },
         { q: 'What happens to my data if I cancel?', a: 'Export everything to Excel and PDF anytime. We keep your info for 90 days after cancellation in case you come back.' },
         { q: 'Do you have bank integrations?', a: 'Yes — local payment gateways plus bank transfer reconciliation via file or API depending on the bank.' },
         { q: 'Which languages and currencies?', a: 'Spanish and English. Any local currency — configure per project.' },

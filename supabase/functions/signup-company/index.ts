@@ -124,6 +124,7 @@ Deno.serve(async (req: Request) => {
         default_currency: (payload.default_currency ?? 'gtq').trim().toLowerCase(),
         servicio_agua: payload.servicio_agua === true,
         servicio_condominios: payload.servicio_condominios === true,
+        servicio_rentas: payload.servicio_rentas === true,
         max_projects: 5,
         max_units: 50,
         signup_source: 'self_service',

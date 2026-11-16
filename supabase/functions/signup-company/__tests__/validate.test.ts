@@ -33,9 +33,13 @@ describe('signup-company/validatePayload', () => {
     expect(validatePayload({ ...ok, company_name: '' })).toMatch(/Nombre de la empresa/)
   })
 
-  it('exige al menos un servicio (agua o condominios)', () => {
+  it('exige al menos un servicio (agua, condominios o rentas)', () => {
     expect(validatePayload({ ...ok, servicio_agua: false, servicio_condominios: false })).toMatch(/al menos un servicio/)
+    expect(validatePayload({ ...ok, servicio_agua: false, servicio_condominios: false, servicio_rentas: false })).toMatch(/al menos un servicio/)
     expect(validatePayload({ ...ok, servicio_agua: false, servicio_condominios: true })).toBeNull()
+    // Rentas es un módulo del plan como los otros dos: basta con él.
+    expect(validatePayload({ ...ok, servicio_agua: false, servicio_condominios: false, servicio_rentas: true })).toBeNull()
+    expect(validatePayload({ ...ok, servicio_rentas: true })).toBeNull()
   })
 
   it('valida la moneda de cobro cuando viene en el payload', () => {

@@ -29,7 +29,7 @@ contrato vigente dentro de sus fechas. Un contrato vencido sin cerrar no ocupa, 
 
 ## Servicio y permisos
 
-- `companies.servicio_rentas` (**por defecto apagado**). Es un servicio aparte de Agua y de Condominios; lo enciende la
+- `companies.servicio_rentas` (**por defecto apagado**). Es el tercer módulo del plan (ver «Plan y cobro»); lo enciende la
   plataforma en *Empresas › detalle › Módulos › Manejo de Rentas*. Apagado, la RLS de las cuatro tablas no deja leer ni
   escribir (ni a la dueña) y el menú no aparece; los datos se conservan.
 - 16 claves RBAC `rentas.<propiedades|reservas|contratos|inventario>.<view|create|edit|delete>`. Dueño y
@@ -44,23 +44,62 @@ contrato vigente dentro de sus fechas. Un contrato vencido sin cerrar no ocupa, 
 Las tablas hijas cuelgan de la propiedad por llave **compuesta** `(propiedad_id, company_id)`: una fila no puede
 colgar de la propiedad de otra empresa.
 
+## Plan y cobro (migración `20261126000000_rentas_tercer_modulo_del_plan`)
+
+Rentas es el **tercer módulo del plan**, igual que Agua y Condominios.
+
+| Módulos | Plan (`billing_plans.code`) | Activación |
+|---|---|---|
+| Rentas | `rentas_only` | $10 |
+| Agua + Rentas | `agua_rentas` | $15 |
+| Condominios + Rentas | `condominios_rentas` | $15 |
+| Agua + Condominios + Rentas | `suite` | $20 |
+
+(`agua_only`, `condominios_only` y `bundle` no cambian.) Los precios por uso —proyecto adicional $10, unidad del proyecto
+principal $1, unidad adicional $0.80— son los mismos en todos los planes. Los planes nuevos heredan los `feature_codes`
+del plan equivalente sin Rentas (uno con Condominios conserva `asambleas_digitales`).
+
+- **Una sola tabla módulos → plan:** `plan_code_por_modulos(agua, condominios, rentas)`. La usan el alta de empresa
+  (`create_trial_subscription`) y el trigger de los interruptores. Su espejo en el front es `planCodePorModulos`
+  (`src/components/superadmin/empresaHelpers.ts`), con una prueba que los compara caso por caso.
+- **Los interruptores mueven el plan.** En *Gestión de Empresas › detalle › Módulos*, encender o apagar Agua,
+  Condominios o Rentas pasa la suscripción viva al plan de esa combinación (`trg_companies_modulos_plan`) y el total se
+  recalcula. Con todos apagados la empresa conserva su último plan. Si la suscripción **ya se factura por Stripe** el
+  cambio se rechaza (`MODULOS_PLAN_STRIPE`): repuntar el plan sin cambiar los precios en Stripe duplicaría líneas; ese
+  cambio va por el checkout.
+- **La empresa no se enciende módulos.** `lock_companies_billing_columns` congela `servicio_agua`,
+  `servicio_condominios` y `servicio_rentas` para todo el que no sea la plataforma (antes un dueño podía cambiarlos por
+  la API).
+- **Las propiedades independientes cuentan como unidades adicionales** (las que no tienen unidad enlazada, y sólo con
+  Rentas contratado): entran en `calculate_monthly_total_cents` (a $0.80), en `get_company_usage`, en el panel de
+  plataforma y contra `max_units` al registrarlas (`plan_limit_reached`). Una enlazada a una unidad no se cobra dos
+  veces.
+- **Registro:** la pantalla de alta y `signup-company` aceptan Rentas como módulo; el trial nace en el plan de la
+  combinación elegida. La página de precios deja elegir uno o varios módulos (10 / 15 / 20).
+
+Lo que **no** hace: no cambia el plan de ninguna empresa existente hasta que alguien toque sus módulos; no crea precios
+en Stripe (los planes nuevos nacen sin `stripe_price_id_*`, como los tres actuales en producción); no toca
+`enforce_max_units` (drift declarado), así que el tope al crear una *unidad* sigue contando sólo unidades.
+
 ## Archivos
 
 | Qué | Dónde |
 |---|---|
 | Migración | `supabase/migrations/20261125000000_rentas_modulo.sql` |
 | Suite SQL (Postgres real, 58 comprobaciones, 5 mutantes) | `supabase/tests/rentas_modulo/` |
+| Migración del plan y su suite (46 comprobaciones, 7 mutantes) | `supabase/migrations/20261126000000_rentas_tercer_modulo_del_plan.sql`, `supabase/tests/rentas_plan/` |
 | Dominio | `src/domain/rentas/` (`logica.ts` pura, `queries.ts`, `mutations.ts`) |
 | Pantallas | `src/components/rentas/` (`RentasSection.tsx` + `tabs/`) |
 | Permisos en el front | `src/lib/moduleConfig.ts` (`RENTAS_*`), `src/hooks/usePermissions.ts`, `src/lib/rentasPermissions.ts` |
 | Menú y rutas | `Sidebar.tsx` (grupo «Manejo Rentas»), `app/routes.tsx` (`/rentas`, `/rentas/<pestaña>`) |
-| Recuperación | `scripts/reversion-rentas-modulo.sql` |
+| Recuperación | `scripts/reversion-rentas-modulo.sql`, `scripts/reversion-rentas-plan.sql` |
 | CI | paso «Rentas — propiedades, reservas, contratos e inventario» en `coverage.yml` |
 
 ## Pruebas
 
 ```bash
 supabase/tests/rentas_modulo/run.sh
+supabase/tests/rentas_plan/run.sh
 npx vitest run src/domain/rentas src/components/rentas src/hooks/__tests__/usePermissions.rentas.test.ts src/__tests__/rentasModuloMigracion.test.ts
 ```
 
@@ -75,8 +114,9 @@ npx vitest run src/domain/rentas src/components/rentas src/hooks/__tests__/usePe
 ## Límites conocidos
 
 - Los montos son informativos: Rentas no genera cargos, cobros ni asientos contables.
+- El selector de plan del perfil de la empresa lista todos los planes activos (ahora siete) sin filtrar por sus módulos; cambiar de plan desde ahí no enciende módulos.
+- El panel de plataforma refresca sus totales cada 15 minutos: tras mover un interruptor, el detalle de la empresa muestra el plan y el desglose al momento, el listado puede tardar.
 - No hay fotos de propiedades ni de artículos, ni carga masiva (la de reservas STR sigue en Condominios).
 - El solape de fechas entre reservas es un aviso, no un bloqueo (igual que en STR).
-- El listado de empresas de la plataforma no muestra aún el servicio en la columna «Módulos»; sí en el detalle.
 - `locales_comerciales` y `contratos_arrendamiento` de Condominios no se migran: son registros por proyecto y siguen
   donde están.
