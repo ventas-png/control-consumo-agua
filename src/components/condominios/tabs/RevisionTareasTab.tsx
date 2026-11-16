@@ -21,6 +21,7 @@ import { openPromptDialog } from '../../shared/PromptDialog'
 import { notify } from '../../shared/Dialog'
 import { novedadesDeTareas, type NovedadOperativa } from '../../../domain/condominios/novedades'
 import { VistaNovedades } from './limpieza/VistaNovedades'
+import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
 import type {
   BloqueTurno, TareaBloque, RevisionTarea,
   PersonalCondominio, EstadoRevision,
@@ -43,6 +44,12 @@ const VISTAS: { id: Vista; label: string; icon: string }[] = [
   { id: 'novedades', label: 'Novedades', icon: '⚠️' },
 ]
 
+const TURNO_LABEL: Record<string, string> = { manana: 'Mañana', tarde: 'Tarde', noche: 'Noche' }
+
+/** Para el buscador: sin acentos ni mayúsculas, para que «lopez» encuentre «López». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 const ESTADO_REV: Record<EstadoRevision, { label: string; icon: string; bg: string; color: string; border: string }> = {
   pendiente: { label: 'Pendiente revisión', icon: '⏳', bg: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: 'var(--at-line)' },
   aprobado:  { label: 'Aprobado',           icon: '✅', bg: 'var(--at-success-tint)', color: 'var(--at-success)', border: 'var(--at-success-border)' },
@@ -55,6 +62,7 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
   const [selectedPersonalId, setSelectedPersonalId] = useState('todos')
   const [bloqueAbierto, setBloqueAbierto] = useState<string | null>(null)
   const [vista, setVista] = useState<Vista>('revision')
+  const [busqueda, setBusqueda] = useState('')
 
   // Sin filtrar por fecha ni por empleado: una novedad no deja de importar
   // porque el administrador esté mirando otro día. Los filtros de arriba son
@@ -80,6 +88,21 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
 
   const tareasDeBloque = (bloqueId: string) =>
     tareas.filter(t => t.bloque_id === bloqueId).sort((a, b) => a.orden - b.orden)
+
+  // El buscador acota los turnos cerrados pintados por empleado, cargo, turno,
+  // título de tarea o lo que el operativo reportó en ella, sin distinguir
+  // acentos. Los filtros de fecha y empleado siguen mandando.
+  const termino = sinAcentos(busqueda)
+  const bloquesVisibles = termino
+    ? bloquesCerrados.filter(b => {
+        const emp = personal.find(p => p.id === b.personal_id)
+        const campos = [
+          emp?.nombre, emp?.cargo, etiquetaCargo(emp?.cargo), TURNO_LABEL[b.turno],
+          ...tareasDeBloque(b.id).flatMap(t => [t.titulo, t.novedad ?? t.notas_operativo]),
+        ]
+        return campos.some(c => sinAcentos(c).includes(termino))
+      })
+    : bloquesCerrados
 
   const revisionDeTarea = (tareaId: string): RevisionTarea | undefined =>
     revisiones.find(r => r.tarea_id === tareaId)
@@ -179,10 +202,13 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
         <input type="date" value={selectedFecha} onChange={e => setSelectedFecha(e.target.value)}
           style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
         {selectedFecha !== hoy && (
-          <button onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-ink-2)' }}>
+          <button type="button" onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-ink-2)' }}>
             Hoy
           </button>
         )}
+        <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar empleado o tarea…" aria-label="Buscar turno cerrado"
+          style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)', flex: '1 1 200px', minWidth: '160px', maxWidth: '340px' }} />
       </div>
 
       {bloquesCerrados.length === 0 ? (
@@ -191,9 +217,15 @@ export function RevisionTareasTab({ bloques, tareas, revisiones, personal, userI
           <p style={{ fontWeight: 700, color: 'var(--at-ink-3)' }}>Sin turnos cerrados para revisar</p>
           <p style={{ fontSize: '13px' }}>Los turnos aparecen aquí cuando el operativo cierra su bloque de trabajo.</p>
         </div>
+      ) : bloquesVisibles.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--at-ink-3)' }}>
+          <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔍</div>
+          <p style={{ fontWeight: 700, color: 'var(--at-ink-3)', margin: '0 0 4px' }}>Ningún turno coincide con «{busqueda.trim()}»</p>
+          <p style={{ fontSize: '13px', margin: 0 }}>Se busca por empleado, cargo, turno, título de tarea y lo reportado en ella.</p>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {bloquesCerrados.map(bloque => {
+          {bloquesVisibles.map(bloque => {
             const empleado = personal.find(p => p.id === bloque.personal_id)
             const ts = tareasDeBloque(bloque.id)
             const rev = estadoRevisionBloque(bloque.id)
