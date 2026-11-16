@@ -133,8 +133,9 @@ export default function ActividadEquipoTab({ proyectoId, companyId }: Props) {
         pageSize={50}
         isLoading={isLoading}
         defaultSort={{ key: 'total', direction: 'desc' }}
-        searchableKeys={['usuario_nombre']}
-        searchPlaceholder="Buscar persona…"
+        // Por nombre y por rol («lecturista»), sin distinguir acentos (lo hace DataTable).
+        searchableKeys={['usuario_nombre', 'usuario_rol']}
+        searchPlaceholder="🔍 Buscar persona o rol…"
         emptyState={{ icon: '📭', title: 'Sin actividad registrada en el período' }}
         columns={[
           {
