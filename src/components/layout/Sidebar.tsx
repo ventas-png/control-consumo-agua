@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, type ReactNode} from 'react'
 import type { AppSection, UserRole, UserSession } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { usePermissionsContext } from '../shared/PermissionsContext'
-import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS } from '../../lib/moduleConfig'
+import { WATER_MODULE_KEYS, CONDOMINIOS_MODULE_KEYS, RENTAS_MODULE_KEYS } from '../../lib/moduleConfig'
 import { getDisplayRoleLabel } from '../../lib/permissions'
 import { CompanyBrandMark } from '../shared/CompanyBrandMark'
 import { SECTIONS, condoTabPath, type SectionKey, type SectionDef } from '../condominios/sections'
@@ -253,6 +253,66 @@ const NAV: NavEntry[] = [
       },
     ],
   },
+  // ── Grupo 5: Manejo Rentas ───────────────────────────────────────────────────
+  // Servicio aparte (companies.servicio_rentas). La visibilidad de cada item la
+  // decide canViewModule (servicio contratado + permiso `rentas.<módulo>.view`).
+  {
+    kind: 'group',
+    id: 'rentas_grp',
+    label: 'Manejo Rentas',
+    tabs: [
+      {
+        id: 'rentas_panel',
+        label: 'Panel',
+        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10" />
+          </svg>
+        ),
+      },
+      {
+        id: 'rentas_propiedades',
+        label: 'Propiedades',
+        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 21V5a2 2 0 012-2h7a2 2 0 012 2v16M15 9h3a2 2 0 012 2v10M3 21h18M8 7h3M8 11h3M8 15h3" />
+          </svg>
+        ),
+      },
+      {
+        id: 'rentas_reservas',
+        label: 'Reservas',
+        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 3v4M16 3v4M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zM9 14l2 2 4-4" />
+          </svg>
+        ),
+      },
+      {
+        id: 'rentas_contratos',
+        label: 'Contratos',
+        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6M9 16h6M9 8h2M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5zM14 3v5h5" />
+          </svg>
+        ),
+      },
+      {
+        id: 'rentas_inventario',
+        label: 'Inventario',
+        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7l8-4 8 4-8 4-8-4zM4 7v10l8 4 8-4V7M12 11v10" />
+          </svg>
+        ),
+      },
+    ],
+  },
   // ── Config. del sistema (standalone) ────────────────────────────────────────
   {
     kind: 'tab',
@@ -323,6 +383,8 @@ function isServiceEnabled(tabId: string, session: UserSession): boolean {
 }
 
 function isTabVisible(tab: Tab, userRole: UserRole, canViewModule: (key: string) => boolean): boolean {
+  // Rentas no admite el atajo de rol: sin el servicio contratado tampoco lo ve el dueño.
+  if (RENTAS_MODULE_KEYS.has(tab.id)) return canViewModule(tab.id)
   if (NON_CONFIGURABLE.includes(tab.id)) return tab.roles.includes(userRole)
   if (BYPASS_ROLES.includes(userRole)) return tab.roles.includes(userRole)
   return canViewModule(tab.id)

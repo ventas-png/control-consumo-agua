@@ -3390,6 +3390,7 @@ export type Database = {
           rfc: string | null
           servicio_agua: boolean
           servicio_condominios: boolean
+          servicio_rentas: boolean
           signup_source: string
           stripe_activo: boolean | null
           stripe_configured: boolean | null
@@ -3435,6 +3436,7 @@ export type Database = {
           rfc?: string | null
           servicio_agua?: boolean
           servicio_condominios?: boolean
+          servicio_rentas?: boolean
           signup_source?: string
           stripe_activo?: boolean | null
           stripe_configured?: boolean | null
@@ -3480,6 +3482,7 @@ export type Database = {
           rfc?: string | null
           servicio_agua?: boolean
           servicio_condominios?: boolean
+          servicio_rentas?: boolean
           signup_source?: string
           stripe_activo?: boolean | null
           stripe_configured?: boolean | null
@@ -19475,6 +19478,331 @@ export type Database = {
           },
         ]
       }
+      rentas_contratos: {
+        Row: {
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          deposito: number | null
+          dia_pago: number | null
+          estado: string
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          inquilino_email: string | null
+          inquilino_identificacion: string | null
+          inquilino_nombre: string
+          inquilino_telefono: string | null
+          notas: string | null
+          propiedad_id: string
+          renta_mensual: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          deposito?: number | null
+          dia_pago?: number | null
+          estado?: string
+          fecha_fin?: string | null
+          fecha_inicio: string
+          id?: string
+          inquilino_email?: string | null
+          inquilino_identificacion?: string | null
+          inquilino_nombre: string
+          inquilino_telefono?: string | null
+          notas?: string | null
+          propiedad_id: string
+          renta_mensual: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          deposito?: number | null
+          dia_pago?: number | null
+          estado?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          inquilino_email?: string | null
+          inquilino_identificacion?: string | null
+          inquilino_nombre?: string
+          inquilino_telefono?: string | null
+          notas?: string | null
+          propiedad_id?: string
+          renta_mensual?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentas_contratos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_contratos_propiedad_fk"
+            columns: ["propiedad_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "rentas_propiedades"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
+      rentas_inventario: {
+        Row: {
+          ambiente: string | null
+          cantidad: number
+          categoria: string
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          estado: string
+          fecha_revision: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          numero_serie: string | null
+          propiedad_id: string
+          updated_at: string
+          valor_unitario: number | null
+        }
+        Insert: {
+          ambiente?: string | null
+          cantidad?: number
+          categoria?: string
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          estado?: string
+          fecha_revision?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          numero_serie?: string | null
+          propiedad_id: string
+          updated_at?: string
+          valor_unitario?: number | null
+        }
+        Update: {
+          ambiente?: string | null
+          cantidad?: number
+          categoria?: string
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          estado?: string
+          fecha_revision?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          numero_serie?: string | null
+          propiedad_id?: string
+          updated_at?: string
+          valor_unitario?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentas_inventario_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_inventario_propiedad_fk"
+            columns: ["propiedad_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "rentas_propiedades"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
+      rentas_propiedades: {
+        Row: {
+          area_m2: number | null
+          banos: number | null
+          capacidad: number | null
+          ciudad: string | null
+          codigo: string | null
+          comision_pct: number | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          direccion: string | null
+          estado: string
+          habitaciones: number | null
+          id: string
+          nombre: string
+          notas: string | null
+          project_id: string | null
+          propietario_email: string | null
+          propietario_nombre: string | null
+          propietario_telefono: string | null
+          tarifa_base: number | null
+          tipo_detalle: string | null
+          tipo_renta: string
+          unidad_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          area_m2?: number | null
+          banos?: number | null
+          capacidad?: number | null
+          ciudad?: string | null
+          codigo?: string | null
+          comision_pct?: number | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          direccion?: string | null
+          estado?: string
+          habitaciones?: number | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          project_id?: string | null
+          propietario_email?: string | null
+          propietario_nombre?: string | null
+          propietario_telefono?: string | null
+          tarifa_base?: number | null
+          tipo_detalle?: string | null
+          tipo_renta?: string
+          unidad_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          area_m2?: number | null
+          banos?: number | null
+          capacidad?: number | null
+          ciudad?: string | null
+          codigo?: string | null
+          comision_pct?: number | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          direccion?: string | null
+          estado?: string
+          habitaciones?: number | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          project_id?: string | null
+          propietario_email?: string | null
+          propietario_nombre?: string | null
+          propietario_telefono?: string | null
+          tarifa_base?: number | null
+          tipo_detalle?: string | null
+          tipo_renta?: string
+          unidad_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentas_propiedades_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_propiedades_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_propiedades_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "unidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rentas_reservas: {
+        Row: {
+          codigo_confirmacion: string | null
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          estado: string
+          fecha_entrada: string
+          fecha_salida: string
+          huesped_email: string | null
+          huesped_nombre: string
+          huesped_telefono: string | null
+          id: string
+          monto_noche: number | null
+          monto_total: number | null
+          notas: string | null
+          num_huespedes: number
+          plataforma: string
+          propiedad_id: string
+          updated_at: string
+        }
+        Insert: {
+          codigo_confirmacion?: string | null
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          estado?: string
+          fecha_entrada: string
+          fecha_salida: string
+          huesped_email?: string | null
+          huesped_nombre: string
+          huesped_telefono?: string | null
+          id?: string
+          monto_noche?: number | null
+          monto_total?: number | null
+          notas?: string | null
+          num_huespedes?: number
+          plataforma?: string
+          propiedad_id: string
+          updated_at?: string
+        }
+        Update: {
+          codigo_confirmacion?: string | null
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          estado?: string
+          fecha_entrada?: string
+          fecha_salida?: string
+          huesped_email?: string | null
+          huesped_nombre?: string
+          huesped_telefono?: string | null
+          id?: string
+          monto_noche?: number | null
+          monto_total?: number | null
+          notas?: string | null
+          num_huespedes?: number
+          plataforma?: string
+          propiedad_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentas_reservas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_reservas_propiedad_fk"
+            columns: ["propiedad_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "rentas_propiedades"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
       reservas_str: {
         Row: {
           codigo_confirmacion: string | null
@@ -26574,6 +26902,14 @@ export type Database = {
       resolver_vehiculo: {
         Args: { p_aprobar: boolean; p_comentario?: string; p_tag_codigo?: string; p_tag_tipo?: string; p_vehiculo_id: string }
         Returns: undefined
+      }
+      rentas_propiedad_accesible: {
+        Args: { p_propiedad: string }
+        Returns: boolean
+      }
+      rentas_servicio_activo: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
       str_import_puede_crear: {
         Args: Record<PropertyKey, never>

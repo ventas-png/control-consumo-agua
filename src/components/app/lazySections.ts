@@ -47,6 +47,7 @@ export const UnidadesSection = lazyWithPreload(() => import('../unidades/Unidade
 export const CobrosSection = lazyWithPreload(() => import('../cobros/CobrosSection').then(m => ({ default: m.CobrosSection })))
 export const ComunicacionSection = lazyWithPreload(() => import('../comunicacion/ComunicacionSection').then(m => ({ default: m.ComunicacionSection })))
 export const ServiciosEnergiaSection = lazyWithPreload(() => import('../servicios-energia/ServiciosEnergiaSection'))
+export const RentasSection = lazyWithPreload(() => import('../rentas/RentasSection'))
 export const CondominiosSection = lazyWithPreload(() => import('../condominios/CondominiosSection').then(m => ({ default: m.CondominiosSection })))
 export const CondominiosDashboard = lazyWithPreload(() => import('../condominios/CondominiosDashboard').then(m => ({ default: m.CondominiosDashboard })))
 export const ContabilidadSection = lazyWithPreload(() => import('../contabilidad/ContabilidadSection').then(m => ({ default: m.ContabilidadSection })))
@@ -79,6 +80,11 @@ const SECTION_PRELOADERS: Partial<Record<AppSection, () => void>> = {
   condominios_cuotas: () => { CondominiosSection.preload() },
   condominios_mantenimiento: () => { CondominiosSection.preload() },
   contabilidad: () => { ContabilidadSection.preload() },
+  rentas_panel: () => { RentasSection.preload() },
+  rentas_propiedades: () => { RentasSection.preload() },
+  rentas_reservas: () => { RentasSection.preload() },
+  rentas_contratos: () => { RentasSection.preload() },
+  rentas_inventario: () => { RentasSection.preload() },
 }
 
 export function prefetchSection(section: AppSection): void {

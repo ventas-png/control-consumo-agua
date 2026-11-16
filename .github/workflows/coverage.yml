@@ -930,6 +930,21 @@ jobs:
           PGPORT_TEST: 55564
         run: supabase/tests/str_importacion/run.sh
 
+      # 20261125000000: Manejo de Rentas (servicio aparte, companies.servicio_rentas).
+      # Catálogo de propiedades en renta a nivel EMPRESA (independientes o enlazadas a
+      # una unidad de un proyecto), reservas por noche, contratos mensuales e
+      # inventario por propiedad. Ejercido como cada persona: servicio apagado (ni la
+      # dueña lee), RBAC por módulo (rentas.<módulo>.<acción>), alcance por proyecto de
+      # las propiedades enlazadas y de sus hijas, unidad de otro proyecto / proyecto de
+      # otra empresa, una propiedad por unidad, reservas sólo en corto plazo e
+      # independientes (las enlazadas viven en reservas_str), un solo contrato vigente,
+      # FK compuesta con la empresa, borrados en cascada. CONTROL NEGATIVO: cinco mutantes.
+      - name: Rentas — propiedades, reservas, contratos e inventario
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55565
+        run: supabase/tests/rentas_modulo/run.sh
+
       # 20261031000200: carga masiva de ACTIVIDADES del catálogo (plantillas_tarea_cargo)
       # desde una plantilla propia, con insumos, herramientas y equipo por NOMBRE
       # (columnas por tipo, «;», cantidad «x n», «!» obligatoria), y recursos EN BLOQUE

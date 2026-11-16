@@ -76,6 +76,7 @@ export async function buildSessionFromSupabase(
   // to prevent login from hanging if Supabase is slow or the nested join stalls
   let servicio_agua: boolean | undefined
   let servicio_condominios: boolean | undefined
+  let servicio_rentas: boolean | undefined
   let empresaSuspendida = false
   let mfa_required = false
   try {
@@ -94,6 +95,16 @@ export async function buildSessionFromSupabase(
           empresaSuspendida = flags.activa === false
           mfa_required = flags.mfa_required === true
         }
+        // Manejo de Rentas va en una consulta APARTE a propósito: si la columna
+        // aún no existe en la base (el front se publica antes que la migración
+        // 20261125000000), esta falla sola y el módulo queda oculto, en vez de
+        // tumbar la lectura de los flags de arriba para todo el mundo.
+        const { data: rentas } = await supabase
+          .from('companies')
+          .select('servicio_rentas')
+          .eq('id', companyId)
+          .maybeSingle()
+        servicio_rentas = (rentas as { servicio_rentas?: boolean } | null)?.servicio_rentas === true
       } else if (clienteId) {
         // portal_mis_unidades (20260822000000) resuelve las unidades con la
         // misma unión dual que las policies (legacy unidades.cliente_id ∪
@@ -138,6 +149,7 @@ export async function buildSessionFromSupabase(
       : new Date(Date.now() + APP_CONFIG.SESSION_TIMEOUT).toISOString(),
     servicio_agua,
     servicio_condominios,
+    servicio_rentas,
     mfa_required,
     permissions: buildPermissionsSet(rbacPermsResult),
     assigned_role_ids: buildAssignedRoleIds(userRolesResult),
@@ -257,6 +269,7 @@ export async function refreshSessionFromSupabase(
       fresh.cliente_id !== current.cliente_id ||
       fresh.servicio_condominios !== current.servicio_condominios ||
       fresh.servicio_agua !== current.servicio_agua ||
+      fresh.servicio_rentas !== current.servicio_rentas ||
       permissionsChanged
     ) {
       // Conservar expires_at original — el refresh de permisos no extiende la sesion

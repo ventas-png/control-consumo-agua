@@ -38,7 +38,7 @@ function lineLabel(key: string, permLabels: Map<string, string>): string {
   // condominios.tab.<id>[.<action>] y resto → etiqueta del catálogo.
   const parts = key.split('.')
   const action = parts[parts.length - 1]
-  if ((parts[0] === 'agua' || parts[0] === 'platform') && ACTION_LABELS[action]) {
+  if ((parts[0] === 'agua' || parts[0] === 'platform' || parts[0] === 'rentas') && ACTION_LABELS[action]) {
     return ACTION_LABELS[action]
   }
   return permLabels.get(key) ?? (parts[2] ?? key)

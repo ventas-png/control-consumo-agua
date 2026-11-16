@@ -519,6 +519,7 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
           companyId={currentUser.company_id}
           servicioAgua={currentUser.servicio_agua !== false}
           servicioCondominios={currentUser.servicio_condominios !== false}
+          servicioRentas={currentUser.servicio_rentas === true}
           rolesRefreshKey={rolesRefreshKey}
           autoSelect={autoSelectRole}
           onClose={() => { setRolCondModal(null); setAutoSelectRole(null) }}

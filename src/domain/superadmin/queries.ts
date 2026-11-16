@@ -63,6 +63,23 @@ export function usePlataformaKpisQuery(enabled = true) {
   })
 }
 
+/**
+ * ¿La empresa tiene contratado Manejo de Rentas? Consulta propia: la RPC del
+ * listado (superadmin_empresas_v2) no trae `servicio_rentas`. Si la columna
+ * aún no existe (migración 20261125000000 sin aplicar) devuelve null y el
+ * panel no ofrece el interruptor.
+ */
+export function useEmpresaServicioRentasQuery(empresaId: string) {
+  return useQuery({
+    queryKey: ['superadmin', 'servicio_rentas', empresaId],
+    queryFn: async (): Promise<boolean | null> => {
+      const { data, error } = await supabase.from('companies').select('servicio_rentas').eq('id', empresaId).maybeSingle()
+      if (error || !data) return null
+      return (data as { servicio_rentas?: boolean }).servicio_rentas === true
+    },
+  })
+}
+
 /** Una fila del listado paginado de empresas (escalares en vivo + MV). */
 export interface EmpresaSuperadminRow {
   id: string

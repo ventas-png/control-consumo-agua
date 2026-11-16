@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import type { UserSession } from '../types'
-import { EXEMPT_ROLES, NON_CONFIGURABLE_MODULES, WATER_MODULE_KEYS, type ModuleAction } from '../lib/moduleConfig'
+import {
+  EXEMPT_ROLES, NON_CONFIGURABLE_MODULES, WATER_MODULE_KEYS, RENTAS_MODULE_KEYS, RENTAS_DATA_MODULE_KEYS,
+  rentasPermissionKey, type ModuleAction,
+} from '../lib/moduleConfig'
 
 export interface PermissionsAPI {
   /** ¿El usuario puede ver este módulo en el sidebar? */
@@ -39,6 +42,8 @@ const CONDOMINIOS_SIDEBAR_TAB_MAP: Record<string, string> = {
  *   - condominios parent ('condominios') → visible if user has any
  *     'condominios.tab.*' permission (avoids requiring the broader
  *     platform.condominios.view to be granted explicitly)
+ *   - rentas modules (RENTAS_MODULE_KEYS) → 'rentas.<módulo>.<action>', sólo
+ *     si la empresa tiene contratado el servicio (session.servicio_rentas)
  *   - other platform modules (clientes/unidades/configuracion/comunicacion)
  *     → 'platform.<module>.<action>'
  */
@@ -50,6 +55,7 @@ export function usePermissions(session: UserSession | null): PermissionsAPI {
     const isExempt = !!role && EXEMPT_ROLES.includes(role)
 
     function permissionKey(moduleKey: string, action: ModuleAction): string {
+      if (RENTAS_MODULE_KEYS.has(moduleKey)) return rentasPermissionKey(moduleKey, action)
       const prefix = WATER_MODULE_KEYS.has(moduleKey) ? 'agua' : 'platform'
       return `${prefix}.${moduleKey}.${action}`
     }
@@ -68,6 +74,16 @@ export function usePermissions(session: UserSession | null): PermissionsAPI {
 
     function canViewModule(moduleKey: string): boolean {
       if ((NON_CONFIGURABLE_MODULES as readonly string[]).includes(moduleKey)) return true
+      // Manejo de Rentas es un servicio aparte: sin contratarlo no se ve NADA,
+      // tampoco con un rol exento (dueño / admin), ni por deep-link a /rentas.
+      // El portal del residente ('cliente', exento) no tiene este módulo.
+      if (RENTAS_MODULE_KEYS.has(moduleKey)) {
+        if (session?.servicio_rentas !== true || role === 'cliente') return false
+        if (isExempt) return true
+        if (moduleKey === 'rentas_panel') return RENTAS_DATA_MODULE_KEYS.some(k => has(k, 'view'))
+        return has(moduleKey, 'view')
+      }
+
       if (isExempt) return true
 
       // Condominios shortcuts in the sidebar map to fine-grained tab permissions.
@@ -85,8 +101,10 @@ export function usePermissions(session: UserSession | null): PermissionsAPI {
     }
 
     // Regla común de acciones: exento pasa; si no, exige .view + la acción.
-    const canDo = (action: ModuleAction) => (moduleKey: string): boolean =>
-      isExempt || (has(moduleKey, 'view') && has(moduleKey, action))
+    const canDo = (action: ModuleAction) => (moduleKey: string): boolean => {
+      if (RENTAS_MODULE_KEYS.has(moduleKey) && (session?.servicio_rentas !== true || role === 'cliente')) return false
+      return isExempt || (has(moduleKey, 'view') && has(moduleKey, action))
+    }
 
     return {
       canViewModule,
@@ -96,5 +114,5 @@ export function usePermissions(session: UserSession | null): PermissionsAPI {
       canApprove: canDo('approve'),
       canDelete: canDo('delete'),
     }
-  }, [session?.role, session?.permissions])
+  }, [session?.role, session?.permissions, session?.servicio_rentas])
 }

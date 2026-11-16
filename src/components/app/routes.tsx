@@ -16,7 +16,7 @@ import {
   ComunicacionSection, CondominiosDashboard, CondominiosSection,
   ContabilidadSection, ContadoresSection, ConfiguracionSection,
   DashboardSection, EmpresaSection, HistorialSection, LecturasSection,
-  MapaSection, PerfilSection, RutasSection, ServiciosEnergiaSection,
+  MapaSection, PerfilSection, RentasSection, RutasSection, ServiciosEnergiaSection,
   SuperAdminSection, TarifasSection, UnidadesSection,
 } from './lazySections'
 
@@ -324,6 +324,14 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   { path: '/energia', sectionName: 'servicios_energia', module: 'servicios_energia', render: renderEnergia },
   { path: '/energia/:tab', sectionName: 'servicios_energia', module: 'servicios_energia', render: renderEnergia },
+  // Manejo de Rentas: una ruta por pestaña, cada una con el guard de SU módulo
+  // (canViewModule exige además el servicio contratado). El panel se ve con
+  // cualquier permiso de lectura de Rentas.
+  { path: '/rentas', sectionName: 'rentas', module: 'rentas_panel', render: () => <RentasSection tab="panel" /> },
+  { path: '/rentas/propiedades', sectionName: 'rentas', module: 'rentas_propiedades', render: () => <RentasSection tab="propiedades" /> },
+  { path: '/rentas/reservas', sectionName: 'rentas', module: 'rentas_reservas', render: () => <RentasSection tab="reservas" /> },
+  { path: '/rentas/contratos', sectionName: 'rentas', module: 'rentas_contratos', render: () => <RentasSection tab="contratos" /> },
+  { path: '/rentas/inventario', sectionName: 'rentas', module: 'rentas_inventario', render: () => <RentasSection tab="inventario" /> },
   // cond:A1 sub-rutas: `/condominios/panel` es el selector de proyecto
   // (CondominiosDashboard). Cualquier otro segmento se interpreta como un tab
   // del registry; tabs desconocidos caen a 'panel'. `/condominios` (sin

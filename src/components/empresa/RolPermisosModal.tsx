@@ -30,6 +30,7 @@ import {
 import type { PermissionDef, RoleDef } from '../../types'
 import { CONDOMINIOS_SECTION_GROUPS, type SectionGroup } from '../../lib/condominiosRoles'
 import { AGUA_MODULE_GROUPS } from '../../lib/aguaPermissions'
+import { gruposRentasDisponibles } from '../../lib/rentasPermissions'
 import { gruposPlataformaDisponibles } from '../../lib/platformPermissions'
 import { condominiosTabPermission, isExemptPlatformRole } from '../../lib/permissions'
 import {
@@ -62,6 +63,8 @@ interface Props {
   companyId: string
   servicioAgua?: boolean
   servicioCondominios?: boolean
+  /** Manejo de Rentas contratado: sólo entonces la matriz ofrece sus permisos. */
+  servicioRentas?: boolean
   /** Bump this counter to force a re-fetch of the roles list (preserves current selection) */
   rolesRefreshKey?: number
   /** Rol recién creado en el editor que debe quedar seleccionado al volver. */
@@ -80,7 +83,7 @@ const CONDOMINIOS_KEY_GROUPS: SectionGroup[] = CONDOMINIOS_SECTION_GROUPS.map(g 
 
 export function RolPermisosModal({
   usuarioId, usuarioNombre, usuarioTier, companyId,
-  servicioAgua, servicioCondominios,
+  servicioAgua, servicioCondominios, servicioRentas,
   rolesRefreshKey = 0, autoSelect, onClose, onSaved, onOpenCustomEditor,
 }: Props) {
   const [roles, setRoles] = useState<RoleDef[]>([])
@@ -242,6 +245,8 @@ export function RolPermisosModal({
   const matrixSections: MatrixSectionBlock[] = [
     ...(showCondominios ? [{ label: 'Condominios', groups: CONDOMINIOS_KEY_GROUPS }] : []),
     ...(showAgua ? [{ label: 'Agua', groups: AGUA_MODULE_GROUPS }] : []),
+    ...(servicioRentas === true && gruposRentasDisponibles(permLabels).length > 0
+      ? [{ label: 'Rentas', groups: gruposRentasDisponibles(permLabels) }] : []),
     // «Compras y pagos» solo muestra las llaves que el catálogo cargado ya tiene (la migración que las siembra puede no haberse aplicado)
     { label: 'Plataforma', groups: gruposPlataformaDisponibles(permLabels) },
   ]

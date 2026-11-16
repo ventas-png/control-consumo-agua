@@ -34,6 +34,7 @@ const GROUP_PLATAFORMA: NavGroupMeta = { id: 'plataforma', label: 'Administraci�
 const GROUP_AGUA: NavGroupMeta = { id: 'agua', label: 'Manejo Agua', anchor: 'dashboard' }
 const GROUP_SERVICIOS: NavGroupMeta = { id: 'servicios', label: 'Servicios', anchor: 'servicios_energia' }
 const GROUP_CONDOMINIOS: NavGroupMeta = { id: 'condominios_grp', label: 'Manejo Condominios', anchor: 'condominios_dashboard' }
+const GROUP_RENTAS: NavGroupMeta = { id: 'rentas_grp', label: 'Manejo Rentas', anchor: 'rentas_panel' }
 
 // Mapa AppSection → metadatos de breadcrumb. Las etiquetas de sección espejan
 // las del Sidebar para que el crumb diga lo mismo que el menú.
@@ -68,6 +69,13 @@ export const SECTION_CRUMBS: Record<AppSection, SectionCrumbMeta> = {
   condominios_mantenimiento: { label: 'Mantenimiento', group: GROUP_CONDOMINIOS },
   condominios: { label: 'Módulo Completo', group: GROUP_CONDOMINIOS },
   paquetes: { label: 'Paquetería', group: GROUP_CONDOMINIOS },
+
+  // ── Manejo Rentas ──
+  rentas_panel: { label: 'Panel', group: GROUP_RENTAS },
+  rentas_propiedades: { label: 'Propiedades', group: GROUP_RENTAS },
+  rentas_reservas: { label: 'Reservas', group: GROUP_RENTAS },
+  rentas_contratos: { label: 'Contratos', group: GROUP_RENTAS },
+  rentas_inventario: { label: 'Inventario', group: GROUP_RENTAS },
 
   // ── Standalone (sin grupo) ──
   superadmin_empresas: { label: 'Empresas' },
