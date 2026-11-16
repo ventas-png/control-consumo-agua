@@ -21,6 +21,8 @@ function ctxStub(overrides: Partial<AppRoutesCtx> = {}): AppRoutesCtx {
     canApprove: () => true,
     canDelete: () => true,
     agua: {} as AguaData,
+    aguaModulo: {} as AguaData,
+    proyectosCondominios: [],
     condominiosSinProyecto: false,
     navigateSection: () => {},
     handleLogout: () => {},

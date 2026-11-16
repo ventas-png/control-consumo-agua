@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { proyectoTieneModulo } from '../../../lib/modulosProyecto'
 import type {
   ArticuloInventarioRenta, ContratoRenta, EstadoPropiedadRenta, PropiedadRenta, Proyecto,
   ReservaUnificada, TipoPropiedadRenta, Unidad,
@@ -295,7 +296,9 @@ export default function PropiedadesTab({
                   <select id="rp-proyecto" value={form.project_id} style={campo}
                     onChange={e => setForm(prev => ({ ...prev, project_id: e.target.value, unidad_id: '' }))}>
                     <option value="">Elige un proyecto…</option>
-                    {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                    {/* Sólo los proyectos que operan en Rentas (módulos por proyecto); el ya enlazado se conserva. */}
+                    {proyectos.filter(p => proyectoTieneModulo(p, 'rentas') || p.id === form.project_id)
+                      .map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
                   </select>
                 </div>
                 <div>

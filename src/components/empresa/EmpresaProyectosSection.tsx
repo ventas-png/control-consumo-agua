@@ -16,6 +16,10 @@ import { AmpliarPlanModal } from './AmpliarPlanModal'
 import type { EmpresaInfo } from '../../domain/empresa/queries'
 import { MOTIVO_SOLO_PRINCIPAL_PROYECTOS } from '../../domain/empresa/usuarios'
 import { tint } from '../shared/statusTone'
+import {
+  COLUMNA_MODULO, MODULO_ICONO, MODULO_LABEL, modulosActivosDeProyecto, proyectoTieneModulo,
+  validarSeleccionModulos, type ModuloServicio,
+} from '../../lib/modulosProyecto'
 
 const ESTADO_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   activo:     { label: 'Activo',     bg: 'rgba(34,197,94,0.15)',  color: 'var(--at-success)' },
@@ -44,9 +48,26 @@ interface Props {
    * (fiscal, cobros, estado, logo) NO depende de esto: projects_update sigue abierto al administrador. Por omisión es `false`: sin la compuerta no se ofrece crear.
    */
   puedeCrear?: boolean
+  /** Módulos que la empresa tiene contratados (de la sesión). Con uno solo no hay nada que elegir por proyecto. */
+  modulosContratados?: readonly ModuloServicio[]
+  /**
+   * ¿Puede quien mira elegir los módulos de cada proyecto? Sólo el principal, y sólo si la base ya tiene los interruptores
+   * (migración 20261127000000). La base repite la regla: trg_projects_modulos_guard.
+   */
+  puedeElegirModulos?: boolean
+  /** Tras guardar los módulos de un proyecto: el contenedor refresca los proyectos que usan el menú y los selectores. */
+  onModulosCambiados?: () => void
 }
 
-export function EmpresaProyectosSection({ empresa, proyectos, companyId, effectiveMaxProjects, onReload, puedeCrear = false }: Props) {
+const SIN_MODULOS: readonly ModuloServicio[] = []
+
+export function EmpresaProyectosSection({
+  empresa, proyectos, companyId, effectiveMaxProjects, onReload, puedeCrear = false,
+  modulosContratados = SIN_MODULOS, puedeElegirModulos = false, onModulosCambiados,
+}: Props) {
+  // Elegir módulos por proyecto sólo tiene sentido con dos o más contratados.
+  const variosModulos = modulosContratados.length > 1
+  const ofrecerModulos = variosModulos && puedeElegirModulos
   const [showAmpliar, setShowAmpliar] = useState(false)
   // Remonta PlanUsageCard tras una ampliación (su usePlanLimits es interno).
   const [usageKey, setUsageKey] = useState(0)
@@ -172,6 +193,45 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
       notify({ variant: 'error', title: 'Error', text: 'No se pudo cambiar el estado.' })
     } else {
       onReload()
+    }
+  }
+
+  async function elegirModulosProyecto(proyecto: Proyecto) {
+    const result = await openPromptDialog({
+      title: `Módulos de ${proyecto.nombre}`,
+      description:
+        'Elige en cuáles de los módulos de tu plan opera este proyecto. No cambia tu plan ni lo que pagas, y apagar un módulo no borra nada: '
+        + 'el proyecto deja de aparecer en ese módulo y sus datos se conservan.',
+      fields: modulosContratados.map((m, i) => ({
+        name: m,
+        label: `${MODULO_ICONO[m]} ${MODULO_LABEL[m]}`,
+        control: 'checkbox' as const,
+        initialValue: proyectoTieneModulo(proyecto, m) ? 'true' : '',
+        autoFocus: i === 0,
+      })),
+      submitText: 'Guardar',
+      validate: (data) => validarSeleccionModulos(
+        { agua: data.agua === 'true', condominios: data.condominios === 'true', rentas: data.rentas === 'true' },
+        modulosContratados,
+      ),
+    })
+    if (!result) return
+    // Sólo se envían los módulos contratados: los demás interruptores no se tocan.
+    const patch: Record<string, boolean> = {}
+    for (const m of modulosContratados) patch[COLUMNA_MODULO[m]] = result[m] === 'true'
+    const { error } = await updateProyecto(proyecto.id, patch)
+    if (error) {
+      const text = error.includes('MODULOS_PROYECTO_SOLO_PRINCIPAL')
+        ? 'Sólo el propietario de la empresa puede elegir los módulos de un proyecto.'
+        : error.includes('MODULOS_PROYECTO_VACIO')
+          ? 'El proyecto debe conservar al menos un módulo activo.'
+          : 'No se pudieron guardar los módulos del proyecto.'
+      notify({ variant: 'error', title: 'Error', text })
+    } else {
+      notify({ variant: 'success', title: 'Módulos actualizados', duration: 1500 })
+      onReload()
+      // El menú y los selectores de cada módulo leen los proyectos de otra caché.
+      onModulosCambiados?.()
     }
   }
 
@@ -335,6 +395,18 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
                         {p.id.slice(0, 6)}…
                       </span>
                     </div>
+                    {variosModulos && (
+                      <div aria-label="Módulos activos" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                        {modulosActivosDeProyecto(p, modulosContratados).map(m => (
+                          <span key={m} style={{
+                            fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '20px',
+                            background: 'var(--at-chip)', color: 'var(--at-ink-2)', whiteSpace: 'nowrap',
+                          }}>
+                            {MODULO_ICONO[m]} {MODULO_LABEL[m]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   {/* Side buttons (hidden on mobile) */}
                   <div className="proyecto-btn-side" style={{ flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
@@ -362,6 +434,19 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
                     >
                       Estado
                     </button>
+                    {ofrecerModulos && (
+                      <button
+                        onClick={() => void elegirModulosProyecto(p)}
+                        title="Elegir en qué módulos opera este proyecto"
+                        style={{
+                          padding: '4px 12px', borderRadius: '7px', border: '1px solid var(--at-line-strong)',
+                          background: 'var(--at-surface-2)', color: 'var(--at-ink-3)',
+                          cursor: 'pointer', fontSize: '11px', fontWeight: 600,
+                        }}
+                      >
+                        Módulos
+                      </button>
+                    )}
                   </div>
                 </div>
                 {/* Datos del proyecto */}
@@ -416,6 +501,19 @@ export function EmpresaProyectosSection({ empresa, proyectos, companyId, effecti
                   >
                     Estado
                   </button>
+                  {ofrecerModulos && (
+                    <button
+                      onClick={() => void elegirModulosProyecto(p)}
+                      style={{
+                        flex: 1, padding: '9px 0', borderRadius: '8px',
+                        border: '1px solid var(--at-line-strong)',
+                        background: 'var(--at-surface-2)', color: 'var(--at-ink-2)',
+                        cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+                      }}
+                    >
+                      Módulos
+                    </button>
+                  )}
                 </div>
               </div>
             )})}

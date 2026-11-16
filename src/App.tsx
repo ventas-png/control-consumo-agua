@@ -16,6 +16,7 @@ import { sectionForPath, type SectionKey } from './components/condominios/sectio
 import { fetchOpenConversationsCount } from './domain/comunicacion/conversations'
 import { useAuth } from './hooks/useAuth'
 import { useAguaData } from './hooks/useAguaData'
+import { useModulosPorProyecto } from './hooks/useModulosPorProyecto'
 import { getResetToken, detectGmailOAuthCallback, handleGmailOAuthCallback } from './lib/gmailOAuth'
 import { SessionProvider } from './components/shared/SessionContext'
 import { PermissionsProvider } from './components/shared/PermissionsContext'
@@ -142,6 +143,8 @@ function AppShell() {
   // T7 · agua:A4 — toda la capa de datos del módulo agua (queries TanStack +
   // callbacks optimistas sobre caché) vive en useAguaData (P1 #4).
   const agua = useAguaData(currentUser)
+  // Módulos por proyecto: qué proyectos ve cada módulo y qué menús se ocultan.
+  const { aguaModulo, proyectosCondominios, sesionMenu } = useModulosPorProyecto(currentUser, agua)
 
   // ── Global keyboard shortcuts + Command Palette (Cmd+K, g X, ?) ────────
   // Los hooks se llaman incondicionalmente (Rules of Hooks). Si no hay
@@ -450,7 +453,7 @@ function AppShell() {
   const condominiosSinProyecto =
     !agua.dataLoading &&
     activeSection.startsWith('condominios') &&
-    agua.proyectos.filter(p => p.estado === 'activo').length === 0
+    proyectosCondominios.filter(p => p.estado === 'activo').length === 0
 
   // F3.11 (P1 quick win): onboarding. El company_owner cuya empresa aún no
   // tiene proyectos ve el SetupWizard (crea el primero). Se evalúa SOLO tras
@@ -473,6 +476,8 @@ function AppShell() {
     currentUser,
     canViewModule, canCreate, canEdit, canChangeStatus, canApprove, canDelete,
     agua,
+    aguaModulo,
+    proyectosCondominios,
     condominiosSinProyecto,
     navigateSection,
     handleLogout,
@@ -484,7 +489,7 @@ function AppShell() {
 
   // Authenticated app
   return (
-    <SessionProvider value={currentUser}>
+    <SessionProvider value={sesionMenu ?? currentUser}>
     <PermissionsProvider>
       {/* Toaster montado a nivel app: lib/toast emite mensajes non-blocking
           en la esquina superior derecha para success/warning/info no críticos.
