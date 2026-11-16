@@ -42,6 +42,10 @@ export const CONFIGURABLE_MODULES: readonly ModuleDefinition[] = [
   { key: 'comunicacion',      label: 'Comunicación',       actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'condominios',       label: 'Condominios',        actions: ['view', 'create', 'edit', 'change_status', 'approve', 'delete'] },
   { key: 'contabilidad',      label: 'Contabilidad',       actions: ['view', 'create', 'edit', 'change_status', 'approve', 'delete'] },
+  { key: 'rentas_propiedades', label: 'Rentas: Propiedades', actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'rentas_reservas',    label: 'Rentas: Reservas',    actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'rentas_contratos',   label: 'Rentas: Contratos',   actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'rentas_inventario',  label: 'Rentas: Inventario',  actions: ['view', 'create', 'edit', 'delete'] },
 ] as const
 
 /** Keys de módulos agrupados por línea de servicio (usados en Sidebar y modal de permisos). */
@@ -50,6 +54,20 @@ export const WATER_MODULE_KEYS = new Set([
   'mapa', 'tabla', 'contadores', 'tarifas', 'servicios_energia',
 ])
 export const CONDOMINIOS_MODULE_KEYS = new Set(['condominios', 'condominios_dashboard', 'condominios_visitantes', 'condominios_cuotas', 'condominios_mantenimiento'])
+
+/**
+ * Manejo de Rentas (servicio aparte, `companies.servicio_rentas`). Cada módulo
+ * `rentas_<x>` usa las claves `rentas.<x>.<acción>`; `rentas_panel` no tiene
+ * clave propia: se ve con cualquier `rentas.*.view`.
+ */
+export const RENTAS_DATA_MODULE_KEYS = ['rentas_propiedades', 'rentas_reservas', 'rentas_contratos', 'rentas_inventario'] as const
+export const RENTAS_MODULE_KEYS = new Set<string>(['rentas_panel', ...RENTAS_DATA_MODULE_KEYS])
+/** Acciones que existen en el catálogo RBAC de Rentas (no hay change_status ni approve). */
+export const RENTAS_ACTIONS: readonly ModuleAction[] = ['view', 'create', 'edit', 'delete'] as const
+/** `rentas_propiedades` + `edit` → `rentas.propiedades.edit`. */
+export function rentasPermissionKey(moduleKey: string, action: ModuleAction): string {
+  return `rentas.${moduleKey.replace(/^rentas_/, '')}.${action}`
+}
 
 /** Módulos que no son configurables (siempre visibles para su rol). */
 export const NON_CONFIGURABLE_MODULES = ['perfil', 'admin_dashboard', 'empresa_proyectos', 'superadmin_empresas'] as const

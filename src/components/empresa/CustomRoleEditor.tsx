@@ -60,6 +60,7 @@ function categoryLabel(category: string): string {
     operaciones: 'Operaciones', instalaciones: 'Instalaciones', seguridad: 'Seguridad',
     comunidad: 'Comunidad', administracion: 'Administración',
     recursos_humanos: 'Recursos Humanos', especiales: 'Especiales',
+    rentas: 'Manejo de Rentas',
   }
   if (FIXED[category]) return FIXED[category]
   const pretty = (s: string) => s.replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())

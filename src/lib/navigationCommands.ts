@@ -53,6 +53,13 @@ export const NAV_COMMANDS: NavCommandDef[] = [
   { id: 'comunicacion',     label: 'Comunicación',       icon: '💬', category: 'Operaciones',                   module: 'comunicacion' },
   { id: 'servicios_energia',label: 'Energía',            icon: '⚡', category: 'Operaciones',                   module: 'servicios_energia' },
 
+  // ── Rentas ──
+  { id: 'rentas_panel',       label: 'Rentas: Panel',       icon: '🏘️', category: 'Rentas', module: 'rentas_panel' },
+  { id: 'rentas_propiedades', label: 'Rentas: Propiedades', icon: '🏠', category: 'Rentas', module: 'rentas_propiedades' },
+  { id: 'rentas_reservas',    label: 'Rentas: Reservas',    icon: '📅', category: 'Rentas', module: 'rentas_reservas' },
+  { id: 'rentas_contratos',   label: 'Rentas: Contratos',   icon: '📝', category: 'Rentas', module: 'rentas_contratos' },
+  { id: 'rentas_inventario',  label: 'Rentas: Inventario',  icon: '🛋️', category: 'Rentas', module: 'rentas_inventario' },
+
   // ── Cuenta ──
   { id: 'empresa_proyectos',label: 'Mis Proyectos',      icon: '📁', category: 'Cuenta',       shortcut: 'g p', roles: ['company_owner'] },
   { id: 'configuracion',    label: 'Configuración',      icon: '⚙️',  category: 'Cuenta',       shortcut: 'g s', module: 'configuracion' },

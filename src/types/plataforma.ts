@@ -44,6 +44,8 @@ export interface UserSession {
   expires_at: string;
   servicio_agua?: boolean;
   servicio_condominios?: boolean;
+  /** Manejo de Rentas contratado (companies.servicio_rentas). Sólo `true` lo enciende. */
+  servicio_rentas?: boolean;
   // P0 #10: si la empresa exige 2FA, el shell bloquea hasta enrolar TOTP.
   mfa_required?: boolean;
   // RBAC: effective permission keys for this user (e.g. 'condominios.tab.cuotas')
@@ -278,4 +280,9 @@ export type AppSection =
   | 'condominios_cuotas'
   | 'condominios_mantenimiento'
   | 'paquetes'
-  | 'contabilidad';
+  | 'contabilidad'
+  | 'rentas_panel'
+  | 'rentas_propiedades'
+  | 'rentas_reservas'
+  | 'rentas_contratos'
+  | 'rentas_inventario';

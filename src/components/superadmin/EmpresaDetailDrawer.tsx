@@ -19,6 +19,7 @@ import {
   useEmpresaComisionResumenQuery,
   useEmpresaTimbradoQuery,
   useEmpresaTimbresResumenQuery,
+  useEmpresaServicioRentasQuery,
   type EmpresaSuperadminRow,
 } from '../../domain/superadmin/queries'
 import { guardarComisionConfig, guardarTimbradoConfig } from '../../domain/superadmin/mutations'
@@ -69,6 +70,8 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
   // F8: modelo de cobro del timbrado fiscal (config + contador mensual).
   const { data: timbrado } = useEmpresaTimbradoQuery(emp.id)
   const { data: timbresResumen = [] } = useEmpresaTimbresResumenQuery(emp.id)
+  // Manejo de Rentas: servicio aparte; null = la base aún no tiene la columna.
+  const { data: servicioRentas = null } = useEmpresaServicioRentasQuery(emp.id)
   const qc = useQueryClient()
 
   const patch = (changes: Partial<EmpresaSuperadminRow>) => setEmp(prev => ({ ...prev, ...changes }))
@@ -261,6 +264,16 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
       notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
     } else {
       patch({ [campo]: nuevoValor } as Partial<EmpresaSuperadminRow>)
+      onChanged()
+    }
+  }
+
+  async function toggleRentas(nuevoValor: boolean) {
+    const { error } = await updateEmpresaCampo(emp.id, { servicio_rentas: nuevoValor })
+    if (error) {
+      notify({ variant: 'error', title: 'Error', text: 'No se pudo actualizar el servicio.' })
+    } else {
+      qc.setQueryData(['superadmin', 'servicio_rentas', emp.id], nuevoValor)
       onChanged()
     }
   }
@@ -502,6 +515,14 @@ export function EmpresaDetailDrawer({ empresa, onClose, onChanged }: Props) {
               onColors={['var(--at-accent-light)', 'var(--at-accent-hover)']}
               onLabelColor="var(--at-accent)"
             />
+            {servicioRentas !== null && (
+              <ToggleSwitch
+                checked={servicioRentas}
+                onChange={v => void toggleRentas(v)}
+                label="Manejo de Rentas"
+                onLabelColor="var(--at-primary)"
+              />
+            )}
           </div>
         </Section>
 
