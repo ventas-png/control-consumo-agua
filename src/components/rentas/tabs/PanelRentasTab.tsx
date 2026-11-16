@@ -13,6 +13,9 @@ import type { PermisosModulo } from '../RentasSection'
 import type { RentasTab } from '../rentasTabs'
 import { TONO_OCUPACION, fila, rejillaTiles, td, tenue, th, thead } from '../ui'
 
+/** «1 dañado», «2 dañados». */
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`
+
 interface Props {
   propiedades: PropiedadRenta[]
   reservas: ReservaUnificada[]
@@ -80,7 +83,7 @@ export default function PanelRentasTab({
         {permisos.inventario.ver && (
           <StatTile label="Inventario" value={formatCurrency(r.inventario.valor, moneda)} icon="🛋️"
             tone={r.inventario.danados + r.inventario.faltantes > 0 ? 'warning' : undefined}
-            hint={`${r.inventario.articulos} artículos · ${r.inventario.danados} dañados · ${r.inventario.faltantes} faltantes`} />
+            hint={`${plural(r.inventario.articulos, 'artículo', 'artículos')} · ${plural(r.inventario.danados, 'dañado', 'dañados')} · ${plural(r.inventario.faltantes, 'faltante', 'faltantes')}`} />
         )}
       </div>
 
@@ -98,8 +101,8 @@ export default function PanelRentasTab({
             {porVencer.length > 6 && <li style={tenue}>…y {porVencer.length - 6} contrato(s) más.</li>}
             {conProblema.slice(0, 6).map(a => (
               <li key={a.id}>
-                <strong>{nombrePropiedad.get(a.propiedad_id) ?? 'Propiedad'}</strong>: {a.nombre}{' '}
-                {a.estado === 'faltante' ? 'falta' : 'está dañado'}{a.ambiente ? ` (${a.ambiente})` : ''}.
+                <strong>{nombrePropiedad.get(a.propiedad_id) ?? 'Propiedad'}</strong>:{' '}
+                {a.estado === 'faltante' ? 'faltante' : 'dañado'} — {a.nombre}{a.ambiente ? ` (${a.ambiente})` : ''}.
               </li>
             ))}
             {conProblema.length > 6 && <li style={tenue}>…y {conProblema.length - 6} artículo(s) más.</li>}
