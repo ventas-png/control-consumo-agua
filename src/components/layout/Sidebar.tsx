@@ -647,7 +647,7 @@ export function Sidebar({ activeSection, activeCondominiosSection = null, onSele
               AdministraTodo
             </div>
             <div style={{ color: 'var(--at-nav-ink-4)', fontSize: '11px', marginTop: '2px', letterSpacing: '0.02em' }}>
-              Agua + Condominios
+              {currentUser.servicio_rentas === true ? 'Agua + Condominios + Rentas' : 'Agua + Condominios'}
             </div>
           </div>
         </div>

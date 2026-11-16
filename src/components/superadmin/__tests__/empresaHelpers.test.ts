@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   moduleBadgeLabel,
   planCodeLabel,
+  planCodePorModulos,
   purgeEligibleAt,
   isPurgeEligible,
   formatUsdCents,
@@ -13,6 +16,48 @@ describe('moduleBadgeLabel', () => {
     expect(moduleBadgeLabel(true, false)).toBe('Agua')
     expect(moduleBadgeLabel(false, true)).toBe('Condominios')
     expect(moduleBadgeLabel(false, false)).toBe('Sin módulos')
+  })
+
+  it('Rentas es el tercer módulo', () => {
+    expect(moduleBadgeLabel(true, true, true)).toBe('Agua + Condominios + Rentas')
+    expect(moduleBadgeLabel(true, false, true)).toBe('Agua + Rentas')
+    expect(moduleBadgeLabel(false, false, true)).toBe('Rentas')
+    expect(moduleBadgeLabel(false, false, false)).toBe('Sin módulos')
+  })
+})
+
+describe('planCodePorModulos (espejo de la función SQL plan_code_por_modulos)', () => {
+  it('las ocho combinaciones', () => {
+    expect(planCodePorModulos(true, false, false)).toBe('agua_only')
+    expect(planCodePorModulos(false, true, false)).toBe('condominios_only')
+    expect(planCodePorModulos(false, false, true)).toBe('rentas_only')
+    expect(planCodePorModulos(true, true, false)).toBe('bundle')
+    expect(planCodePorModulos(true, false, true)).toBe('agua_rentas')
+    expect(planCodePorModulos(false, true, true)).toBe('condominios_rentas')
+    expect(planCodePorModulos(true, true, true)).toBe('suite')
+    expect(planCodePorModulos(false, false, false)).toBeNull()
+  })
+
+  it('coincide, caso por caso, con el CASE de la migración', () => {
+    const sql = readFileSync(resolve('supabase/migrations/20261126000000_rentas_tercer_modulo_del_plan.sql'), 'utf8')
+    const cuerpo = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.plan_code_por_modulos('), sql.indexOf('COMMENT ON FUNCTION public.plan_code_por_modulos'))
+    const casos = [...cuerpo.matchAll(/WHEN (.+?)\s+THEN '(\w+)'/g)].map(m => ({
+      agua: m[1].includes('p_agua'), condominios: m[1].includes('p_condominios'), rentas: m[1].includes('p_rentas'), plan: m[2],
+    }))
+    expect(casos).toHaveLength(7)
+    // El CASE evalúa en orden: la primera rama cuyos módulos están todos encendidos gana.
+    const segunSql = (a: boolean, c: boolean, r: boolean) =>
+      casos.find(k => (!k.agua || a) && (!k.condominios || c) && (!k.rentas || r))?.plan ?? null
+    for (const a of [true, false]) for (const c of [true, false]) for (const r of [true, false]) {
+      expect(planCodePorModulos(a, c, r), `${a} ${c} ${r}`).toBe(segunSql(a, c, r))
+    }
+  })
+
+  it('todo plan que devuelve tiene etiqueta legible', () => {
+    for (const a of [true, false]) for (const c of [true, false]) for (const r of [true, false]) {
+      const code = planCodePorModulos(a, c, r)
+      if (code) expect(planCodeLabel(code)).not.toBe(code)
+    }
   })
 })
 

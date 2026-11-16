@@ -72,7 +72,7 @@ export function EmpresasTable({ onRowClick, onNuevaEmpresa }: Props) {
             {!e.activa && <StatusBadge tone="danger" dot>Suspendida</StatusBadge>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', flexWrap: 'wrap' }}>
-            <StatusBadge tone="neutral">{moduleBadgeLabel(e.servicio_agua, e.servicio_condominios)}</StatusBadge>
+            <StatusBadge tone="neutral">{moduleBadgeLabel(e.servicio_agua, e.servicio_condominios, e.servicio_rentas === true)}</StatusBadge>
             {e.email && <span style={{ fontSize: '12px', color: 'var(--at-ink-3)' }}>{e.email}</span>}
           </div>
         </div>
@@ -137,7 +137,7 @@ export function EmpresasTable({ onRowClick, onNuevaEmpresa }: Props) {
     { header: 'Empresa', accessor: 'nombre' as const },
     { header: 'NIT', accessor: (e: EmpresaSuperadminRow) => e.nit ?? '' },
     { header: 'Email', accessor: (e: EmpresaSuperadminRow) => e.email ?? '' },
-    { header: 'Módulos', accessor: (e: EmpresaSuperadminRow) => moduleBadgeLabel(e.servicio_agua, e.servicio_condominios) },
+    { header: 'Módulos', accessor: (e: EmpresaSuperadminRow) => moduleBadgeLabel(e.servicio_agua, e.servicio_condominios, e.servicio_rentas === true) },
     { header: 'Estado', accessor: (e: EmpresaSuperadminRow) => e.activa ? 'Activa' : 'Suspendida' },
     { header: 'Proyectos', accessor: 'project_count' as const, align: 'right' as const },
     { header: 'Unidades', accessor: 'unit_count' as const, align: 'right' as const },
@@ -180,6 +180,7 @@ export function EmpresasTable({ onRowClick, onNuevaEmpresa }: Props) {
           <option value="agua">Solo Agua</option>
           <option value="condominios">Solo Condominios</option>
           <option value="ambos">Agua + Condominios</option>
+          <option value="rentas">Con Rentas</option>
         </select>
         <select
           value={sort}

@@ -308,6 +308,11 @@ export default function PropiedadesTab({
                 </div>
               </div>
             )}
+            {!form.enlazada && (
+              <p style={{ ...tenue, margin: 0 }}>
+                Una propiedad independiente cuenta como una unidad adicional en el plan y en el límite de unidades de la empresa.
+              </p>
+            )}
             {form.enlazada && form.tipo_renta === 'corto_plazo' && (
               <p style={{ ...tenue, margin: 0 }}>
                 Sus reservas se guardan en la pestaña STR de ese condominio: las que ya existen aparecerán aquí y las que registres aquí aparecerán allá.

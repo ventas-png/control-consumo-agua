@@ -95,6 +95,8 @@ export interface EmpresaSuperadminRow {
   max_units: number
   servicio_agua: boolean
   servicio_condominios: boolean
+  /** Ausente mientras la base no tenga 20261126000000 (el listado aún no lo devuelve). */
+  servicio_rentas?: boolean
   project_count: number
   user_count: number
   unit_count: number
@@ -114,7 +116,7 @@ export interface EmpresasSuperadminPage {
 }
 
 export type EmpresaStatusFilter = '' | 'activas' | 'suspendidas'
-export type EmpresaModuleFilter = '' | 'agua' | 'condominios' | 'ambos'
+export type EmpresaModuleFilter = '' | 'agua' | 'condominios' | 'ambos' | 'rentas'
 export type EmpresaSortOption = 'nombre' | 'created_at' | 'unidades' | 'monto'
 
 export interface EmpresasSuperadminParams {

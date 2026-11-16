@@ -14,6 +14,9 @@ export interface SignupPayload {
   // Modulo inicial elegido en el formulario para personalizar el dashboard
   servicio_agua?: boolean
   servicio_condominios?: boolean
+  // Manejo de Rentas: tercer modulo del plan (20261126000000). El trial nace en
+  // el plan de la combinacion elegida (plan_code_por_modulos).
+  servicio_rentas?: boolean
   // Aceptacion click-wrap (RGPD/CCPA): debe venir en true. El handler registra la
   // evidencia (version + IP + timestamp + user-agent) en legal_acceptances.
   legal_accepted?: boolean
@@ -41,8 +44,8 @@ export function validatePayload(p: SignupPayload): string | null {
   if (!p.company_name || typeof p.company_name !== 'string' || p.company_name.trim().length < 2) {
     return 'Nombre de la empresa es requerido'
   }
-  if (p.servicio_agua !== true && p.servicio_condominios !== true) {
-    return 'Selecciona al menos un servicio (agua o condominios)'
+  if (p.servicio_agua !== true && p.servicio_condominios !== true && p.servicio_rentas !== true) {
+    return 'Selecciona al menos un servicio (agua, condominios o rentas)'
   }
   if (p.default_currency !== undefined) {
     if (typeof p.default_currency !== 'string' || !MONEDAS_SIGNUP.has(p.default_currency.trim().toLowerCase())) {
