@@ -490,61 +490,100 @@ CREATE POLICY rentas_propiedades_delete ON public.rentas_propiedades FOR DELETE 
          AND (SELECT COALESCE(public.user_has_permission('rentas.propiedades.view'), false))
          AND (SELECT COALESCE(public.user_has_permission('rentas.propiedades.delete'), false)));
 
--- 7.2 Tablas hijas: mismo molde, cada una con la clave de su módulo.
-DO $$
-DECLARE
-  par text[];
-  t   text;
-  m   text;
-BEGIN
-  FOREACH par SLICE 1 IN ARRAY ARRAY[
-    ARRAY['rentas_reservas',   'reservas'],
-    ARRAY['rentas_contratos',  'contratos'],
-    ARRAY['rentas_inventario', 'inventario']
-  ] LOOP
-    t := par[1];
-    m := par[2];
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_select', t);
-    EXECUTE format($pol$
-      CREATE POLICY %I ON public.%I FOR SELECT TO authenticated
-        USING ((SELECT public.is_super_admin())
-               OR (company_id = (SELECT public.get_my_company_id())
-                   AND (SELECT public.rentas_servicio_activo())
-                   AND public.rentas_propiedad_accesible(propiedad_id)
-                   AND (SELECT COALESCE(public.user_has_permission(%L), false))))
-    $pol$, t || '_select', t, 'rentas.' || m || '.view');
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_insert', t);
-    EXECUTE format($pol$
-      CREATE POLICY %I ON public.%I FOR INSERT TO authenticated
-        WITH CHECK (company_id = (SELECT public.get_my_company_id())
-                    AND (SELECT public.rentas_servicio_activo())
-                    AND public.rentas_propiedad_accesible(propiedad_id)
-                    AND (SELECT COALESCE(public.user_has_permission(%L), false))
-                    AND (SELECT COALESCE(public.user_has_permission(%L), false)))
-    $pol$, t || '_insert', t, 'rentas.' || m || '.view', 'rentas.' || m || '.create');
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_update', t);
-    EXECUTE format($pol$
-      CREATE POLICY %I ON public.%I FOR UPDATE TO authenticated
-        USING (company_id = (SELECT public.get_my_company_id())
-               AND (SELECT public.rentas_servicio_activo())
-               AND public.rentas_propiedad_accesible(propiedad_id)
-               AND (SELECT COALESCE(public.user_has_permission(%L), false))
-               AND (SELECT COALESCE(public.user_has_permission(%L), false)))
-        WITH CHECK (company_id = (SELECT public.get_my_company_id())
-                    AND public.rentas_propiedad_accesible(propiedad_id))
-    $pol$, t || '_update', t, 'rentas.' || m || '.view', 'rentas.' || m || '.edit');
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_delete', t);
-    EXECUTE format($pol$
-      CREATE POLICY %I ON public.%I FOR DELETE TO authenticated
-        USING (company_id = (SELECT public.get_my_company_id())
-               AND (SELECT public.rentas_servicio_activo())
-               AND public.rentas_propiedad_accesible(propiedad_id)
-               AND (SELECT COALESCE(public.user_has_permission(%L), false))
-               AND (SELECT COALESCE(public.user_has_permission(%L), false)))
-    $pol$, t || '_delete', t, 'rentas.' || m || '.view', 'rentas.' || m || '.delete');
-  END LOOP;
-END;
-$$;
+-- 7.2 Tablas hijas: mismo molde, cada una con la clave de su módulo. Escritas una
+-- por una (no generadas con format): así las lee el análisis estático del repo.
+DROP POLICY IF EXISTS rentas_reservas_select ON public.rentas_reservas;
+CREATE POLICY rentas_reservas_select ON public.rentas_reservas FOR SELECT TO authenticated
+  USING ((SELECT public.is_super_admin())
+         OR (company_id = (SELECT public.get_my_company_id())
+             AND (SELECT public.rentas_servicio_activo())
+             AND public.rentas_propiedad_accesible(propiedad_id)
+             AND (SELECT COALESCE(public.user_has_permission('rentas.reservas.view'), false))));
+DROP POLICY IF EXISTS rentas_reservas_insert ON public.rentas_reservas;
+CREATE POLICY rentas_reservas_insert ON public.rentas_reservas FOR INSERT TO authenticated
+  WITH CHECK (company_id = (SELECT public.get_my_company_id())
+              AND (SELECT public.rentas_servicio_activo())
+              AND public.rentas_propiedad_accesible(propiedad_id)
+              AND (SELECT COALESCE(public.user_has_permission('rentas.reservas.view'), false))
+              AND (SELECT COALESCE(public.user_has_permission('rentas.reservas.create'), false)));
+DROP POLICY IF EXISTS rentas_reservas_update ON public.rentas_reservas;
+CREATE POLICY rentas_reservas_update ON public.rentas_reservas FOR UPDATE TO authenticated
+  USING (company_id = (SELECT public.get_my_company_id())
+         AND (SELECT public.rentas_servicio_activo())
+         AND public.rentas_propiedad_accesible(propiedad_id)
+         AND (SELECT COALESCE(public.user_has_permission('rentas.reservas.view'), false))
+         AND (SELECT COALESCE(public.user_has_permission('rentas.reservas.edit'), false)))
+  WITH CHECK (company_id = (SELECT public.get_my_company_id())
+              AND public.rentas_propiedad_accesible(propiedad_id));
+DROP POLICY IF EXISTS rentas_reservas_delete ON public.rentas_reservas;
+CREATE POLICY rentas_reservas_delete ON public.rentas_reservas FOR DELETE TO authenticated
+  USING (company_id = (SELECT public.get_my_company_id())
+         AND (SELECT public.rentas_servicio_activo())
+         AND public.rentas_propiedad_accesible(propiedad_id)
+         AND (SELECT COALESCE(public.user_has_permission('rentas.reservas.view'), false))
+         AND (SELECT COALESCE(public.user_has_permission('rentas.reservas.delete'), false)));
+
+DROP POLICY IF EXISTS rentas_contratos_select ON public.rentas_contratos;
+CREATE POLICY rentas_contratos_select ON public.rentas_contratos FOR SELECT TO authenticated
+  USING ((SELECT public.is_super_admin())
+         OR (company_id = (SELECT public.get_my_company_id())
+             AND (SELECT public.rentas_servicio_activo())
+             AND public.rentas_propiedad_accesible(propiedad_id)
+             AND (SELECT COALESCE(public.user_has_permission('rentas.contratos.view'), false))));
+DROP POLICY IF EXISTS rentas_contratos_insert ON public.rentas_contratos;
+CREATE POLICY rentas_contratos_insert ON public.rentas_contratos FOR INSERT TO authenticated
+  WITH CHECK (company_id = (SELECT public.get_my_company_id())
+              AND (SELECT public.rentas_servicio_activo())
+              AND public.rentas_propiedad_accesible(propiedad_id)
+              AND (SELECT COALESCE(public.user_has_permission('rentas.contratos.view'), false))
+              AND (SELECT COALESCE(public.user_has_permission('rentas.contratos.create'), false)));
+DROP POLICY IF EXISTS rentas_contratos_update ON public.rentas_contratos;
+CREATE POLICY rentas_contratos_update ON public.rentas_contratos FOR UPDATE TO authenticated
+  USING (company_id = (SELECT public.get_my_company_id())
+         AND (SELECT public.rentas_servicio_activo())
+         AND public.rentas_propiedad_accesible(propiedad_id)
+         AND (SELECT COALESCE(public.user_has_permission('rentas.contratos.view'), false))
+         AND (SELECT COALESCE(public.user_has_permission('rentas.contratos.edit'), false)))
+  WITH CHECK (company_id = (SELECT public.get_my_company_id())
+              AND public.rentas_propiedad_accesible(propiedad_id));
+DROP POLICY IF EXISTS rentas_contratos_delete ON public.rentas_contratos;
+CREATE POLICY rentas_contratos_delete ON public.rentas_contratos FOR DELETE TO authenticated
+  USING (company_id = (SELECT public.get_my_company_id())
+         AND (SELECT public.rentas_servicio_activo())
+         AND public.rentas_propiedad_accesible(propiedad_id)
+         AND (SELECT COALESCE(public.user_has_permission('rentas.contratos.view'), false))
+         AND (SELECT COALESCE(public.user_has_permission('rentas.contratos.delete'), false)));
+
+DROP POLICY IF EXISTS rentas_inventario_select ON public.rentas_inventario;
+CREATE POLICY rentas_inventario_select ON public.rentas_inventario FOR SELECT TO authenticated
+  USING ((SELECT public.is_super_admin())
+         OR (company_id = (SELECT public.get_my_company_id())
+             AND (SELECT public.rentas_servicio_activo())
+             AND public.rentas_propiedad_accesible(propiedad_id)
+             AND (SELECT COALESCE(public.user_has_permission('rentas.inventario.view'), false))));
+DROP POLICY IF EXISTS rentas_inventario_insert ON public.rentas_inventario;
+CREATE POLICY rentas_inventario_insert ON public.rentas_inventario FOR INSERT TO authenticated
+  WITH CHECK (company_id = (SELECT public.get_my_company_id())
+              AND (SELECT public.rentas_servicio_activo())
+              AND public.rentas_propiedad_accesible(propiedad_id)
+              AND (SELECT COALESCE(public.user_has_permission('rentas.inventario.view'), false))
+              AND (SELECT COALESCE(public.user_has_permission('rentas.inventario.create'), false)));
+DROP POLICY IF EXISTS rentas_inventario_update ON public.rentas_inventario;
+CREATE POLICY rentas_inventario_update ON public.rentas_inventario FOR UPDATE TO authenticated
+  USING (company_id = (SELECT public.get_my_company_id())
+         AND (SELECT public.rentas_servicio_activo())
+         AND public.rentas_propiedad_accesible(propiedad_id)
+         AND (SELECT COALESCE(public.user_has_permission('rentas.inventario.view'), false))
+         AND (SELECT COALESCE(public.user_has_permission('rentas.inventario.edit'), false)))
+  WITH CHECK (company_id = (SELECT public.get_my_company_id())
+              AND public.rentas_propiedad_accesible(propiedad_id));
+DROP POLICY IF EXISTS rentas_inventario_delete ON public.rentas_inventario;
+CREATE POLICY rentas_inventario_delete ON public.rentas_inventario FOR DELETE TO authenticated
+  USING (company_id = (SELECT public.get_my_company_id())
+         AND (SELECT public.rentas_servicio_activo())
+         AND public.rentas_propiedad_accesible(propiedad_id)
+         AND (SELECT COALESCE(public.user_has_permission('rentas.inventario.view'), false))
+         AND (SELECT COALESCE(public.user_has_permission('rentas.inventario.delete'), false)));
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 8. Guarda: lo que tiene que existir al terminar

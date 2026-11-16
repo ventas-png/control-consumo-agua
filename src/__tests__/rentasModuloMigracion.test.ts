@@ -47,8 +47,9 @@ describe('20261125000000 — forma de la migración', () => {
   })
 
   it('toda escritura pide el servicio contratado', () => {
-    // 4 policies de propiedades + 4 del molde de las hijas (una por comando).
-    expect((sql.match(/\(SELECT public\.rentas_servicio_activo\(\)\)/g) ?? []).length).toBe(8)
+    // 4 tablas × 4 comandos, escritas una por una.
+    expect((sql.match(/\(SELECT public\.rentas_servicio_activo\(\)\)/g) ?? []).length).toBe(16)
+    expect((sql.match(/CREATE POLICY rentas_\w+ ON public\.rentas_\w+ FOR (SELECT|INSERT|UPDATE|DELETE) TO authenticated/g) ?? []).length).toBe(16)
   })
 })
 
