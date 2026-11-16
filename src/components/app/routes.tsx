@@ -6,7 +6,7 @@
 // El JSX de cada sección se movió intacto; los datos vienen de `ctx.agua`
 // (useAguaData) y los permisos/navegación del resto del contexto.
 import type { ReactNode } from 'react'
-import type { AppSection, Ruta, UserRole, UserSession } from '../../types'
+import type { AppSection, Proyecto, Ruta, UserRole, UserSession } from '../../types'
 import { ErrorBoundary } from '../ErrorBoundary'
 import { RoleGuard, AccessDenied } from '../shared/AccessDenied'
 import { SinProyectoAsignado } from '../condominios/SinProyectoAsignado'
@@ -29,6 +29,14 @@ export interface AppRoutesCtx {
   canApprove: (moduleKey: string) => boolean
   canDelete: (moduleKey: string) => boolean
   agua: AguaData
+  /**
+   * `agua` acotado a los proyectos que operan en Manejo Agua (módulos por
+   * proyecto). Es lo que reciben las secciones de ese módulo; las compartidas
+   * (clientes, unidades, comunicación, panel del dueño) usan `agua`.
+   */
+  aguaModulo: AguaData
+  /** Proyectos que operan en Manejo Condominios: los que ofrece su selector. */
+  proyectosCondominios: Proyecto[]
   condominiosSinProyecto: boolean
   navigateSection: (section: AppSection) => void
   handleLogout: () => void
@@ -95,7 +103,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/lecturas', sectionName: 'lecturas', module: 'lecturas',
-    render: ({ agua, rutaActivaParaLecturas, clearRutaActiva }) => (
+    render: ({ aguaModulo: agua, rutaActivaParaLecturas, clearRutaActiva }) => (
       <LecturasSection
         clientes={agua.clientes}
         unidades={agua.unidades}
@@ -117,7 +125,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/historial', sectionName: 'historial', module: 'tabla',
-    render: ({ currentUser, agua, canEdit, canChangeStatus, canDelete }) => (
+    render: ({ currentUser, aguaModulo: agua, canEdit, canChangeStatus, canDelete }) => (
       <HistorialSection
         registros={agua.registros}
         clientes={agua.clientes}
@@ -139,7 +147,7 @@ export const APP_ROUTES: AppRouteDef[] = [
     // agua.cobros.view, que es lo que el sidebar ya evalúa.
     path: '/cobros', sectionName: 'cobros',
     module: 'cobros', moduleRoleBypass: ['collector'],
-    render: ({ agua }) => (
+    render: ({ aguaModulo: agua }) => (
       <CobrosSection
         registros={agua.registros}
         clientes={agua.clientes}
@@ -156,7 +164,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/dashboard', sectionName: 'dashboard', module: 'dashboard',
-    render: ({ agua, currentUser }) => (
+    render: ({ aguaModulo: agua, currentUser }) => (
       <DashboardSection registros={agua.registros} moneda={agua.moneda} isLoading={agua.dataLoading} companyId={currentUser.company_id ?? undefined} />
     ),
   },
@@ -194,7 +202,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/mapa', sectionName: 'mapa', module: 'mapa',
-    render: ({ currentUser, agua }) => (
+    render: ({ currentUser, aguaModulo: agua }) => (
       <MapaSection
         clientes={agua.clientes}
         registros={agua.registros}
@@ -205,7 +213,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/rutas', sectionName: 'rutas', module: 'rutas',
-    render: ({ currentUser, agua, canCreate, canEdit, canDelete, onEjecutarRuta }) => (
+    render: ({ currentUser, aguaModulo: agua, canCreate, canEdit, canDelete, onEjecutarRuta }) => (
       <RutasSection
         clientes={agua.clientes}
         contadores={agua.contadores}
@@ -256,7 +264,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/tarifas', sectionName: 'tarifas', module: 'tarifas',
-    render: ({ agua }) => (
+    render: ({ aguaModulo: agua }) => (
       <TarifasSection
         tarifas={agua.tarifas}
         proyectos={agua.proyectos}
@@ -285,7 +293,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/contadores', sectionName: 'contadores', module: 'contadores',
-    render: ({ agua, canDelete }) => (
+    render: ({ aguaModulo: agua, canDelete }) => (
       <ContadoresSection
         contadores={agua.contadores}
         tarifas={agua.tarifas}
@@ -339,11 +347,11 @@ export const APP_ROUTES: AppRouteDef[] = [
   // asignado" es propio de estas rutas, por eso va dentro del render.
   {
     path: '/condominios/panel',
-    render: ({ currentUser, agua, navigateSection, condominiosSinProyecto }) => (
+    render: ({ currentUser, agua, proyectosCondominios, navigateSection, condominiosSinProyecto }) => (
       condominiosSinProyecto ? <SinProyectoAsignado /> : (
         <CondominiosDashboard
           currentUser={currentUser}
-          proyectos={agua.proyectos}
+          proyectos={proyectosCondominios}
           unidades={agua.unidades}
           onNavigateSection={navigateSection}
         />
@@ -352,21 +360,21 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/condominios/:tab',
-    render: ({ currentUser, agua, condominiosSinProyecto }) => (
+    render: ({ currentUser, agua, proyectosCondominios, condominiosSinProyecto }) => (
       condominiosSinProyecto ? <SinProyectoAsignado /> : (
         <ErrorBoundary sectionName="condominios">
-          <CondominiosSection proyectos={agua.proyectos} unidades={agua.unidades} currentUser={currentUser} />
+          <CondominiosSection proyectos={proyectosCondominios} unidades={agua.unidades} currentUser={currentUser} />
         </ErrorBoundary>
       )
     ),
   },
   {
     path: '/condominios',
-    render: ({ currentUser, agua, condominiosSinProyecto }) => (
+    render: ({ currentUser, agua, proyectosCondominios, condominiosSinProyecto }) => (
       condominiosSinProyecto ? <SinProyectoAsignado /> : (
         <ErrorBoundary sectionName="condominios">
           <CondominiosSection
-            proyectos={agua.proyectos}
+            proyectos={proyectosCondominios}
             unidades={agua.unidades}
             currentUser={currentUser}
           />

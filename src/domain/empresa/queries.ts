@@ -57,6 +57,12 @@ export interface EmpresaSectionData {
   empresa: EmpresaInfo | null
   proyectos: Proyecto[]
   usuarios: Usuario[]
+  /**
+   * ¿La base ya tiene los interruptores de módulos por proyecto
+   * (projects.modulo_*, migración 20261127000000)? Si no, la sección no ofrece
+   * elegirlos y los proyectos se tratan con todo encendido.
+   */
+  modulosPorProyecto: boolean
 }
 
 /**
@@ -92,6 +98,21 @@ export function useEmpresaSectionDataQuery(companyId?: string, currentUserId?: s
         ),
       ])
 
+      // Los interruptores de módulos van en una consulta APARTE a propósito
+      // (igual que servicio_rentas en la sesión): si la columna aún no existe
+      // en la base, falla sola y la sección carga como hasta ahora.
+      const { data: modulos, error: modulosError } = await supabase
+        .from('projects')
+        .select('id, modulo_agua, modulo_condominios, modulo_rentas')
+        .eq('company_id', companyId!)
+      const modulosPorId = new Map((modulos ?? []).map((m) => [m.id, m]))
+      const proyectosConModulos = (proyectos ?? []).map((p): Proyecto => {
+        const m = modulosPorId.get(p.id)
+        return m
+          ? { ...p, modulo_agua: m.modulo_agua, modulo_condominios: m.modulo_condominios, modulo_rentas: m.modulo_rentas }
+          : p
+      })
+
       const usuarios = baseUsers ?? []
       const userIds = usuarios.map((u) => u.id)
       if (userIds.length > 0) {
@@ -125,7 +146,7 @@ export function useEmpresaSectionDataQuery(companyId?: string, currentUserId?: s
         }
       }
 
-      return { empresa: empresa ?? null, proyectos: proyectos ?? [], usuarios }
+      return { empresa: empresa ?? null, proyectos: proyectosConModulos, usuarios, modulosPorProyecto: !modulosError }
     },
     enabled: !!companyId && !!currentUserId,
   })

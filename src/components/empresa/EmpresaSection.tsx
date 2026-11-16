@@ -24,12 +24,14 @@ import { EmpresaHeaderCard } from './EmpresaHeaderCard'
 import { EmpresaProyectosSection } from './EmpresaProyectosSection'
 import { EmpresaUsuariosSection } from './EmpresaUsuariosSection'
 import { empresaKeys } from '../../domain/empresa/keys'
+import { aguaKeys } from '../../domain/agua/keys'
 import { useEmpresaSectionDataQuery } from '../../domain/empresa/queries'
 import { CompanyBrandingSection } from './CompanyBrandingSection'
 import { isExemptPlatformRole } from '../../lib/permissions'
 import { SsoConfigSection } from './SsoConfigSection'
 import { useFeatureFlags } from '../../lib/featureFlags'
 import { puedeCrearProyectos } from '../../domain/empresa/usuarios'
+import { modulosContratados } from '../../lib/modulosProyecto'
 
 interface Props {
   currentUser: UserSession
@@ -81,6 +83,9 @@ export function EmpresaSection({ currentUser }: Props) {
         effectiveMaxProjects={effectiveMaxProjects}
         onReload={reload}
         puedeCrear={puedeCrearProyectos(currentUser.role)}
+        modulosContratados={modulosContratados(currentUser)}
+        puedeElegirModulos={puedeCrearProyectos(currentUser.role) && data?.modulosPorProyecto === true}
+        onModulosCambiados={() => { void queryClient.invalidateQueries({ queryKey: aguaKeys.proyectos(companyId) }) }}
       />
 
       <EmpresaUsuariosSection
