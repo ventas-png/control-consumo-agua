@@ -199,3 +199,85 @@ describe('RrhhConfiguracionTab — los dos catálogos', () => {
     expect(screen.getByText('Sin tipos de turno definidos')).toBeTruthy()
   })
 })
+
+describe('RrhhConfiguracionTab — buscador y formulario en ventana emergente', () => {
+  const buscador = (tipo: 'cargo' | 'tipo de turno') => screen.getByRole('searchbox', { name: `Buscar ${tipo}` })
+  const visibles = (tipo: 'cargo' | 'turno', codigos: string[]) => codigos.filter(c => screen.queryByTestId(`rrhh-${tipo}-${c}`))
+
+  it('cada catálogo tiene su buscador: acota por nombre, código o descripción sin acentos y no toca al otro', () => {
+    renderTab({ cargos: [...cargos, item({ id: 'c3', codigo: 'recepcion', nombre: 'Recepción', icono: '🛎️', orden: 20, descripcion: 'Atiende la garita' })] })
+    expect(visibles('cargo', ['conserje', 'recepcion', 'jardinero'])).toEqual(['conserje', 'recepcion', 'jardinero'])
+
+    fireEvent.change(buscador('cargo'), { target: { value: 'RECEPCION' } })
+    expect(visibles('cargo', ['conserje', 'recepcion', 'jardinero'])).toEqual(['recepcion'])
+    // Los tipos de turno siguen completos: el buscador es de su catálogo.
+    expect(visibles('turno', ['diurno', 'nocturno'])).toEqual(['diurno', 'nocturno'])
+    // Por descripción y por código.
+    fireEvent.change(buscador('cargo'), { target: { value: 'garita' } })
+    expect(visibles('cargo', ['conserje', 'recepcion', 'jardinero'])).toEqual(['recepcion'])
+    fireEvent.change(buscador('cargo'), { target: { value: 'jardin' } })
+    expect(visibles('cargo', ['conserje', 'recepcion', 'jardinero'])).toEqual(['jardinero'])
+
+    fireEvent.change(buscador('cargo'), { target: { value: 'zzz' } })
+    expect(visibles('cargo', ['conserje', 'recepcion', 'jardinero'])).toEqual([])
+    expect(screen.getByText('Ningún cargo coincide con «zzz»')).toBeTruthy()
+    // Los contadores de la cabecera siguen siendo del catálogo completo.
+    expect(screen.getByText(/^3 cargos \(3 activos\)/)).toBeTruthy()
+
+    fireEvent.change(buscador('tipo de turno'), { target: { value: 'noct' } })
+    expect(visibles('turno', ['diurno', 'nocturno'])).toEqual(['nocturno'])
+    fireEvent.change(buscador('cargo'), { target: { value: '' } })
+    expect(visibles('cargo', ['conserje', 'recepcion', 'jardinero'])).toEqual(['conserje', 'recepcion', 'jardinero'])
+  })
+
+  it('sin catálogo no hay buscador; en consulta sí lo hay aunque no haya «+ Nuevo»', () => {
+    renderTab({ cargos: [], tiposTurno: [] })
+    expect(screen.queryByRole('searchbox', { name: 'Buscar cargo' })).toBeNull()
+    cleanup()
+    renderTab({ canCreate: false, canEdit: false })
+    expect(screen.queryByText('+ Nuevo cargo')).toBeNull()
+    expect(buscador('cargo')).toBeTruthy()
+  })
+
+  it('+ Nuevo abre un diálogo con el formulario en blanco; Cancelar descarta el borrador y el botón sigue a la vista', () => {
+    renderTab()
+    fireEvent.click(screen.getByText('+ Nuevo tipo de turno'))
+    const ventana = screen.getByRole('dialog', { name: 'Nuevo tipo de turno' })
+    expect((within(ventana).getByLabelText('Nombre *') as HTMLInputElement).value).toBe('')
+    expect(screen.getByText('+ Nuevo tipo de turno')).toBeTruthy()
+    expect(screen.getByTestId('rrhh-turno-diurno')).toBeTruthy()
+    fireEvent.change(within(ventana).getByLabelText('Nombre *'), { target: { value: 'Madrugada' } })
+    expect((within(ventana).getByLabelText('Código *') as HTMLInputElement).value).toBe('madrugada')
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.createCondominioRow).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('+ Nuevo tipo de turno'))
+    expect((screen.getByLabelText('Nombre *') as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText('Código *') as HTMLInputElement).value).toBe('')
+  })
+
+  it('Editar abre el diálogo con los datos y Escape lo cierra sin guardar', () => {
+    renderTab()
+    fireEvent.click(within(tarjeta('cargo', 'conserje')).getByLabelText('Editar Conserje'))
+    const ventana = screen.getByRole('dialog', { name: 'Editar cargo' })
+    expect((within(ventana).getByLabelText('Nombre *') as HTMLInputElement).value).toBe('Conserje')
+    expect((within(ventana).getByLabelText('Código (no se cambia)') as HTMLInputElement).readOnly).toBe(true)
+    expect(within(ventana).getByRole('group', { name: 'Ícono' })).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('Guardar cierra la ventana y refresca', async () => {
+    const onRefresh = vi.fn()
+    renderTab({ onRefresh })
+    fireEvent.click(screen.getByText('+ Nuevo cargo'))
+    const ventana = screen.getByRole('dialog', { name: 'Nuevo cargo' })
+    fireEvent.change(within(ventana).getByLabelText('Nombre *'), { target: { value: 'Recepcionista' } })
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(mocks.createCondominioRow).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+  })
+})
