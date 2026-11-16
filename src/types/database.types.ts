@@ -17062,6 +17062,9 @@ export type Database = {
           max_unidades_oficina: number | null
           max_unidades_otro: number | null
           max_unidades_parqueadero: number | null
+          modulo_agua: boolean
+          modulo_condominios: boolean
+          modulo_rentas: boolean
           moneda: string
           moneda_condominios: string | null
           nit: string | null
@@ -17098,6 +17101,9 @@ export type Database = {
           max_unidades_oficina?: number | null
           max_unidades_otro?: number | null
           max_unidades_parqueadero?: number | null
+          modulo_agua?: boolean
+          modulo_condominios?: boolean
+          modulo_rentas?: boolean
           moneda?: string
           moneda_condominios?: string | null
           nit?: string | null
@@ -17134,6 +17140,9 @@ export type Database = {
           max_unidades_oficina?: number | null
           max_unidades_otro?: number | null
           max_unidades_parqueadero?: number | null
+          modulo_agua?: boolean
+          modulo_condominios?: boolean
+          modulo_rentas?: boolean
           moneda?: string
           moneda_condominios?: string | null
           nit?: string | null

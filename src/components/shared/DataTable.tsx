@@ -68,6 +68,12 @@ export interface DataTableProps<T> {
 
   /** Búsqueda libre que matchea contra estos campos. Si no se pasa, sin search. */
   searchableKeys?: (keyof T | ((row: T) => string))[]
+  /**
+   * Nombre accesible del cuadro de búsqueda. Por defecto se deriva del
+   * placeholder sin el emoji inicial ni los puntos suspensivos («🔍 Buscar
+   * persona…» → «Buscar persona»).
+   */
+  searchLabel?: string
   /** Placeholder del input de búsqueda. */
   searchPlaceholder?: string
 
@@ -151,6 +157,15 @@ export interface DataTableProps<T> {
 
 // ── Componente ────────────────────────────────────────────────────────────
 
+/** Para la búsqueda: sin acentos ni mayúsculas, para que «lopez» encuentre «López». */
+const sinAcentos = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+/** «🔍 Buscar persona…» → «Buscar persona»: el placeholder sin adorno sirve de nombre accesible. */
+function etiquetaDesdePlaceholder(placeholder: string): string {
+  const limpio = placeholder.replace(/^[^\p{L}\p{N}]+/u, '').replace(/[.…\s]+$/u, '').trim()
+  return limpio || 'Buscar'
+}
+
 export function DataTable<T>({
   data,
   columns,
@@ -159,6 +174,7 @@ export function DataTable<T>({
   rowKey,
   searchableKeys,
   searchPlaceholder = 'Buscar…',
+  searchLabel,
   filters,
   pageSize = 50,
   defaultSort,
@@ -194,14 +210,15 @@ export function DataTable<T>({
     if (isServer) return data
     let result = data
     if (search && searchableKeys && searchableKeys.length > 0) {
-      const needle = search.toLowerCase().trim()
+      // Sin acentos ni mayúsculas: «lopez» encuentra «López», «marmol» a «mármol».
+      const needle = sinAcentos(search).trim()
       result = result.filter(row =>
         searchableKeys.some(key => {
           const value = typeof key === 'function'
             ? key(row)
             : ((row as Record<string, unknown>)[key as string] as unknown)
           if (value === null || value === undefined) return false
-          return String(value).toLowerCase().includes(needle)
+          return sinAcentos(String(value)).includes(needle)
         })
       )
     }
@@ -307,6 +324,7 @@ export function DataTable<T>({
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(0) }}
               placeholder={searchPlaceholder}
+              aria-label={searchLabel ?? etiquetaDesdePlaceholder(searchPlaceholder)}
               style={{
                 flex: '1 1 240px',
                 minWidth: '180px',

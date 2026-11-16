@@ -243,6 +243,14 @@ export interface Proyecto {
   max_unidades_oficina: number | null
   max_unidades_parqueadero: number | null
   max_unidades_otro: number | null
+  /**
+   * Módulos en los que opera el proyecto (migración 20261127000000). Sólo
+   * `false` apaga; ausente = encendido. Cuentan únicamente si la empresa tiene
+   * contratado el módulo — ver lib/modulosProyecto.
+   */
+  modulo_agua?: boolean
+  modulo_condominios?: boolean
+  modulo_rentas?: boolean
 }
 
 export const MONEDAS = [

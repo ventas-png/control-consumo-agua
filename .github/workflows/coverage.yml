@@ -960,6 +960,23 @@ jobs:
           PGPORT_TEST: 55566
         run: supabase/tests/rentas_plan/run.sh
 
+<<<<<<< HEAD
+=======
+      # 20261127000000: módulos por PROYECTO. Cada proyecto elige en cuáles de los
+      # módulos contratados por su empresa opera (projects.modulo_*, encendidos por
+      # defecto). Ejercido como cada persona: la dueña y la plataforma mueven los
+      # interruptores, un administrador no (pero sigue editando el proyecto); un
+      # proyecto conserva al menos un módulo de los CONTRATADOS; el portal del
+      # residente cruza el servicio de la empresa con el módulo del proyecto de cada
+      # unidad; Rentas no enlaza a un proyecto que lo tiene apagado y conserva lo ya
+      # enlazado. CONTROL NEGATIVO: cuatro mutantes.
+      - name: Módulos por proyecto
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55592
+        run: supabase/tests/modulos_por_proyecto/run.sh
+
+>>>>>>> origin/main
       # 20261031000200: carga masiva de ACTIVIDADES del catálogo (plantillas_tarea_cargo)
       # desde una plantilla propia, con insumos, herramientas y equipo por NOMBRE
       # (columnas por tipo, «;», cantidad «x n», «!» obligatoria), y recursos EN BLOQUE
