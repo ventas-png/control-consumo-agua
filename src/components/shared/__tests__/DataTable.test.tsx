@@ -67,6 +67,17 @@ describe('DataTable — search', () => {
     expect(screen.queryByText('Ana Pérez')).toBeNull()
   })
 
+  it('busca sin distinguir acentos y el cuadro tiene nombre accesible derivado del placeholder', () => {
+    render(<DataTable data={rows} columns={columns} rowKey="id" searchableKeys={['nombre']} searchPlaceholder="🔍 Buscar persona…" pageSize={0} />)
+    const cuadro = screen.getByRole('searchbox', { name: 'Buscar persona' })
+    fireEvent.change(cuadro, { target: { value: 'maria' } })
+    expect(screen.getByText('María Sol')).toBeTruthy()
+    expect(screen.queryByText('Ana Pérez')).toBeNull()
+    fireEvent.change(cuadro, { target: { value: 'ÁNA' } })
+    expect(screen.getByText('Ana Pérez')).toBeTruthy()
+    expect(screen.queryByText('María Sol')).toBeNull()
+  })
+
   it('acepta función como searchable key', () => {
     render(
       <DataTable
