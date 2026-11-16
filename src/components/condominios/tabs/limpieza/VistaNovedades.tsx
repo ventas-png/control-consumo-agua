@@ -15,6 +15,10 @@ import { ImageGallery } from '../../../shared/ImageGallery'
 import type { NovedadOperativa } from '../../../../domain/condominios/novedades'
 import { btn, chip, inputStyle, labelStyle, PRIORIDAD_LABEL } from './ui'
 
+/** Para el buscador: sin acentos ni mayúsculas, para que «fundida» encuentre «Luminaria fundida». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 interface Props {
   /** Ya ordenadas y filtradas por el adaptador de su fuente. */
   novedades: NovedadOperativa[]
@@ -26,6 +30,7 @@ interface Props {
 export function VistaNovedades({ novedades, canEdit, onAtender }: Props) {
   const [soloMantenimiento, setSoloMantenimiento] = useState(false)
   const [filtroPrioridad, setFiltroPrioridad] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   /** La que se está marcando: su botón espera en vez de aceptar un segundo toque. */
   const [atendiendo, setAtendiendo] = useState<string | null>(null)
 
@@ -35,10 +40,14 @@ export function VistaNovedades({ novedades, canEdit, onAtender }: Props) {
     try { await onAtender(nov) } finally { setAtendiendo(null) }
   }
 
+  // El buscador acota por dónde (título), qué (texto), quién y fecha, sin
+  // distinguir acentos. El contador de mantenimiento pendiente no se toca.
+  const termino = sinAcentos(busqueda)
   const visibles = useMemo(() => novedades
     .filter(n => !soloMantenimiento || n.requiere_mantenimiento)
-    .filter(n => !filtroPrioridad || n.prioridad === filtroPrioridad),
-  [novedades, soloMantenimiento, filtroPrioridad])
+    .filter(n => !filtroPrioridad || n.prioridad === filtroPrioridad)
+    .filter(n => !termino || [n.titulo, n.texto, n.persona, n.fecha].some(c => sinAcentos(c).includes(termino))),
+  [novedades, soloMantenimiento, filtroPrioridad, termino])
 
   const pendientesManto = novedades.filter(n => n.requiere_mantenimiento).length
 
@@ -53,6 +62,7 @@ export function VistaNovedades({ novedades, canEdit, onAtender }: Props) {
           </select>
         </div>
         <button
+          type="button"
           onClick={() => setSoloMantenimiento(v => !v)}
           style={soloMantenimiento
             ? btn('var(--at-danger-tint)', 'var(--at-danger)')
@@ -60,9 +70,18 @@ export function VistaNovedades({ novedades, canEdit, onAtender }: Props) {
         >
           🛠 Solo mantenimiento pendiente ({pendientesManto})
         </button>
+        <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar novedad…" aria-label="Buscar novedad"
+          style={{ ...inputStyle, width: 'auto', flex: '1 1 200px', minWidth: '160px', maxWidth: '340px' }} />
       </div>
 
-      {visibles.length === 0 ? (
+      {visibles.length === 0 && termino && novedades.length > 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--at-ink-3)' }}>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
+          <p style={{ fontWeight: 600, color: 'var(--at-ink-3)', margin: '0 0 4px' }}>Ninguna novedad coincide con «{busqueda.trim()}»</p>
+          <p style={{ fontSize: '13px', margin: 0 }}>Se busca por lugar, texto, persona y fecha.</p>
+        </div>
+      ) : visibles.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px', color: 'var(--at-ink-3)' }}>
           <div style={{ fontSize: '36px', marginBottom: '8px' }}>✨</div>
           <p style={{ fontWeight: 600, color: 'var(--at-ink-3)' }}>Sin novedades reportadas</p>
