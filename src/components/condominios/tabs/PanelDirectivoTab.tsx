@@ -235,7 +235,10 @@ export default function PanelDirectivoTab({
         <Kpi label="Recargos mora" val={`${moneda} ${recargosPendientes.toLocaleString('es', { minimumFractionDigits: 2 })}`} sub="pendientes de cobro" color={recargosPendientes > 0 ? 'var(--at-danger)' : 'var(--at-success)'} bg={recargosPendientes > 0 ? 'var(--at-danger-tint)' : 'var(--at-success-tint)'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      {/* auto-fit: dos columnas en escritorio, una sola en el teléfono. Con
+          «1fr 1fr» fijas, cada bloque quedaba en media pantalla angosta y las
+          cifras se partían en dos líneas. */}
+      <div data-testid="bloques-indicadores" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: 14 }}>
         {/* Financiero */}
         <div style={SECTION}>
           <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--at-ink)', marginBottom: 10 }}>💰 Gestión Financiera</div>
