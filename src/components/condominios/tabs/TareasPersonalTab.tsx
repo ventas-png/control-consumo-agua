@@ -1,5 +1,5 @@
 import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, type CSSProperties } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import {
@@ -15,6 +15,7 @@ import {
   paradasDelTurno, preparacionDelTurno, siguientePendiente,
 } from '../../../domain/condominios/ejecucionGuiada'
 import { MultiImageUploader } from '../../shared/ImageUploader'
+import { EditModal } from '../../shared/EditModal'
 import { PreparacionTurno } from './turno/PreparacionTurno'
 import { EjecucionGuiada } from './turno/EjecucionGuiada'
 import type {
@@ -74,6 +75,21 @@ const ESTADO_TAREA: Record<EstadoTareaBloque, { label: string; icon: string; bg:
 function blankBloque(hoy: string) {
   return { personal_id: '', turno: 'manana' as TurnoTipo, fecha: hoy, notas: '' }
 }
+const blankTarea = () => ({ titulo: '', descripcion: '', area_id: '', plantilla_id: '', requiere_foto: false })
+
+/** Para el buscador: sin acentos ni mayúsculas, para que «lopez» encuentre «López». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+const labelForm: CSSProperties = { fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }
+const campoForm: CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)',
+  borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)',
+}
+const campoTarea: CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-warning-border)',
+  borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-warning-tint)',
+}
 
 /** El mapa sin esa clave (para soltar lo local de una tarea). */
 function sin<T>(m: Record<string, T>, clave: string): Record<string, T> {
@@ -107,7 +123,12 @@ export function TareasPersonalTab({
 
   // Tareas a agregar al bloque
   const [addingTarea, setAddingTarea] = useState(false)
-  const [nuevaTarea, setNuevaTarea] = useState({ titulo: '', descripcion: '', area_id: '', plantilla_id: '', requiere_foto: false })
+  const [nuevaTarea, setNuevaTarea] = useState(blankTarea())
+  const [busqueda, setBusqueda] = useState('')
+
+  /** Cerrar la ventana descarta el borrador; mientras guarda no se cierra. */
+  function cerrarBloqueForm() { if (saving) return; setBloqueForm(blankBloque(hoy)); setShowBloqueForm(false) }
+  function cerrarTareaForm() { if (saving) return; setNuevaTarea(blankTarea()); setAddingTarea(false) }
 
   const bloquesFiltrados = bloques.filter(b => {
     const porPersonal = selectedPersonalId === 'todos' || b.personal_id === selectedPersonalId
@@ -117,6 +138,23 @@ export function TareasPersonalTab({
 
   const tareasDeBloque = (bloqueId: string) =>
     tareas.filter(t => t.bloque_id === bloqueId).sort((a, b) => a.orden - b.orden)
+
+  // El buscador acota los turnos PINTADOS por empleado, cargo, turno o el título
+  // de alguna de sus tareas («¿quién tiene hoy la piscina?»), sin distinguir
+  // acentos. El contador de «en curso hoy» de la cabecera no se toca.
+  const termino = sinAcentos(busqueda)
+  const bloquesVisibles = termino
+    ? bloquesFiltrados.filter(b => {
+        const emp = personal.find(p => p.id === b.personal_id)
+        const campos = [
+          emp?.nombre ?? b.personal_nombre,
+          etiquetaCargo(emp?.cargo ?? b.personal_cargo, cargos),
+          TURNO_CONFIG[b.turno]?.label,
+          ...tareasDeBloque(b.id).map(t => t.titulo),
+        ]
+        return campos.some(c => sinAcentos(c).includes(termino))
+      })
+    : bloquesFiltrados
 
   // ── CRUD Bloque ─────────────────────────────────────────────
   async function crearBloque() {
@@ -254,7 +292,7 @@ export function TareasPersonalTab({
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setNuevaTarea({ titulo: '', descripcion: '', area_id: '', plantilla_id: '', requiere_foto: false })
+    setNuevaTarea(blankTarea())
     setAddingTarea(false); onRefresh()
   }
 
@@ -733,53 +771,57 @@ export function TareasPersonalTab({
           </p>
         </div>
         {puedeArmar && (
-          <button onClick={() => { setBloqueForm(blankBloque(hoy)); setShowBloqueForm(true) }}
+          <button type="button" onClick={() => { setBloqueForm(blankBloque(hoy)); setShowBloqueForm(true) }}
             style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
             + Asignar turno
           </button>
         )}
       </div>
 
-      {/* Form nuevo bloque */}
+      {/* Form nuevo bloque — BORRADOR en ventana emergente: nada persiste hasta «Crear turno» */}
       {showBloqueForm && (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Asignar bloque de turno</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
+        <EditModal
+          title="Asignar turno"
+          subtitle="Un bloque de turno para un empleado; las tareas se le cargan después"
+          onClose={cerrarBloqueForm}
+          size="md"
+          fullScreenOnMobile
+          footer={
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={cerrarBloqueForm} disabled={saving} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+              <button type="button" onClick={crearBloque} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                {saving ? 'Creando...' : 'Crear turno'}
+              </button>
+            </div>
+          }
+        >
+          {/* auto-fit: fecha y turno lado a lado en escritorio, una columna en el teléfono. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '14px' }}>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Empleado *</label>
-              <select value={bloqueForm.personal_id} onChange={e => setBloqueForm(f => ({ ...f, personal_id: e.target.value }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+              <label style={labelForm} htmlFor="turno-empleado">Empleado *</label>
+              <select id="turno-empleado" value={bloqueForm.personal_id} autoFocus onChange={e => setBloqueForm(f => ({ ...f, personal_id: e.target.value }))} style={campoForm}>
                 <option value="">Seleccionar empleado...</option>
                 {personalActivo.map(p => <option key={p.id} value={p.id}>{p.nombre} — {etiquetaCargo(p.cargo, cargos)}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Fecha</label>
-              <input type="date" value={bloqueForm.fecha} onChange={e => setBloqueForm(f => ({ ...f, fecha: e.target.value }))}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+              <label style={labelForm} htmlFor="turno-fecha">Fecha</label>
+              <input id="turno-fecha" type="date" value={bloqueForm.fecha} onChange={e => setBloqueForm(f => ({ ...f, fecha: e.target.value }))} style={campoForm} />
             </div>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Turno</label>
-              <select value={bloqueForm.turno} onChange={e => setBloqueForm(f => ({ ...f, turno: e.target.value as TurnoTipo }))}
-                style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }}>
+              <label style={labelForm} htmlFor="turno-turno">Turno</label>
+              <select id="turno-turno" value={bloqueForm.turno} onChange={e => setBloqueForm(f => ({ ...f, turno: e.target.value as TurnoTipo }))} style={campoForm}>
                 <option value="manana">🌅 Mañana</option>
                 <option value="tarde">☀️ Tarde</option>
                 <option value="noche">🌙 Noche</option>
               </select>
             </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px' }}>Notas</label>
-              <input value={bloqueForm.notas} onChange={e => setBloqueForm(f => ({ ...f, notas: e.target.value }))} placeholder="Indicaciones especiales..."
-                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', background: 'var(--at-surface-2)' }} />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelForm} htmlFor="turno-notas">Notas</label>
+              <input id="turno-notas" value={bloqueForm.notas} onChange={e => setBloqueForm(f => ({ ...f, notas: e.target.value }))} placeholder="Indicaciones especiales..." style={campoForm} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={crearBloque} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Creando...' : 'Crear turno'}
-            </button>
-            <button onClick={() => setShowBloqueForm(false)} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {/* Filtros */}
@@ -792,10 +834,13 @@ export function TareasPersonalTab({
         <input type="date" value={selectedFecha} onChange={e => setSelectedFecha(e.target.value)}
           style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
         {selectedFecha !== hoy && (
-          <button onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-ink-2)' }}>
+          <button type="button" onClick={() => setSelectedFecha(hoy)} style={{ padding: '7px 12px', background: 'var(--at-chip)', border: '1px solid var(--at-line)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-ink-2)' }}>
             Hoy
           </button>
         )}
+        <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+          placeholder="🔍 Buscar empleado o tarea…" aria-label="Buscar turno"
+          style={{ padding: '7px 12px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)', flex: '1 1 200px', minWidth: '160px', maxWidth: '340px' }} />
       </div>
 
       {/* Lista de bloques */}
@@ -804,9 +849,15 @@ export function TareasPersonalTab({
           <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚙️</div>
           <p style={{ fontWeight: 700, color: 'var(--at-ink-3)' }}>Sin turnos asignados para este filtro</p>
         </div>
+      ) : bloquesVisibles.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--at-ink-3)' }}>
+          <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔍</div>
+          <p style={{ fontWeight: 700, color: 'var(--at-ink-3)', margin: '0 0 4px' }}>Ningún turno coincide con «{busqueda.trim()}»</p>
+          <p style={{ fontSize: '13px', margin: 0 }}>Se busca por empleado, cargo, turno y título de sus tareas.</p>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {bloquesFiltrados.map(fila => {
+          {bloquesVisibles.map(fila => {
             const bloque = estadoBloqueLocal[fila.id] ? { ...fila, estado: estadoBloqueLocal[fila.id] } : fila
             const tc = TURNO_CONFIG[bloque.turno]
             const ec = ESTADO_BLOQUE[bloque.estado]
@@ -997,23 +1048,40 @@ export function TareasPersonalTab({
                       </div>
                     )}
 
-                    {/* Agregar tarea ad-hoc */}
+                    {/* Agregar tarea ad-hoc — BORRADOR en ventana emergente: nada persiste hasta «Agregar» */}
                     {puedeArmar && bloque.estado !== 'completado' && bloque.estado !== 'incompleto' && (
                       <>
-                        {!addingTarea ? (
-                          <button onClick={() => setAddingTarea(true)}
-                            style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-warning)', border: '1.5px dashed #fcd34d', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                            + Agregar tarea
-                          </button>
-                        ) : (
-                          <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-warning-border)', borderRadius: '10px', padding: '14px', marginTop: '4px' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                        <button type="button" onClick={() => setAddingTarea(true)}
+                          style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-warning)', border: '1.5px dashed #fcd34d', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
+                          + Agregar tarea
+                        </button>
+                        {addingTarea && (
+                          <EditModal
+                            title="Agregar tarea al turno"
+                            subtitle={`${nombreEmpleado} · ${tc.label} · ${formatFechaCalendario(bloque.fecha, { day: '2-digit', month: 'short', year: 'numeric' }, 'es', '—')}`}
+                            onClose={cerrarTareaForm}
+                            size="md"
+                            fullScreenOnMobile
+                            footer={
+                              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                <button type="button" onClick={cerrarTareaForm} disabled={saving}
+                                  style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                                  Cancelar
+                                </button>
+                                <button type="button" onClick={() => agregarTareaDesde(bloque.id)} disabled={saving}
+                                  style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                                  {saving ? 'Agregando...' : 'Agregar'}
+                                </button>
+                              </div>
+                            }
+                          >
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '12px' }}>
                               <div style={{ gridColumn: '1 / -1' }}>
-                                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>Desde plantilla</label>
-                                <select value={nuevaTarea.plantilla_id} onChange={e => {
+                                <label style={labelForm} htmlFor="tarea-plantilla">Desde plantilla</label>
+                                <select id="tarea-plantilla" value={nuevaTarea.plantilla_id} autoFocus onChange={e => {
                                   const p = plantillas.find(x => x.id === e.target.value)
                                   setNuevaTarea(f => ({ ...f, plantilla_id: e.target.value, titulo: p?.titulo ?? '', descripcion: p?.descripcion ?? '', area_id: p?.area_id ?? '', requiere_foto: p?.requiere_foto ?? false }))
-                                }} style={{ width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-warning-border)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-warning-tint)' }}>
+                                }} style={campoTarea}>
                                   <option value="">Tarea personalizada</option>
                                   {plantillas.filter(p => p.activo).sort((a, b) => a.cargo.localeCompare(b.cargo) || a.orden - b.orden).map(p => (
                                     <option key={p.id} value={p.id}>{etiquetaCargo(p.cargo, cargos)} — {p.titulo}</option>
@@ -1022,36 +1090,25 @@ export function TareasPersonalTab({
                               </div>
                               {!nuevaTarea.plantilla_id && (
                                 <div style={{ gridColumn: '1 / -1' }}>
-                                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>Título *</label>
-                                  <input value={nuevaTarea.titulo} onChange={e => setNuevaTarea(f => ({ ...f, titulo: e.target.value }))} placeholder="Título de la tarea..."
-                                    style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1.5px solid var(--at-warning-border)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-warning-tint)' }} />
+                                  <label style={labelForm} htmlFor="tarea-titulo">Título *</label>
+                                  <input id="tarea-titulo" value={nuevaTarea.titulo} onChange={e => setNuevaTarea(f => ({ ...f, titulo: e.target.value }))} placeholder="Título de la tarea..." style={campoTarea} />
                                 </div>
                               )}
                               <div>
-                                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '3px' }}>Área</label>
-                                <select value={nuevaTarea.area_id} onChange={e => setNuevaTarea(f => ({ ...f, area_id: e.target.value }))}
-                                  style={{ width: '100%', padding: '8px 10px', border: '1.5px solid var(--at-warning-border)', borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-warning-tint)' }}>
+                                <label style={labelForm} htmlFor="tarea-area">Área</label>
+                                <select id="tarea-area" value={nuevaTarea.area_id} onChange={e => setNuevaTarea(f => ({ ...f, area_id: e.target.value }))} style={campoTarea}>
                                   <option value="">Sin área</option>
                                   {areas.filter(a => a.activo).map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
                                 </select>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--at-ink-2)', cursor: 'pointer', marginTop: '16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--at-ink-2)', cursor: 'pointer', paddingBottom: '9px' }}>
                                   <input type="checkbox" checked={nuevaTarea.requiere_foto} onChange={e => setNuevaTarea(f => ({ ...f, requiere_foto: e.target.checked }))} />
                                   Requiere foto
                                 </label>
                               </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              <button onClick={() => agregarTareaDesde(bloque.id)} disabled={saving} style={{ padding: '8px 18px', background: 'linear-gradient(135deg,var(--at-warning),var(--at-warning))', color: 'var(--at-on-status)', border: 'none', borderRadius: '7px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}>
-                                {saving ? '...' : 'Agregar'}
-                              </button>
-                              <button onClick={() => { setAddingTarea(false); setNuevaTarea({ titulo: '', descripcion: '', area_id: '', plantilla_id: '', requiere_foto: false }) }}
-                                style={{ padding: '8px 14px', background: 'var(--at-surface)', color: 'var(--at-ink-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px' }}>
-                                Cancelar
-                              </button>
-                            </div>
-                          </div>
+                          </EditModal>
                         )}
                       </>
                     )}

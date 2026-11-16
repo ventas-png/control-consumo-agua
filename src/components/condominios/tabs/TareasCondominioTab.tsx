@@ -15,6 +15,7 @@ import { nombreAreaDe } from '../../../domain/condominios/areas'
 import { notify, confirm } from '../../shared/Dialog'
 import { AreaCondominio, TareaCondominio, CategoriaTareaCondominio, PrioridadTarea, EstadoTarea, ComentarioTarea } from '../../../types'
 import { ImportTareasModal } from '../ImportTareasModal'
+import { EditModal } from '../../shared/EditModal'
 
 interface Props {
   tareas: TareaCondominio[]
@@ -56,6 +57,16 @@ const CATEGORIAS: { value: CategoriaTareaCondominio; label: string }[] = [
 
 const FLUJO: EstadoTarea[] = ['pendiente', 'en_proceso', 'completada']
 
+/** Para el buscador: sin acentos ni mayúsculas, para que «marmol» encuentre «mármol». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+const FORM_VACIO = {
+  titulo: '', descripcion: '', categoria: 'operativa' as CategoriaTareaCondominio,
+  prioridad: 'media' as PrioridadTarea, asignado_a: '', reportado_por: '',
+  area_id: '', fecha_inicio: '', fecha_limite: '', costo_estimado: '', notas: '',
+}
+
 function diasRestantes(fecha?: string | null): number | null {
   if (!fecha) return null
   return Math.round((new Date(fecha).getTime() - Date.now()) / 86400000)
@@ -69,12 +80,11 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
   const [filtroEstado, setFiltroEstado] = useState<EstadoTarea | ''>('')
   const [filtroPrio, setFiltroPrio] = useState<PrioridadTarea | ''>('')
   const [filtroArea, setFiltroArea] = useState('')
+  const [busqueda, setBusqueda] = useState('')
 
-  const [form, setForm] = useState({
-    titulo: '', descripcion: '', categoria: 'operativa' as CategoriaTareaCondominio,
-    prioridad: 'media' as PrioridadTarea, asignado_a: '', reportado_por: '',
-    area_id: '', fecha_inicio: '', fecha_limite: '', costo_estimado: '', notas: '',
-  })
+  const [form, setForm] = useState({ ...FORM_VACIO })
+  /** Cerrar la ventana descarta el borrador; mientras guarda no se cierra. */
+  function cerrarForm() { if (saving) return; setForm({ ...FORM_VACIO }); setMostrarForm(false) }
 
   // Solo las activas se ofrecen al capturar; las inactivas siguen renderizándose
   // en las tareas que ya las usan (mismo criterio que Limpieza).
@@ -84,13 +94,24 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
 
   const [comentario, setComentario] = useState({ autor: '', texto: '' })
 
-  const lista = tareas.filter(t =>
+  const listaFiltros = tareas.filter(t =>
     (filtroEstado === '' || t.estado === filtroEstado) &&
     (filtroPrio === '' || t.prioridad === filtroPrio) &&
     // 'sin_vincular' agrupa lo legado: tiene texto de área pero no catálogo.
     (filtroArea === ''
       || (filtroArea === 'sin_vincular' ? !t.area_id && !!t.area : t.area_id === filtroArea))
   )
+  // El buscador se suma a los filtros: título, descripción, a quién se asignó,
+  // quién la reportó, el área y la categoría, sin distinguir acentos. Los KPI
+  // de estado siguen contando todas las tareas.
+  const termino = sinAcentos(busqueda)
+  const lista = termino
+    ? listaFiltros.filter(t => [
+        t.titulo, t.descripcion, t.asignado_a, t.reportado_por,
+        nombreAreaDe(t.area_id, areas, t.area ?? ''),
+        CATEGORIAS.find(c => c.value === t.categoria)?.label,
+      ].some(c => sinAcentos(c).includes(termino)))
+    : listaFiltros
 
   const kpis = ESTADOS.map(s => ({ ...s, count: tareas.filter(t => t.estado === s.value).length }))
   // Tareas anteriores al catálogo cuyo texto de área quedó sin vincular (el
@@ -120,7 +141,7 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
     })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    setForm({ titulo: '', descripcion: '', categoria: 'operativa', prioridad: 'media', asignado_a: '', reportado_por: '', area_id: '', fecha_inicio: '', fecha_limite: '', costo_estimado: '', notas: '' })
+    setForm({ ...FORM_VACIO })
     setMostrarForm(false)
     onRefresh()
   }
@@ -172,17 +193,19 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
             <span style={{ fontWeight: 600, fontSize: 14 }}>Tareas ({lista.length})</span>
             {canCreate && (
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setShowImportModal(true)} title="Carga masiva desde Excel/CSV"
+                <button type="button" onClick={() => setShowImportModal(true)} title="Carga masiva desde Excel/CSV"
                   style={{ padding: '5px 10px', background: 'var(--at-primary-tint)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                   ⬆ Masiva
                 </button>
-                <button onClick={() => { setMostrarForm(true); setSelected(null) }}
+                <button type="button" onClick={() => { setForm({ ...FORM_VACIO }); setMostrarForm(true) }}
                   style={{ padding: '5px 10px', background: 'var(--at-accent)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                   + Nueva
                 </button>
               </div>
             )}
           </div>
+          <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            placeholder="🔍 Buscar tarea…" aria-label="Buscar tarea" style={{ ...inp, marginBottom: 8 }} />
           {/* KPIs */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginBottom: 8 }}>
             {kpis.map(k => (
@@ -212,7 +235,11 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
           </div>
         )}
 
-        {lista.length === 0 && <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>Sin tareas</div>}
+        {lista.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--at-ink-3)', padding: '32px 16px', fontSize: 13 }}>
+            {termino && listaFiltros.length > 0 ? `Ninguna tarea coincide con «${busqueda.trim()}»` : 'Sin tareas'}
+          </div>
+        )}
 
         {lista.map(t => {
           const est = ESTADOS.find(s => s.value === t.estado)
@@ -220,7 +247,7 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
           const dias = diasRestantes(t.fecha_limite)
           const vencida = dias !== null && dias < 0 && t.estado !== 'completada' && t.estado !== 'cancelada'
           return (
-            <div key={t.id} onClick={() => { setSelected(t); setMostrarForm(false) }}
+            <div key={t.id} onClick={() => setSelected(t)}
               style={{ padding: '10px 12px', borderBottom: '1px solid var(--at-chip)', cursor: 'pointer', background: selected?.id === t.id ? 'var(--at-accent-tint)' : 'var(--at-surface)', borderLeft: vencida ? '3px solid var(--at-danger)' : '3px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: 600, fontSize: 13, flex: 1, marginRight: 8 }}>{t.titulo}</span>
@@ -242,29 +269,47 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
 
       {/* Panel derecho */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        {/* Alta — BORRADOR en ventana emergente: nada persiste hasta «Crear tarea» */}
         {mostrarForm && (
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 16 }}>Nueva tarea</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Título *</label>
-                <input style={inp} placeholder="Descripción breve de la tarea" value={form.titulo} onChange={e => setForm(p => ({ ...p, titulo: e.target.value }))} />
+          <EditModal
+            title="Nueva tarea"
+            onClose={cerrarForm}
+            size="lg"
+            fullScreenOnMobile
+            footer={
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={cerrarForm} disabled={saving}
+                  style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                  Cancelar
+                </button>
+                <button type="button" onClick={guardar} disabled={saving}
+                  style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                  {saving ? 'Guardando…' : '✅ Crear tarea'}
+                </button>
+              </div>
+            }
+          >
+            {/* auto-fit: tres columnas en escritorio, una sola en el teléfono (hoja a pantalla completa). */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12 }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={lbl} htmlFor="tarea-titulo">Título *</label>
+                <input id="tarea-titulo" style={inp} autoFocus placeholder="Descripción breve de la tarea" value={form.titulo} onChange={e => setForm(p => ({ ...p, titulo: e.target.value }))} />
               </div>
               <div>
-                <label style={lbl}>Categoría</label>
-                <select style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaTareaCondominio }))}>
+                <label style={lbl} htmlFor="tarea-categoria">Categoría</label>
+                <select id="tarea-categoria" style={inp} value={form.categoria} onChange={e => setForm(p => ({ ...p, categoria: e.target.value as CategoriaTareaCondominio }))}>
                   {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
               <div>
-                <label style={lbl}>Prioridad</label>
-                <select style={inp} value={form.prioridad} onChange={e => setForm(p => ({ ...p, prioridad: e.target.value as PrioridadTarea }))}>
+                <label style={lbl} htmlFor="tarea-prioridad">Prioridad</label>
+                <select id="tarea-prioridad" style={inp} value={form.prioridad} onChange={e => setForm(p => ({ ...p, prioridad: e.target.value as PrioridadTarea }))}>
                   {PRIORIDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </div>
               <div>
-                <label style={lbl}>Área</label>
-                <select style={inp} value={form.area_id} onChange={e => setForm(p => ({ ...p, area_id: e.target.value }))}>
+                <label style={lbl} htmlFor="tarea-area">Área</label>
+                <select id="tarea-area" style={inp} value={form.area_id} onChange={e => setForm(p => ({ ...p, area_id: e.target.value }))}>
                   <option value="">— Sin área específica —</option>
                   {areasActivas.map(a => <option key={a.id} value={a.id}>{a.icono} {a.nombre}</option>)}
                 </select>
@@ -273,7 +318,7 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
                     Sin áreas activas.{' '}
                     {puedeConfigurarAreas
                       ? (
-                        <button type="button" onClick={() => onIrATab('areas_config')}
+                        <button type="button" onClick={() => { cerrarForm(); onIrATab('areas_config') }}
                           style={{ background: 'none', border: 'none', padding: 0, color: 'var(--at-accent)', fontWeight: 600, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>
                           Crearlas en el tab Áreas
                         </button>
@@ -283,44 +328,34 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
                 )}
               </div>
               <div>
-                <label style={lbl}>Asignado a</label>
-                <input style={inp} value={form.asignado_a} onChange={e => setForm(p => ({ ...p, asignado_a: e.target.value }))} />
+                <label style={lbl} htmlFor="tarea-asignado">Asignado a</label>
+                <input id="tarea-asignado" style={inp} value={form.asignado_a} onChange={e => setForm(p => ({ ...p, asignado_a: e.target.value }))} />
               </div>
               <div>
-                <label style={lbl}>Reportado por</label>
-                <input style={inp} value={form.reportado_por} onChange={e => setForm(p => ({ ...p, reportado_por: e.target.value }))} />
+                <label style={lbl} htmlFor="tarea-reportado">Reportado por</label>
+                <input id="tarea-reportado" style={inp} value={form.reportado_por} onChange={e => setForm(p => ({ ...p, reportado_por: e.target.value }))} />
               </div>
               <div>
-                <label style={lbl}>Costo estimado ({moneda})</label>
-                <input type="number" style={inp} value={form.costo_estimado} onChange={e => setForm(p => ({ ...p, costo_estimado: e.target.value }))} />
+                <label style={lbl} htmlFor="tarea-costo">Costo estimado ({moneda})</label>
+                <input id="tarea-costo" type="number" style={inp} value={form.costo_estimado} onChange={e => setForm(p => ({ ...p, costo_estimado: e.target.value }))} />
               </div>
               <div>
-                <label style={lbl}>Fecha inicio</label>
-                <input type="date" style={inp} value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
+                <label style={lbl} htmlFor="tarea-inicio">Fecha inicio</label>
+                <input id="tarea-inicio" type="date" style={inp} value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} />
               </div>
               <div>
-                <label style={lbl}>Fecha límite</label>
-                <input type="date" style={inp} value={form.fecha_limite} onChange={e => setForm(p => ({ ...p, fecha_limite: e.target.value }))} />
+                <label style={lbl} htmlFor="tarea-limite">Fecha límite</label>
+                <input id="tarea-limite" type="date" style={inp} value={form.fecha_limite} onChange={e => setForm(p => ({ ...p, fecha_limite: e.target.value }))} />
               </div>
-              <div style={{ gridColumn: 'span 3' }}>
-                <label style={lbl}>Descripción</label>
-                <textarea style={{ ...inp, height: 70, resize: 'vertical' }} value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))} />
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={lbl} htmlFor="tarea-descripcion">Descripción</label>
+                <textarea id="tarea-descripcion" style={{ ...inp, height: 70, resize: 'vertical' }} value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={guardar} disabled={saving}
-                style={{ padding: '8px 20px', background: 'var(--at-success)', color: 'var(--at-on-status)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                {saving ? 'Guardando…' : '✅ Crear tarea'}
-              </button>
-              <button onClick={() => setMostrarForm(false)}
-                style={{ padding: '8px 16px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                Cancelar
-              </button>
-            </div>
-          </div>
+          </EditModal>
         )}
 
-        {!mostrarForm && selected && (() => {
+        {selected && (() => {
           const est = ESTADOS.find(s => s.value === selected.estado)
           const prio = PRIORIDADES.find(p => p.value === selected.prioridad)
           const dias = diasRestantes(selected.fecha_limite)
@@ -415,7 +450,7 @@ export default function TareasCondominioTab({ tareas, areas, proyectoId, company
           )
         })()}
 
-        {!mostrarForm && !selected && (
+        {!selected && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--at-ink-3)', fontSize: 14 }}>
             Selecciona una tarea o crea una nueva
           </div>

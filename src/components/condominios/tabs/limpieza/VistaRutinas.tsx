@@ -50,6 +50,10 @@ interface Props {
 /** Cuántas áreas se nombran en la vista previa de la tarjeta antes de «+N». */
 const AREAS_EN_PREVIA = 3
 
+/** Para el buscador: sin acentos ni mayúsculas, para que «manana» encuentre «Mañana». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 export function VistaRutinas({
   plantillas, areas, proyectoId, companyId,
   canCreate, canEdit, canDelete, onRefresh, cargos = [],
@@ -60,6 +64,7 @@ export function VistaRutinas({
   const [horarios, setHorarios] = useState<Jornada[]>([])
   const [cargaError, setCargaError] = useState<string | null>(null)
   const [cargando, setCargando] = useState(true)
+  const [busqueda, setBusqueda] = useState('')
 
   /**
    * Editor abierto (uno a la vez). `rutina: null` = rutina nueva. `vez` remonta
@@ -86,6 +91,16 @@ export function VistaRutinas({
     (rutinaId: string) => recorridoDesdeFilas(rutinaId, paradas, pasos),
     [paradas, pasos],
   )
+
+  // El buscador acota las tarjetas por nombre, descripción, jornada o las áreas
+  // del recorrido («¿qué rutina pasa por las gradas?»), sin distinguir acentos.
+  const termino = sinAcentos(busqueda)
+  const visibles = termino
+    ? rutinas.filter(r => [
+        r.nombre, r.descripcion, r.horario_nombre,
+        ...recorridoDe(r.id).filter(p => p.area_id !== null).map(p => porArea.get(p.area_id!)?.nombre),
+      ].some(c => sinAcentos(c).includes(termino)))
+    : rutinas
 
   function abrir(rutina: RutinaLimpieza | null) {
     setEditor(e => ({ rutina, vez: (e?.vez ?? 0) + 1 }))
@@ -139,6 +154,11 @@ export function VistaRutinas({
             Cada rutina es un recorrido: las áreas en el orden en que se intervienen, y en cada una sus actividades. A quién le toca y qué día se asigna en el Calendario.
           </p>
         </div>
+        {rutinas.length > 0 && (
+          <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            placeholder="🔍 Buscar rutina…" aria-label="Buscar rutina"
+            style={{ padding: '7px 10px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface-2)', flex: '1 1 180px', minWidth: '160px', maxWidth: '320px' }} />
+        )}
         {canCreate && !editor && (
           <button onClick={() => abrir(null)} style={{ padding: '8px 14px', background: 'var(--at-primary)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 700 }}>
             + Nueva rutina
@@ -178,9 +198,16 @@ export function VistaRutinas({
             description="Una rutina es un recorrido: las áreas en orden y lo que se hace en cada una, para no rearmarlo cada día."
           />
         )
+      ) : visibles.length === 0 ? (
+        <EmptyState
+          compact
+          icon="🔍"
+          title={`Ninguna rutina coincide con «${busqueda.trim()}»`}
+          description="Se busca por nombre, descripción, jornada y áreas del recorrido."
+        />
       ) : (
         <div style={{ display: 'grid', gap: '10px' }}>
-          {rutinas.map(r => {
+          {visibles.map(r => {
             const rec = recorridoDe(r.id)
             const t = tiempoRecorrido(rec, porPlantilla)
             const nombres = rec.filter(p => p.area_id !== null).map(p => porArea.get(p.area_id!)?.nombre ?? '(área)')

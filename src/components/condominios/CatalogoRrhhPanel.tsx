@@ -13,9 +13,14 @@
 //     muestra el motivo;
 //   · duplicados por código o por nombre normalizado se avisan antes de guardar
 //     (la BD también los rechaza: 23505).
+//
+// Forma: el alta/edición abre en ventana emergente (EditModal) sobre las
+// tarjetas, y un buscador acota las tarjetas por nombre, código o descripción
+// sin distinguir acentos; el «+ Nuevo» queda siempre a la vista.
 import { useState, type CSSProperties } from 'react'
 import { notify, confirm } from '../shared/Dialog'
 import { EmptyState } from '../shared/EmptyState'
+import { EditModal } from '../shared/EditModal'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../domain/condominios/tabMutations'
 import {
   TABLA_CARGOS, TABLA_TURNOS, ICONOS_CARGO, ICONOS_TURNO, NOMBRE_MAX,
@@ -79,6 +84,10 @@ const labelStyle: CSSProperties = {
   fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-2)', display: 'block', marginBottom: '4px',
 }
 
+/** Para el buscador: sin acentos ni mayúsculas, para que «jardin» encuentre «Jardinero». */
+const sinAcentos = (t: string | null | undefined) =>
+  (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
 export function CatalogoRrhhPanel({ tipo, items, uso, proyectoId, companyId, canCreate, canEdit, canDelete, onRefresh }: Props) {
   const t = TEXTO[tipo]
   const blank = (): Form => ({ codigo: '', codigoManual: false, nombre: '', descripcion: '', icono: t.iconoDefecto, orden: (items.length + 1) * 10, activo: true })
@@ -86,6 +95,7 @@ export function CatalogoRrhhPanel({ tipo, items, uso, proyectoId, companyId, can
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState<Form>(blank)
+  const [busqueda, setBusqueda] = useState('')
 
   function startEdit(i: CatalogoRrhhItem) {
     setEditId(i.id)
@@ -93,6 +103,8 @@ export function CatalogoRrhhPanel({ tipo, items, uso, proyectoId, companyId, can
     setShowForm(true)
   }
   function resetForm() { setForm(blank()); setEditId(null); setShowForm(false) }
+  /** Cerrar la ventana descarta el borrador; mientras guarda no se cierra. */
+  function cerrarForm() { if (saving) return; resetForm() }
 
   function setNombre(nombre: string) {
     setForm(f => ({ ...f, nombre, codigo: editId || f.codigoManual ? f.codigo : slugDesdeNombre(nombre) }))
@@ -140,25 +152,52 @@ export function CatalogoRrhhPanel({ tipo, items, uso, proyectoId, companyId, can
   }
 
   const ordenados = ordenarCatalogo(items)
+  // El buscador acota las tarjetas por nombre, código o descripción; los
+  // contadores de la cabecera del tab no se tocan.
+  const termino = sinAcentos(busqueda)
+  const visibles = termino
+    ? ordenados.filter(i => sinAcentos(i.nombre).includes(termino) || sinAcentos(i.codigo).includes(termino) || sinAcentos(i.descripcion).includes(termino))
+    : ordenados
 
   return (
     <div>
-      {canCreate && !showForm && (
-        <div style={{ marginBottom: '14px' }}>
-          <button onClick={() => { resetForm(); setShowForm(true) }}
-            style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
-            + Nuevo {t.singular}
-          </button>
+      {(canCreate || items.length > 0) && (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '14px' }}>
+          {canCreate && (
+            <button type="button" onClick={() => { resetForm(); setShowForm(true) }}
+              style={{ padding: '9px 16px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '9px', fontWeight: 600, cursor: 'pointer', fontSize: '13.5px' }}>
+              + Nuevo {t.singular}
+            </button>
+          )}
+          {items.length > 0 && (
+            <input type="search" value={busqueda} onChange={e => setBusqueda(e.target.value)}
+              placeholder={`🔍 Buscar ${t.singular}…`} aria-label={`Buscar ${t.singular}`}
+              style={{ ...inputStyle, width: 'auto', flex: '1 1 200px', minWidth: '160px', maxWidth: '340px', padding: '8px 12px', fontSize: '13px' }} />
+          )}
         </div>
       )}
 
+      {/* Form — BORRADOR en ventana emergente: nada persiste hasta Guardar */}
       {showForm && (
-        <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>{editId ? `Editar ${t.singular}` : `Nuevo ${t.singular}`}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+        <EditModal
+          title={editId ? `Editar ${t.singular}` : `Nuevo ${t.singular}`}
+          onClose={cerrarForm}
+          size="md"
+          fullScreenOnMobile
+          footer={
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={cerrarForm} disabled={saving} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
+              <button type="button" onClick={save} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                {saving ? 'Guardando...' : editId ? 'Actualizar' : 'Guardar'}
+              </button>
+            </div>
+          }
+        >
+          {/* auto-fit: dos columnas en escritorio, una sola en el teléfono (hoja a pantalla completa). */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '14px' }}>
             <div>
               <label style={labelStyle} htmlFor={`rrhh-${tipo}-nombre`}>Nombre *</label>
-              <input id={`rrhh-${tipo}-nombre`} value={form.nombre} maxLength={NOMBRE_MAX} onChange={e => setNombre(e.target.value)} placeholder={t.ejemplo} style={inputStyle} />
+              <input id={`rrhh-${tipo}-nombre`} value={form.nombre} maxLength={NOMBRE_MAX} autoFocus onChange={e => setNombre(e.target.value)} placeholder={t.ejemplo} style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle} htmlFor={`rrhh-${tipo}-codigo`}>Código {editId ? '(no se cambia)' : '*'}</label>
@@ -172,8 +211,8 @@ export function CatalogoRrhhPanel({ tipo, items, uso, proyectoId, companyId, can
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Ícono</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1.5px solid var(--at-line)' }}>
+              <div style={labelStyle} id={`rrhh-${tipo}-icono-label`}>Ícono</div>
+              <div role="group" aria-labelledby={`rrhh-${tipo}-icono-label`} style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px', background: 'var(--at-surface-2)', borderRadius: '8px', border: '1.5px solid var(--at-line)' }}>
                 {t.iconos.map(ic => (
                   <button key={ic} type="button" onClick={() => setForm(f => ({ ...f, icono: ic }))} aria-label={`Ícono ${ic}`}
                     style={{ width: '36px', height: '36px', fontSize: '20px', borderRadius: '8px', border: '2px solid', borderColor: form.icono === ic ? 'var(--at-accent)' : 'transparent', background: form.icono === ic ? 'var(--at-accent-tint)' : 'transparent', cursor: 'pointer' }}>
@@ -200,20 +239,16 @@ export function CatalogoRrhhPanel({ tipo, items, uso, proyectoId, companyId, can
               <input id={`rrhh-${tipo}-descripcion`} value={form.descripcion} maxLength={300} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} placeholder="Descripción opcional…" style={inputStyle} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={save} disabled={saving} style={{ padding: '10px 24px', background: 'linear-gradient(135deg,var(--at-accent),var(--at-accent-hover))', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-              {saving ? 'Guardando...' : editId ? 'Actualizar' : 'Guardar'}
-            </button>
-            <button onClick={resetForm} style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        </div>
+        </EditModal>
       )}
 
       {ordenados.length === 0 ? (
         <EmptyState icon={tipo === 'cargo' ? '🧑‍💼' : '🕐'} title={`Sin ${t.plural} definidos`} description={t.vacio} />
+      ) : visibles.length === 0 ? (
+        <EmptyState compact icon="🔍" title={`Ningún ${t.singular} coincide con «${busqueda.trim()}»`} description="Se busca por nombre, código y descripción." />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '12px' }}>
-          {ordenados.map(i => {
+          {visibles.map(i => {
             const u = uso.get(i.codigo)
             const n = totalUso(u)
             return (
@@ -232,12 +267,12 @@ export function CatalogoRrhhPanel({ tipo, items, uso, proyectoId, companyId, can
                 {u && n != null && n > 0 && <p style={{ margin: '0 0 10px', fontSize: '11.5px', color: 'var(--at-ink-3)' }} title={t.usoDe(u)}>{t.usoDe(u)}</p>}
                 {canEdit && (
                   <div style={{ display: 'flex', gap: '6px' }}>
-                    <button onClick={() => startEdit(i)} aria-label={`Editar ${i.nombre}`} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)', fontWeight: 600 }}>✏️ Editar</button>
-                    <button onClick={() => toggleActivo(i)} aria-label={`${i.activo ? 'Desactivar' : 'Activar'} ${i.nombre}`} style={{ padding: '6px 10px', background: i.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: `1px solid ${i.activo ? 'var(--at-warning-border)' : 'var(--at-success-border)'}`, borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: i.activo ? 'var(--at-warning-strong)' : 'var(--at-success)', fontWeight: 600 }}>
+                    <button type="button" onClick={() => startEdit(i)} aria-label={`Editar ${i.nombre}`} style={{ flex: 1, padding: '6px', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: 'var(--at-ink-2)', fontWeight: 600 }}>✏️ Editar</button>
+                    <button type="button" onClick={() => toggleActivo(i)} aria-label={`${i.activo ? 'Desactivar' : 'Activar'} ${i.nombre}`} style={{ padding: '6px 10px', background: i.activo ? 'var(--at-warning-tint)' : 'var(--at-success-tint)', border: `1px solid ${i.activo ? 'var(--at-warning-border)' : 'var(--at-success-border)'}`, borderRadius: '7px', cursor: 'pointer', fontSize: '12px', color: i.activo ? 'var(--at-warning-strong)' : 'var(--at-success)', fontWeight: 600 }}>
                       {i.activo ? 'Desactivar' : 'Activar'}
                     </button>
                     {canDelete && (n == null || n === 0) && (
-                      <button onClick={() => handleDelete(i)} aria-label={`Eliminar ${i.nombre}`} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
+                      <button type="button" onClick={() => handleDelete(i)} aria-label={`Eliminar ${i.nombre}`} style={{ padding: '6px 10px', background: 'var(--at-danger-tint)', border: '1px solid var(--at-danger-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '13px', color: 'var(--at-danger)' }}>🗑</button>
                     )}
                   </div>
                 )}
