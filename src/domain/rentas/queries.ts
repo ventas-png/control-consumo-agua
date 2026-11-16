@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ArticuloInventarioRenta, ContratoRenta, PropiedadRenta, ReservaRenta, ReservaSTR } from '../../types'
+import type {
+  ArticuloInventarioRenta, ConceptoRenta, ContratoRenta, GastoRenta, LiquidacionRenta, PropiedadRenta, ReservaRenta, ReservaSTR,
+} from '../../types'
 import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { rentasKeys } from './keys'
@@ -70,6 +72,45 @@ export function useInventarioRentaQuery(companyId?: string, enabled = true) {
         supabase.from('rentas_inventario').select('*').eq('company_id', companyId ?? '')
           .order('nombre', { ascending: true }).abortSignal(signal)
           .overrideTypes<ArticuloInventarioRenta[], { merge: false }>())) ?? [],
+    enabled: !!companyId && enabled,
+  })
+}
+
+// ── Finanzas ─────────────────────────────────────────────────────────────────
+
+/** Conceptos del desglose, activos e inactivos (los inactivos siguen sumando en reservas viejas). */
+export function useConceptosRentaQuery(companyId?: string, enabled = true) {
+  return useQuery({
+    queryKey: rentasKeys.conceptos(companyId),
+    queryFn: async () =>
+      (await runQuery<ConceptoRenta[]>((signal) =>
+        supabase.from('rentas_conceptos').select('*').eq('company_id', companyId ?? '')
+          .order('orden', { ascending: true }).abortSignal(signal)
+          .overrideTypes<ConceptoRenta[], { merge: false }>())) ?? [],
+    enabled: !!companyId && enabled,
+  })
+}
+
+export function useLiquidacionesRentaQuery(companyId?: string, enabled = true) {
+  return useQuery({
+    queryKey: rentasKeys.liquidaciones(companyId),
+    queryFn: async () =>
+      (await runQuery<LiquidacionRenta[]>((signal) =>
+        supabase.from('rentas_liquidaciones').select('*').eq('company_id', companyId ?? '')
+          .abortSignal(signal)
+          .overrideTypes<LiquidacionRenta[], { merge: false }>())) ?? [],
+    enabled: !!companyId && enabled,
+  })
+}
+
+export function useGastosRentaQuery(companyId?: string, enabled = true) {
+  return useQuery({
+    queryKey: rentasKeys.gastos(companyId),
+    queryFn: async () =>
+      (await runQuery<GastoRenta[]>((signal) =>
+        supabase.from('rentas_gastos').select('*').eq('company_id', companyId ?? '')
+          .order('fecha', { ascending: false }).abortSignal(signal)
+          .overrideTypes<GastoRenta[], { merge: false }>())) ?? [],
     enabled: !!companyId && enabled,
   })
 }

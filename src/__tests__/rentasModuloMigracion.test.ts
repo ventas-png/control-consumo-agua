@@ -56,7 +56,8 @@ describe('20261125000000 — forma de la migración', () => {
 describe('el front pide las claves que la migración siembra', () => {
   it('módulos y acciones del catálogo coinciden con moduleConfig y con la matriz de roles', () => {
     const modulos = [...sql.matchAll(/\('(\w+)',\s+'[^']+'\)/g)].map(m => m[1])
-    for (const m of RENTAS_DATA_MODULE_KEYS) expect(modulos).toContain(m.replace(/^rentas_/, ''))
+    // Finanzas lo siembra 20261128000000 (rentasFinanzasMigracion.test.ts).
+    for (const m of RENTAS_DATA_MODULE_KEYS) if (m !== 'rentas_finanzas') expect(modulos).toContain(m.replace(/^rentas_/, ''))
     for (const a of RENTAS_ACTIONS) expect(sql).toMatch(new RegExp(`\\('${a}',\\s+'`))
     expect(sql).toMatch(/IF v_claves <> 16 THEN/)
     expect(RENTAS_MODULE_GROUPS.flatMap(g => g.tabs).sort()).toEqual(

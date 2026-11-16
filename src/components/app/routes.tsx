@@ -340,6 +340,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   { path: '/rentas/reservas', sectionName: 'rentas', module: 'rentas_reservas', render: () => <RentasSection tab="reservas" /> },
   { path: '/rentas/contratos', sectionName: 'rentas', module: 'rentas_contratos', render: () => <RentasSection tab="contratos" /> },
   { path: '/rentas/inventario', sectionName: 'rentas', module: 'rentas_inventario', render: () => <RentasSection tab="inventario" /> },
+  { path: '/rentas/finanzas', sectionName: 'rentas', module: 'rentas_finanzas', render: () => <RentasSection tab="finanzas" /> },
   // cond:A1 sub-rutas: `/condominios/panel` es el selector de proyecto
   // (CondominiosDashboard). Cualquier otro segmento se interpreta como un tab
   // del registry; tabs desconocidos caen a 'panel'. `/condominios` (sin

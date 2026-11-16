@@ -88,6 +88,7 @@ export function unificarReservas(
       fecha_entrada: r.fecha_entrada, fecha_salida: r.fecha_salida, num_huespedes: r.num_huespedes,
       plataforma: r.plataforma, codigo_confirmacion: r.codigo_confirmacion,
       monto_noche: r.monto_noche, monto_total: r.monto_total, estado: r.estado, notas: r.notas,
+      politica_cancelacion: r.politica_cancelacion ?? null, num_mascotas: r.num_mascotas ?? 0,
     }))
 
   const enlazadas: ReservaUnificada[] = []
@@ -104,6 +105,7 @@ export function unificarReservas(
       monto_noche: r.monto_noche ?? null, monto_total: r.monto_total ?? null,
       estado: ESTADOS_RESERVA_SET.has(r.estado) ? (r.estado as EstadoReservaRenta) : 'confirmada',
       notas: r.notas ?? null,
+      politica_cancelacion: r.politica_cancelacion ?? null, num_mascotas: r.mascotas ? 1 : 0,
     })
   }
 
@@ -248,6 +250,7 @@ export function mensajeErrorRentas(e: unknown, porDefecto: string): string {
   if (!texto) return porDefecto
   if (texto.includes('rentas_propiedades_unidad_uq')) return 'Esa unidad ya está registrada como propiedad en renta.'
   if (texto.includes('rentas_contratos_vigente_uq')) return 'La propiedad ya tiene un contrato vigente. Finalízalo antes de registrar otro.'
+  if (texto.includes('rentas_conceptos_codigo_uq')) return 'Ya existe un concepto con ese nombre en ese bloque.'
   if (texto.includes('plan_limit_reached')) {
     return 'La empresa alcanzó su límite de unidades. Las propiedades independientes cuentan como unidades: pide ampliar el límite para registrar más.'
   }

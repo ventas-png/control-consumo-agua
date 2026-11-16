@@ -35,6 +35,7 @@ export const SECTION_TO_PATH: Record<AppSection, string> = {
   rentas_reservas: '/rentas/reservas',
   rentas_contratos: '/rentas/contratos',
   rentas_inventario: '/rentas/inventario',
+  rentas_finanzas: '/rentas/finanzas',
 }
 
 const PATH_TO_SECTION: Record<string, AppSection> = Object.fromEntries(

@@ -3,12 +3,14 @@ import { RENTAS_ACTIONS, RENTAS_DATA_MODULE_KEYS, rentasPermissionKey } from './
 
 // Grupos de permisos de Manejo de Rentas para la matriz de roles. Un grupo por
 // módulo; cada uno expone las 4 acciones que existen en el catálogo
-// (rentas.<módulo>.view / create / edit / delete — migración 20261125000000).
+// (rentas.<módulo>.view / create / edit / delete — migraciones 20261125000000 y,
+// para Finanzas, 20261128000000).
 const ETIQUETAS: Record<(typeof RENTAS_DATA_MODULE_KEYS)[number], string> = {
   rentas_propiedades: 'Rentas: Propiedades',
   rentas_reservas: 'Rentas: Reservas',
   rentas_contratos: 'Rentas: Contratos',
   rentas_inventario: 'Rentas: Inventario',
+  rentas_finanzas: 'Rentas: Finanzas (desglose, gastos y estado mensual)',
 }
 
 export const RENTAS_MODULE_GROUPS: SectionGroup[] = RENTAS_DATA_MODULE_KEYS.map(modulo => ({

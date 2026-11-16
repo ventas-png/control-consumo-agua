@@ -76,6 +76,7 @@ export const SECTION_CRUMBS: Record<AppSection, SectionCrumbMeta> = {
   rentas_reservas: { label: 'Reservas', group: GROUP_RENTAS },
   rentas_contratos: { label: 'Contratos', group: GROUP_RENTAS },
   rentas_inventario: { label: 'Inventario', group: GROUP_RENTAS },
+  rentas_finanzas: { label: 'Finanzas', group: GROUP_RENTAS },
 
   // ── Standalone (sin grupo) ──
   superadmin_empresas: { label: 'Empresas' },

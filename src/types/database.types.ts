@@ -19490,6 +19490,59 @@ export type Database = {
           },
         ]
       }
+      rentas_conceptos: {
+        Row: {
+          activo: boolean
+          bloque: string
+          codigo: string
+          comisionable: boolean
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          id: string
+          nombre: string
+          orden: number
+          signo: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          bloque: string
+          codigo: string
+          comisionable?: boolean
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          nombre: string
+          orden?: number
+          signo?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          bloque?: string
+          codigo?: string
+          comisionable?: boolean
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          nombre?: string
+          orden?: number
+          signo?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentas_conceptos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rentas_contratos: {
         Row: {
           company_id: string
@@ -19565,6 +19618,69 @@ export type Database = {
           },
         ]
       }
+      rentas_gastos: {
+        Row: {
+          a_cargo_de: string
+          categoria: string
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          descripcion: string
+          fecha: string
+          id: string
+          monto: number
+          notas: string | null
+          propiedad_id: string
+          proveedor: string | null
+          updated_at: string
+        }
+        Insert: {
+          a_cargo_de?: string
+          categoria?: string
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion: string
+          fecha: string
+          id?: string
+          monto: number
+          notas?: string | null
+          propiedad_id: string
+          proveedor?: string | null
+          updated_at?: string
+        }
+        Update: {
+          a_cargo_de?: string
+          categoria?: string
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          descripcion?: string
+          fecha?: string
+          id?: string
+          monto?: number
+          notas?: string | null
+          propiedad_id?: string
+          proveedor?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentas_gastos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_gastos_propiedad_fk"
+            columns: ["propiedad_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "rentas_propiedades"
+            referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
       rentas_inventario: {
         Row: {
           ambiente: string | null
@@ -19631,6 +19747,71 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "rentas_propiedades"
             referencedColumns: ["id", "company_id"]
+          },
+        ]
+      }
+      rentas_liquidaciones: {
+        Row: {
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          id: string
+          importes: Json
+          propiedad_id: string
+          reserva_id: string | null
+          reserva_str_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          importes?: Json
+          propiedad_id: string
+          reserva_id?: string | null
+          reserva_str_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          importes?: Json
+          propiedad_id?: string
+          reserva_id?: string | null
+          reserva_str_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentas_liquidaciones_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_liquidaciones_propiedad_fk"
+            columns: ["propiedad_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "rentas_propiedades"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "rentas_liquidaciones_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "rentas_reservas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_liquidaciones_reserva_str_id_fkey"
+            columns: ["reserva_str_id"]
+            isOneToOne: false
+            referencedRelation: "reservas_str"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -19754,7 +19935,9 @@ export type Database = {
           monto_total: number | null
           notas: string | null
           num_huespedes: number
+          num_mascotas: number
           plataforma: string
+          politica_cancelacion: string | null
           propiedad_id: string
           updated_at: string
         }
@@ -19774,7 +19957,9 @@ export type Database = {
           monto_total?: number | null
           notas?: string | null
           num_huespedes?: number
+          num_mascotas?: number
           plataforma?: string
+          politica_cancelacion?: string | null
           propiedad_id: string
           updated_at?: string
         }
@@ -19794,7 +19979,9 @@ export type Database = {
           monto_total?: number | null
           notas?: string | null
           num_huespedes?: number
+          num_mascotas?: number
           plataforma?: string
+          politica_cancelacion?: string | null
           propiedad_id?: string
           updated_at?: string
         }

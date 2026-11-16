@@ -85,6 +85,7 @@ const SECTION_PRELOADERS: Partial<Record<AppSection, () => void>> = {
   rentas_reservas: () => { RentasSection.preload() },
   rentas_contratos: () => { RentasSection.preload() },
   rentas_inventario: () => { RentasSection.preload() },
+  rentas_finanzas: () => { RentasSection.preload() },
 }
 
 export function prefetchSection(section: AppSection): void {

@@ -37,6 +37,8 @@ export interface PropiedadRenta {
 
 export type EstadoReservaRenta = 'confirmada' | 'en_curso' | 'completada' | 'cancelada'
 export type PlataformaRenta = 'airbnb' | 'booking' | 'vrbo' | 'directo' | 'otro'
+/** El mismo catálogo de la pestaña STR de Condominios. */
+export type PoliticaCancelacionRenta = 'flexible' | 'moderada' | 'estricta' | 'no_reembolsable' | 'na' | 'otra'
 
 /** Reserva por noche de una propiedad INDEPENDIENTE (tabla rentas_reservas). */
 export interface ReservaRenta {
@@ -55,6 +57,8 @@ export interface ReservaRenta {
   monto_total: number | null
   estado: EstadoReservaRenta
   notas: string | null
+  politica_cancelacion: PoliticaCancelacionRenta | null
+  num_mascotas: number
   created_at: string
   updated_at: string
 }
@@ -80,6 +84,8 @@ export interface ReservaUnificada {
   monto_total: number | null
   estado: EstadoReservaRenta
   notas: string | null
+  politica_cancelacion: PoliticaCancelacionRenta | null
+  num_mascotas: number
 }
 
 export type EstadoContratoRenta = 'vigente' | 'finalizado' | 'cancelado'
@@ -121,6 +127,62 @@ export interface ArticuloInventarioRenta {
   valor_unitario: number | null
   numero_serie: string | null
   fecha_revision: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ── Finanzas (20261128000000) ────────────────────────────────────────────────
+
+/** huesped = lo que la plataforma le cobró al huésped; anfitrion = lo que recibió el anfitrión. */
+export type BloqueConceptoRenta = 'huesped' | 'anfitrion'
+
+/** Una columna del desglose de cobro de una reserva, configurable por empresa. */
+export interface ConceptoRenta {
+  id: string
+  company_id: string
+  codigo: string
+  nombre: string
+  bloque: BloqueConceptoRenta
+  /** 1 suma al total del bloque; -1 resta (descuentos, comisión de la plataforma). */
+  signo: 1 | -1
+  /** Sólo bloque anfitrión: entra en la base de la comisión de administración. */
+  comisionable: boolean
+  orden: number
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** Concepto → monto (siempre ≥ 0; el signo lo pone el concepto). */
+export type ImportesRenta = Record<string, number>
+
+/** Desglose de una reserva: de `rentas_reservas` o de `reservas_str`, nunca de las dos. */
+export interface LiquidacionRenta {
+  id: string
+  company_id: string
+  propiedad_id: string
+  reserva_id: string | null
+  reserva_str_id: string | null
+  importes: ImportesRenta
+  created_at: string
+  updated_at: string
+}
+
+export type CategoriaGastoRenta = 'limpieza' | 'mantenimiento' | 'servicios' | 'suministros' | 'impuestos' | 'otro'
+export type CargoGastoRenta = 'propietario' | 'administradora'
+
+export interface GastoRenta {
+  id: string
+  company_id: string
+  propiedad_id: string
+  fecha: string
+  categoria: CategoriaGastoRenta
+  descripcion: string
+  proveedor: string | null
+  monto: number
+  /** propietario: se le descuenta en su estado mensual; administradora: lo absorbe la empresa. */
+  a_cargo_de: CargoGastoRenta
   notas: string | null
   created_at: string
   updated_at: string
