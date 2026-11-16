@@ -72,6 +72,11 @@ export function PricingSection({ t, onCta }: { t: Copy; onCta: () => void }) {
                 <PrLine label={t.pricing.units_extra} value={extraUnits} min={0} max={1000} step={1} unit={t.pricing.unidades_unit}
                   onChange={setExtraUnits} />
               )}
+              {mods.includes('rentas') && (
+                <p className="pr-note" style={{ margin: '14px 0 0', fontSize: '13px', lineHeight: 1.5, color: 'var(--c-ink_3)' }}>
+                  {t.pricing.rentas_note}
+                </p>
+              )}
             </div>
 
             <div className="pr-includes">
