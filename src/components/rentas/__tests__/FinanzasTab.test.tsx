@@ -166,3 +166,20 @@ describe('moneda', () => {
     unmount()
   })
 })
+
+describe('tendencia', () => {
+  it('muestra el periodo mes a mes y lleva al detalle del mes elegido', () => {
+    montar()
+    fireEvent.click(screen.getByRole('radio', { name: 'Tendencia' }))
+    expect((screen.getByLabelText('Periodo') as HTMLSelectElement).value).toBe('12')
+    expect(screen.getByRole('region', { name: 'Acreditado por mes (USD)' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: 'Ocupación por mes (%)' })).toBeTruthy()
+    expect(screen.getAllByRole('row')).toHaveLength(1 + 12 + 1)
+    expect(fila(/Febrero de 2026/).textContent).toMatch(/4% \(2\/56\).*USD 90[.,]00/)
+    fireEvent.change(screen.getByLabelText('Periodo'), { target: { value: '6' } })
+    expect(screen.getAllByRole('row')).toHaveLength(1 + 6 + 1)
+    fireEvent.click(screen.getByRole('button', { name: 'Ver el detalle de enero de 2026' }))
+    expect((screen.getByLabelText('Mes') as HTMLInputElement).value).toBe('2026-01')
+    expect(screen.getByRole('heading', { name: 'Finanzas de la cartera' })).toBeTruthy()
+  })
+})
