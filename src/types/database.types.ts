@@ -19761,6 +19761,7 @@ export type Database = {
           created_at: string
           estado: string
           fecha_revision: string | null
+          fotos: string[]
           id: string
           nombre: string
           notas: string | null
@@ -19778,6 +19779,7 @@ export type Database = {
           created_at?: string
           estado?: string
           fecha_revision?: string | null
+          fotos?: string[]
           id?: string
           nombre: string
           notas?: string | null
@@ -19795,6 +19797,7 @@ export type Database = {
           created_at?: string
           estado?: string
           fecha_revision?: string | null
+          fotos?: string[]
           id?: string
           nombre?: string
           notas?: string | null
@@ -27190,6 +27193,14 @@ export type Database = {
       }
       rentas_servicio_activo: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      rentas_fotos_en_carpeta: {
+        Args: { p_company: string; p_fotos: string[]; p_propiedad: string }
+        Returns: boolean
+      }
+      rentas_inventario_foto_permitida: {
+        Args: { p_accion: string; p_ruta: string }
         Returns: boolean
       }
       str_import_puede_crear: {

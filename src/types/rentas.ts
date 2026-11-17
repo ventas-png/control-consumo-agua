@@ -130,6 +130,8 @@ export interface ArticuloInventarioRenta {
   numero_serie: string | null
   fecha_revision: string | null
   notas: string | null
+  /** Rutas en el bucket privado `rentas-inventario` (`<empresa>/<propiedad>/…`), hasta 6 (20261202000000). */
+  fotos: string[]
   created_at: string
   updated_at: string
 }

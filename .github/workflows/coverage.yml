@@ -989,6 +989,19 @@ jobs:
           PGPORT_TEST: 55594
         run: supabase/tests/historial_lecturas/run.sh
 
+      # 20261202000000: fotos del inventario de Rentas. `rentas_inventario.fotos`
+      # (hasta 6, todas en la carpeta <empresa>/<propiedad> de la fila: CHECK) y el
+      # bucket privado `rentas-inventario`, con la misma regla que la RLS de la tabla
+      # (empresa, servicio, alcance por proyecto, rentas.inventario.*). Ejercido como
+      # cada persona contra storage.objects: rutas fabricadas se niegan sin reventar,
+      # sin UPDATE, y no se borra una foto que alguna fila nombra todavía.
+      # CONTROL NEGATIVO: siete mutantes.
+      - name: Rentas — fotos del inventario (bucket privado por propiedad)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55595
+        run: supabase/tests/rentas_inventario_fotos/run.sh
+
       # 20261127000000: módulos por PROYECTO. Cada proyecto elige en cuáles de los
       # módulos contratados por su empresa opera (projects.modulo_*, encendidos por
       # defecto). Ejercido como cada persona: la dueña y la plataforma mueven los

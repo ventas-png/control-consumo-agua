@@ -68,10 +68,13 @@ export function useInventarioRentaQuery(companyId?: string, enabled = true) {
   return useQuery({
     queryKey: rentasKeys.inventario(companyId),
     queryFn: async () =>
-      (await runQuery<ArticuloInventarioRenta[]>((signal) =>
+      // `fotos ?? []`: el front puede llegar a producción minutos antes que
+      // 20261202000000; sin la columna, la pestaña no debe romperse.
+      ((await runQuery<ArticuloInventarioRenta[]>((signal) =>
         supabase.from('rentas_inventario').select('*').eq('company_id', companyId ?? '')
           .order('nombre', { ascending: true }).abortSignal(signal)
-          .overrideTypes<ArticuloInventarioRenta[], { merge: false }>())) ?? [],
+          .overrideTypes<ArticuloInventarioRenta[], { merge: false }>())) ?? [])
+        .map(a => ({ ...a, fotos: a.fotos ?? [] })),
     enabled: !!companyId && enabled,
   })
 }

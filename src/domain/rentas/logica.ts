@@ -182,6 +182,29 @@ export function resumenInventario(articulos: ArticuloInventarioRenta[]): Resumen
   return r
 }
 
+// ── Fotos del inventario (20261202000000) ───────────────────────────────────
+
+/** Tope de la base (`rentas_inventario_fotos_check`). */
+export const MAX_FOTOS_ARTICULO = 6
+
+/**
+ * Qué fotos retirar del bucket al cerrar el formulario de UN artículo.
+ *   · `originales`: las que la fila tenía al abrir.
+ *   · `vistas`: toda ruta que pasó por la lista (también las subidas y quitadas).
+ *   · `guardadas`: lo que quedó en la fila; null si no se guardó (cancelar).
+ * Sin guardar sólo se van las subidas en esta edición; guardando, todo lo que
+ * la fila ya no nombra. Las originales nunca se borran sin guardar: la fila
+ * todavía apunta a ellas (y la policy del bucket tampoco lo dejaría).
+ */
+export function fotosPorBorrar(originales: readonly string[], vistas: Iterable<string>, guardadas: readonly string[] | null): string[] {
+  const conservar = new Set(guardadas ?? originales)
+  const fuera = new Set<string>()
+  for (const r of [...(guardadas ? originales : []), ...vistas]) {
+    if (!conservar.has(r)) fuera.add(r)
+  }
+  return [...fuera]
+}
+
 export interface ResumenCartera {
   propiedades: number
   porTipo: Record<TipoPropiedadRenta, number>
