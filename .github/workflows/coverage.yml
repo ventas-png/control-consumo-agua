@@ -974,6 +974,21 @@ jobs:
           PGPORT_TEST: 55593
         run: supabase/tests/rentas_finanzas/run.sh
 
+      # 20261130000000: historial de lecturas de agua anterior a la plataforma (carga
+      # manual). Va en su propia tabla, NO en registros: no cobra, no factura, no entra
+      # en totales ni en el portal. La importación busca cada contador por número de
+      # serie SÓLO en el proyecto elegido, valida el lote entero (todo o nada),
+      # re-importar la misma fecha reemplaza, y para contadores sin lecturas sube
+      # lectura_inicial a la última del historial (no si es anterior a la instalación,
+      # nunca la baja). Ejercido como cada persona: alcance por proyecto, empresa
+      # ajena, cuenta sin permisos, quien captura sin editar contadores.
+      # CONTROL NEGATIVO: siete mutantes.
+      - name: Agua — historial de lecturas (carga manual, sin cobro)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55594
+        run: supabase/tests/historial_lecturas/run.sh
+
       # 20261127000000: módulos por PROYECTO. Cada proyecto elige en cuáles de los
       # módulos contratados por su empresa opera (projects.modulo_*, encendidos por
       # defecto). Ejercido como cada persona: la dueña y la plataforma mueven los
