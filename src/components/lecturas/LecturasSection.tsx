@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo, type CSSProperties, type ChangeEvent} from 'react'
+import { useState, useEffect, useMemo, Suspense, type CSSProperties, type ChangeEvent} from 'react'
+import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad } from '../../types'
+import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { registrarLectura, uploadRegistroFoto, type LecturaCaptura } from '../../domain/agua/mutations'
 import { hoyLocalISO, formatFechaCalendario } from '../../lib/format'
@@ -20,6 +21,8 @@ import { APP_CONFIG } from '../../lib/config'
 import { watchLocation } from '../../lib/nativeGeo'
 import { isNative } from '../../lib/platform'
 
+const CargaMasivaLecturasModal = lazy(() => import('./CargaMasivaLecturasModal').then(m => ({ default: m.CargaMasivaLecturasModal })))
+
 interface Props {
   clientes: Cliente[]
   unidades: Unidad[]
@@ -31,6 +34,8 @@ interface Props {
   rutaActiva?: Ruta | null
   onClearRuta?: () => void
   onRutaCompletada?: (rutaId: string) => void
+  /** Para la carga masiva desde Excel (sin proyectos no se ofrece). */
+  proyectos?: Proyecto[]
 }
 
 export function LecturasSection({
@@ -44,6 +49,7 @@ export function LecturasSection({
   rutaActiva,
   onClearRuta,
   onRutaCompletada,
+  proyectos = [],
 }: Props) {
   const canCreate = usePermissionsContext().canCreate('lecturas')
   // Derive project_id from selected unidad/contador, then fall back to single-project context
@@ -78,6 +84,7 @@ export function LecturasSection({
   const outbox = useMemo(() => localStorageOutbox(), [])
   const [pendientes, setPendientes] = useState(() => leerPendientes(outbox))
   const [sincronizando, setSincronizando] = useState(false)
+  const [showCargaMasiva, setShowCargaMasiva] = useState(false)
 
   // En modo ruta, derivar unidades según el tipo de ruta
   const unidadesOrdenadas: Unidad[] = rutaActiva
@@ -653,8 +660,18 @@ export function LecturasSection({
       </div>
 
       <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
-          Ingreso de Lectura
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '20px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
+          <span style={{ fontSize: '20px', fontWeight: 700 }}>Ingreso de Lectura</span>
+          {canEdit && proyectos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowCargaMasiva(true)}
+              title="Registrar muchas lecturas a la vez desde un Excel (generan su cobro como cualquier lectura)"
+              style={{ padding: '8px 16px', background: 'var(--at-surface)', color: 'var(--at-primary)', border: '2px solid var(--at-primary)', borderRadius: '8px', fontWeight: 600, fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              📥 Carga masiva (Excel)
+            </button>
+          )}
         </div>
 
         {/* Selector de unidad */}
@@ -935,6 +952,19 @@ export function LecturasSection({
           </>
         )}
       </div>
+      {showCargaMasiva && (
+        <Suspense fallback={null}>
+          <CargaMasivaLecturasModal
+            proyectos={proyectos}
+            contadores={contadores}
+            tarifas={tarifas}
+            registros={registros}
+            moneda={moneda}
+            onClose={() => setShowCargaMasiva(false)}
+            onRegistroAdded={onRegistroAdded}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
