@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { notify } from '../shared/Dialog'
-import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserSession } from '../../types'
+import type { Unidad, TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro, UserSession, Proyecto } from '../../types'
 import { resolveUnidadProjectCompany } from '../../domain/unidades/queries'
 import { insertUnidades } from '../../domain/unidades/mutations'
 import { sanitizeInput } from '../../lib/validation'
@@ -164,13 +164,28 @@ function validateRow(row: Record<string, unknown>): RowValidationResult<UnidadRo
 
 interface Props {
   currentUser: UserSession
+  /** Proyectos donde se puede importar (los mismos que ofrece «Nueva Unidad»). */
+  proyectos: Proyecto[]
+  /** Proyecto filtrado en la pantalla; se propone como destino. */
+  proyectoInicial?: string
   onClose: () => void
   onImportado: (unidades: Unidad[]) => void
 }
 
-export function ImportUnidadesModal({ currentUser, onClose, onImportado }: Props) {
+/**
+ * Proyecto que se propone al abrir: el filtrado en la pantalla si existe, o el
+ * único proyecto. Con varios y sin filtro no se adivina: antes se tomaba el
+ * primero de la empresa y las unidades caían en el proyecto equivocado.
+ */
+export function proyectoDestinoInicial(proyectos: Pick<Proyecto, 'id'>[], proyectoInicial?: string): string {
+  if (proyectoInicial && proyectos.some(p => p.id === proyectoInicial)) return proyectoInicial
+  return proyectos.length === 1 ? proyectos[0].id : ''
+}
+
+export function ImportUnidadesModal({ currentUser, proyectos, proyectoInicial, onClose, onImportado }: Props) {
   const [ids, setIds] = useState<{ projectId: string; companyId: string } | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
+  const [destinoId, setDestinoId] = useState(() => proyectoDestinoInicial(proyectos, proyectoInicial))
   const insertedRef = useRef<Unidad[]>([])
 
   useEffect(() => {
@@ -199,6 +214,39 @@ export function ImportUnidadesModal({ currentUser, onClose, onImportado }: Props
   }
   if (!ids) return null
 
+  // Con la lista de proyectos, el destino es el que se elige y su empresa la
+  // del proyecto. Sin lista (no debería pasar) queda la resolución de antes.
+  const destino = proyectos.find(p => p.id === destinoId) ?? null
+  const hayLista = proyectos.length > 0
+  const projectId = hayLista ? destino?.id ?? null : ids.projectId
+  const companyId = (hayLista ? destino?.company_id : null) || ids.companyId
+
+  const panelDestino = !hayLista ? undefined : proyectos.length === 1 ? (
+    <p style={{ margin: 0, fontSize: '13px', color: 'var(--at-ink-2)' }}>
+      Las unidades se crearán en el proyecto <strong>{proyectos[0].nombre}</strong>.
+    </p>
+  ) : (
+    <div>
+      <label htmlFor="import-unidades-proyecto" style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '5px' }}>
+        Proyecto destino *
+      </label>
+      <select
+        id="import-unidades-proyecto"
+        value={destinoId}
+        onChange={e => setDestinoId(e.target.value)}
+        style={{ width: '100%', padding: '10px 14px', border: '2px solid var(--at-line)', borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', background: 'var(--at-surface)', color: 'var(--at-ink)' }}
+      >
+        <option value="">— Elegir proyecto —</option>
+        {proyectos.map(p => (
+          <option key={p.id} value={p.id}>{p.nombre}</option>
+        ))}
+      </select>
+      <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--at-ink-3)' }}>
+        Todas las unidades del archivo se crean en este proyecto.
+      </p>
+    </div>
+  )
+
   return (
     <ImportModal<UnidadRow>
       entityLabel="unidad"
@@ -207,11 +255,15 @@ export function ImportUnidadesModal({ currentUser, onClose, onImportado }: Props
       templateFilename="plantilla_unidades"
       columns={COLUMNS}
       validateRow={validateRow}
+      optionsPanel={panelDestino}
+      importDisabled={!projectId}
+      importDisabledReason="Elige el proyecto destino."
       onInsertBatch={async (batch) => {
+        if (!projectId) return { ok: 0, error: 'Elige el proyecto destino.' }
         const payload = batch.map(u => ({
           ...u,
-          project_id: ids.projectId,
-          company_id: ids.companyId,
+          project_id: projectId,
+          company_id: companyId,
           activo: true,
         }))
         const { data, error } = await insertUnidades(payload)
