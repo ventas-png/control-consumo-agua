@@ -418,6 +418,70 @@ export type Database = {
           },
         ]
       }
+      agua_historial_lecturas: {
+        Row: {
+          company_id: string
+          consumo: number | null
+          contador_id: string
+          created_at: string
+          creado_por: string | null
+          fecha: string
+          id: string
+          lectura: number | null
+          notas: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          consumo?: number | null
+          contador_id: string
+          created_at?: string
+          creado_por?: string | null
+          fecha: string
+          id?: string
+          lectura?: number | null
+          notas?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          consumo?: number | null
+          contador_id?: string
+          created_at?: string
+          creado_por?: string | null
+          fecha?: string
+          id?: string
+          lectura?: number | null
+          notas?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agua_historial_lecturas_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agua_historial_lecturas_contador_id_fkey"
+            columns: ["contador_id"]
+            isOneToOne: false
+            referencedRelation: "contadores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agua_historial_lecturas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alertas_condominio: {
         Row: {
           company_id: string
@@ -24899,6 +24963,10 @@ export type Database = {
           company_id: string
           tipo_agua: string
         }[]
+      }
+      agua_historial_lecturas_importar: {
+        Args: { p_filas: Json; p_project_id: string }
+        Returns: Json
       }
       agua_lectura_contexto: {
         Args: { p_contador_id: string }

@@ -298,6 +298,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         contadores={agua.contadores}
         tarifas={agua.tarifas}
         unidades={agua.unidades}
+        proyectos={agua.proyectos}
         moneda={agua.moneda}
         onContadorAdded={agua.addContador}
         onContadorUpdated={agua.updateContador}

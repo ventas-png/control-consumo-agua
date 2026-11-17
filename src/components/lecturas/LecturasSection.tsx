@@ -7,6 +7,8 @@ import { registrarLectura, uploadRegistroFoto, type LecturaCaptura } from '../..
 import { hoyLocalISO, formatFechaCalendario } from '../../lib/format'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularCostoTarifa, validarLectura } from '../../lib/business'
+import { fetchHistorialLecturas, type HistorialLectura } from '../../domain/agua/historialLecturas'
+import { estadisticasConsumo, serieConsumo } from '../../lib/historialConsumo'
 import {
   localStorageOutbox,
   leerPendientes,
@@ -165,6 +167,17 @@ export function LecturasSection({
 
   const contadorSeleccionado = contadores.find(c => c.id === selectedContadorId) ?? null
 
+  // Historial que la empresa llevaba a mano (importado en Contadores). No es un
+  // cobro: sólo se usa para comparar la lectura nueva con su tendencia.
+  const [historialContador, setHistorialContador] = useState<HistorialLectura[]>([])
+  useEffect(() => {
+    const id = contadorSeleccionado?.id
+    if (!id) { setHistorialContador([]); return }
+    let vigente = true
+    void fetchHistorialLecturas([id]).then(h => { if (vigente) setHistorialContador(h) })
+    return () => { vigente = false }
+  }, [contadorSeleccionado?.id])
+
   // El `project_id` de la lectura ya NO lo deriva el navegador: lo resuelve el
   // servidor desde el contador (20260910000200). Derivarlo aquí era, además de
   // redundante, la puerta por la que una lectura podía acabar contabilizada en
@@ -214,14 +227,16 @@ export function LecturasSection({
     : null
   const lecturaNum = parseFloat(lecturaActual)
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
-  // Promedio histórico de consumo del contador → detección de salto anómalo.
-  const promedioHistorico = (() => {
-    if (!contadorSeleccionado) return undefined
-    const consumos = registros
-      .filter(r => r.contador_id === contadorSeleccionado.id && typeof r.consumo === 'number' && r.consumo > 0)
-      .map(r => r.consumo)
-    return consumos.length ? consumos.reduce((a, b) => a + b, 0) / consumos.length : undefined
-  })()
+  // Tendencia del contador → detección de salto anómalo. La serie une el
+  // historial importado con las lecturas del sistema, y la referencia es el
+  // promedio de los últimos 6 periodos antes de la fecha de esta lectura.
+  const tendencia = useMemo(() => {
+    if (!contadorSeleccionado) return null
+    const delContador = registros.filter(r => r.contador_id === contadorSeleccionado.id && !r.deleted_at)
+    const serie = serieConsumo(historialContador, delContador)
+    return estadisticasConsumo(serie, fechaLecturaActual || hoyLocalISO())
+  }, [contadorSeleccionado, registros, historialContador, fechaLecturaActual])
+  const promedioHistorico = tendencia?.promedioReciente ?? undefined
   // validarLectura: fuente única de validación (retroceso/reset + anomalía).
   const validacion = !isNaN(lecturaNum)
     ? validarLectura(ultimaLectura, lecturaNum, { resetContador, promedioHistorico })
@@ -785,6 +800,25 @@ export function LecturasSection({
                   {validacion?.warning && (
                     <div style={{ gridColumn: '1 / -1', background: 'var(--at-warning-tint)', border: '1px solid var(--at-warning)', color: 'var(--at-warning-strong)', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
                       ⚠️ {validacion.warning}
+                    </div>
+                  )}
+                  {tendencia && (tendencia.promedioReciente !== null || tendencia.mismoMesAnterior !== null) && (
+                    <div data-testid="tendencia-consumo" style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--at-ink-2)', display: 'flex', flexWrap: 'wrap', gap: '6px 18px' }}>
+                      {tendencia.promedioReciente !== null && (
+                        <span>
+                          Promedio de los últimos {tendencia.nReciente} periodo{tendencia.nReciente === 1 ? '' : 's'}:{' '}
+                          <strong>{tendencia.promedioReciente.toFixed(2)} m³</strong>
+                          {consumoEfectivo !== null && consumoEfectivo > 0 && tendencia.promedioReciente > 0 && (
+                            <> · esta lectura: <strong>{(consumoEfectivo / tendencia.promedioReciente).toFixed(1)}×</strong></>
+                          )}
+                        </span>
+                      )}
+                      {tendencia.mismoMesAnterior !== null && (
+                        <span>Mismo mes del año anterior ({tendencia.etiquetaMismoMes}): <strong>{tendencia.mismoMesAnterior.toFixed(2)} m³</strong></span>
+                      )}
+                      {tendencia.nHistorial > 0 && (
+                        <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>Incluye {tendencia.nHistorial} lectura{tendencia.nHistorial === 1 ? '' : 's'} del historial importado.</span>
+                      )}
                     </div>
                   )}
                   <div style={{ gridColumn: '1 / -1' }}>

@@ -5,6 +5,7 @@ import { resolveUnidadProjectCompany } from '../../domain/unidades/queries'
 import { insertUnidades } from '../../domain/unidades/mutations'
 import { sanitizeInput } from '../../lib/validation'
 import { ImportModal, type ImportColumn, type RowValidationResult } from '../shared'
+import { proyectoDestinoInicial } from '../../lib/proyectoDestino'
 
 const TIPOS_UNIDAD_VALIDOS: TipoUnidad[] = [
   'apartamento', 'casa', 'bodega', 'local_comercial', 'oficina', 'parqueadero', 'otro',
@@ -172,15 +173,7 @@ interface Props {
   onImportado: (unidades: Unidad[]) => void
 }
 
-/**
- * Proyecto que se propone al abrir: el filtrado en la pantalla si existe, o el
- * único proyecto. Con varios y sin filtro no se adivina: antes se tomaba el
- * primero de la empresa y las unidades caían en el proyecto equivocado.
- */
-export function proyectoDestinoInicial(proyectos: Pick<Proyecto, 'id'>[], proyectoInicial?: string): string {
-  if (proyectoInicial && proyectos.some(p => p.id === proyectoInicial)) return proyectoInicial
-  return proyectos.length === 1 ? proyectos[0].id : ''
-}
+export { proyectoDestinoInicial }
 
 export function ImportUnidadesModal({ currentUser, proyectos, proyectoInicial, onClose, onImportado }: Props) {
   const [ids, setIds] = useState<{ projectId: string; companyId: string } | null>(null)
