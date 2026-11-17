@@ -4,6 +4,7 @@
 // Es referencia para comparar: NO es un cobro. No vive en `registros`, así que
 // no se factura, no aparece como deuda ni suma en los totales del Historial.
 import { db } from '../../lib/supabase'
+import { fetchAllRows } from '../../lib/fetchAllRows'
 import type { Json } from '../../types/database.types'
 
 export interface HistorialLectura {
@@ -67,6 +68,31 @@ export async function fetchHistorialLecturas(contadorIds: string[]): Promise<His
     .order('fecha', { ascending: true })
   if (error) return []
   return (data ?? []).map(r => ({
+    ...r,
+    lectura: r.lectura === null ? null : Number(r.lectura),
+    consumo: r.consumo === null ? null : Number(r.consumo),
+  }))
+}
+
+/**
+ * Todo el historial de un proyecto (para la carga masiva, que compara cientos
+ * de contadores a la vez: pedirlos por id haría una URL enorme). Pagina para no
+ * quedarse en el tope de filas de la API. Vacío si falla: el preview sigue,
+ * sólo que sin promedio del historial.
+ */
+export async function fetchHistorialLecturasProyecto(projectId: string): Promise<HistorialLectura[]> {
+  if (!projectId) return []
+  const { data, error } = await fetchAllRows<HistorialLectura>((from, to) =>
+    db
+      .from('agua_historial_lecturas')
+      .select(COLS)
+      .eq('project_id', projectId)
+      .order('fecha', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to),
+  )
+  if (error) return []
+  return data.map(r => ({
     ...r,
     lectura: r.lectura === null ? null : Number(r.lectura),
     consumo: r.consumo === null ? null : Number(r.consumo),

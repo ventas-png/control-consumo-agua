@@ -197,3 +197,41 @@ describe('ImportModal — pluralización', () => {
     await checkA11y(container)
   })
 })
+
+describe('ImportModal — opciones que cambian la validación', () => {
+  function subirCsv(texto: string) {
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [new File([texto], 'datos.csv', { type: 'text/csv' })] } })
+  }
+  // Valida contra una edad mínima que se elige en el panel de opciones.
+  function Modal({ minimo }: { minimo: number }) {
+    return (
+      <ImportModal<Row>
+        entityLabel="contacto"
+        columns={columns}
+        validateRow={raw => {
+          const r = validateRow(raw)
+          return r.ok && r.data.edad < minimo ? { ok: false, errors: [`menor de ${minimo}`] } : r
+        }}
+        revalidarCon={minimo}
+        renderValidas={filas => <p data-testid="validas">{filas.map(f => f.nombre).join(', ')}</p>}
+        onInsertBatch={async b => ({ ok: b.length })}
+        onClose={() => {}}
+        onImportado={() => {}}
+      />
+    )
+  }
+
+  it('al cambiar `revalidarCon` vuelve a validar las filas ya leídas', async () => {
+    const { rerender } = render(<Modal minimo={18} />)
+    subirCsv('nombre,edad\nAna,30\nLuis,16\n')
+    expect(await screen.findByText(/1 válida, 1 con error/)).toBeDefined()
+    expect(screen.getByTestId('validas').textContent).toBe('Ana')
+    rerender(<Modal minimo={10} />)
+    expect(await screen.findByText(/2 válidas, 0 con errores/)).toBeDefined()
+    expect(screen.getByTestId('validas').textContent).toBe('Ana, Luis')
+    rerender(<Modal minimo={40} />)
+    expect(await screen.findByText(/0 válidas, 2 con errores/)).toBeDefined()
+    expect(screen.queryByTestId('validas')).toBeNull()
+  })
+})

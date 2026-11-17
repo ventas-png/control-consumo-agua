@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback, type CSSProperties, type ReactNode } from 'react'
+import { useState, useMemo, useCallback, Suspense, type CSSProperties, type ReactNode } from 'react'
+import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { confirm, notify } from '../shared/Dialog'
-import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador } from '../../types'
+import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador, Tarifa } from '../../types'
 import { cambiarEstadoRegistro, deleteRegistro, type EstadoSeguimiento } from '../../domain/agua/mutations'
 import { calcularTotalPagar } from '../../lib/business'
 import { APP_CONFIG } from '../../lib/config'
@@ -17,6 +18,9 @@ import {
 } from '../../lib/historialFiltros'
 import { tint } from '../shared/statusTone'
 
+const CargaMasivaLecturasModal = lazy(() => import('../lecturas/CargaMasivaLecturasModal').then(m => ({ default: m.CargaMasivaLecturasModal })))
+const ImportHistorialLecturasModal = lazy(() => import('../contadores/ImportHistorialLecturasModal').then(m => ({ default: m.ImportHistorialLecturasModal })))
+
 interface Props {
   registros: Registro[]
   clientes: Cliente[]
@@ -30,6 +34,14 @@ interface Props {
   canEdit?: boolean
   canChangeStatus?: boolean
   canDelete?: boolean
+  /**
+   * Puede registrar lecturas: habilita la carga masiva desde Excel y la
+   * importación del historial de referencia (necesitan además los callbacks).
+   */
+  canCargarLecturas?: boolean
+  tarifas?: Tarifa[]
+  onRegistroAdded?: (registro: Registro) => void
+  onContadorUpdated?: (id: string, partial: Partial<Contador>) => void
 }
 
 const ESTADO_PILL: Record<string, { bg: string; color: string; icon: string }> = {
@@ -62,10 +74,17 @@ export function HistorialSection({
   canEdit: canEditProp = true,
   canChangeStatus: canChangeStatusProp = true,
   canDelete: canDeleteProp = true,
+  canCargarLecturas = false,
+  tarifas = [],
+  onRegistroAdded,
+  onContadorUpdated,
 }: Props) {
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [filtroProyecto, setFiltroProyecto] = useState('')
+  const [importar, setImportar] = useState<'carga' | 'historial' | null>(null)
+  const puedeCarga = canCargarLecturas && !!onRegistroAdded && proyectos.length > 0
+  const puedeHistorial = canCargarLecturas && !!onContadorUpdated && proyectos.length > 0
   const [filtroUnidad, setFiltroUnidad] = useState('')
   const [filtroTipoAgua, setFiltroTipoAgua] = useState('')
   const [filtroFechaInicio, setFiltroFechaInicio] = useState('')
@@ -344,6 +363,22 @@ export function HistorialSection({
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20, paddingBottom: 12, borderBottom: '2px solid var(--at-line)' }}>
         <span style={{ fontSize: 20, fontWeight: 700, flex: '1 1 240px', minWidth: 0 }}>📊 Historial de Lecturas</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {puedeCarga && (
+            <button
+              type="button"
+              onClick={() => setImportar('carga')}
+              title="Registrar muchas lecturas a la vez desde un Excel (generan su cobro como cualquier lectura)"
+              style={botonImportar}
+            >📥 Carga masiva</button>
+          )}
+          {puedeHistorial && (
+            <button
+              type="button"
+              onClick={() => setImportar('historial')}
+              title="Cargar lecturas que se llevaban a mano, sólo para comparar las nuevas (no genera cobros)"
+              style={botonImportar}
+            >🗂️ Importar historial</button>
+          )}
           <button
             onClick={() => setShowFilters(s => !s)}
             aria-expanded={showFilters}
@@ -629,6 +664,34 @@ export function HistorialSection({
           onClose={() => setPhotoModal(null)}
         />
       )}
+
+      {importar === 'carga' && onRegistroAdded && (
+        <Suspense fallback={null}>
+          <CargaMasivaLecturasModal
+            proyectos={proyectos}
+            contadores={contadores}
+            tarifas={tarifas}
+            registros={registros}
+            moneda={moneda}
+            proyectoInicial={filtroProyecto}
+            onClose={() => setImportar(null)}
+            onRegistroAdded={onRegistroAdded}
+          />
+        </Suspense>
+      )}
+      {importar === 'historial' && onContadorUpdated && (
+        <Suspense fallback={null}>
+          <ImportHistorialLecturasModal
+            proyectos={proyectos}
+            contadores={contadores}
+            proyectoInicial={filtroProyecto}
+            onClose={() => setImportar(null)}
+            onLecturaInicialActualizada={cambios => {
+              cambios.forEach(c => onContadorUpdated(c.id, { lectura_inicial: Number(c.lectura_inicial) }))
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
@@ -798,6 +861,12 @@ function pillStyle(p: { bg: string; color: string }): CSSProperties {
 
 // Botón del nombre del cliente: se ve como texto enlazado y hereda la
 // alineación de la celda (a la derecha en la tarjeta del teléfono).
+const botonImportar: CSSProperties = {
+  padding: '10px 16px', background: 'var(--at-surface)', color: 'var(--at-primary)',
+  border: '2px solid var(--at-primary)', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14,
+  whiteSpace: 'nowrap',
+}
+
 const rowMainBtnStyle: CSSProperties = {
   background: 'none', border: 'none', padding: 0, margin: 0,
   fontFamily: 'inherit', fontSize: 'inherit', lineHeight: 'inherit',
