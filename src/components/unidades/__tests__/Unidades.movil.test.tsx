@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   resolveUnidadProjectCompany: vi.fn(),
   fetchResidentesDeUnidad: vi.fn(),
   addResidente: vi.fn(),
+  updateUnidad: vi.fn(),
   notify: vi.fn(),
 }))
 
@@ -25,7 +26,7 @@ vi.mock('../../../domain/unidades/queries', () => ({
   checkUnidadesLimit: vi.fn(async () => ({ maxUnits: 100, total: 0 })),
 }))
 vi.mock('../../../domain/unidades/mutations', () => ({
-  createUnidad: vi.fn(), updateUnidad: vi.fn(), setUnidadActiva: vi.fn(), deleteUnidad: vi.fn(),
+  createUnidad: vi.fn(), updateUnidad: h.updateUnidad, setUnidadActiva: vi.fn(), deleteUnidad: vi.fn(),
   assignContadoresToUnidad: vi.fn(), unlinkContadores: vi.fn(),
 }))
 vi.mock('../../../domain/unidades/residentes', () => ({
@@ -94,6 +95,41 @@ describe('UnidadFormModal — pantalla completa en el teléfono', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(dialog)
     expect(screen.getByRole('dialog', { name: 'Nueva Unidad' })).toBeTruthy()
+  })
+})
+
+describe('UnidadFormModal — cliente asignado con buscador', () => {
+  it('se busca sin acentos, se elige y se guarda su id; Escape cierra la lista y no la ventana', async () => {
+    const otros = [
+      cliente,
+      { id: 'cli-2', nombre: 'Byron Antonio Lopez Rodriguez', codigo: 'CVI-001', telefono: '23105905' },
+      { id: 'cli-3', nombre: 'Eva María Peña', codigo: 'CLI-113' },
+    ] as unknown as Cliente[]
+    h.resolveUnidadProjectCompany.mockResolvedValue({ projectId: 'p1', companyId: 'co1', error: null })
+    h.updateUnidad.mockResolvedValue({ data: { ...unidad, cliente_id: 'cli-3' }, error: null })
+    render(
+      <UnidadesSection
+        unidades={[unidad]} contadores={[]} clientes={otros} proyectos={[proyecto]}
+        onUnidadAdded={() => {}} onUnidadUpdated={() => {}} onUnidadDeleted={() => {}} onContadorUpdated={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar Unidad' })
+    expect(within(dialog).queryByText('— Sin cliente asignado —')).toBeNull()
+    const buscador = within(dialog).getByRole('combobox', { name: 'Cliente asignado' })
+
+    fireEvent.focus(buscador)
+    fireEvent.change(buscador, { target: { value: 'pena' } })
+    fireEvent.keyDown(buscador, { key: 'Escape' })
+    expect(within(dialog).queryByRole('listbox')).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Editar Unidad' })).toBeTruthy()
+
+    fireEvent.keyDown(buscador, { key: 'ArrowDown' })
+    fireEvent.keyDown(buscador, { key: 'Enter' })
+    expect(within(within(dialog).getByTestId('cliente-seleccionado')).getByText('Eva María Peña')).toBeTruthy()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Actualizar' }))
+    await waitFor(() => expect(h.updateUnidad).toHaveBeenCalledWith('un-1', expect.objectContaining({ cliente_id: 'cli-3' })))
   })
 })
 

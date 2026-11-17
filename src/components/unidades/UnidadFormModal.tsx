@@ -5,6 +5,7 @@ import { inputStyle, labelStyle } from './ui'
 import type { TipoUnidad, TipoRegimen, EstadoOcupacional, ContratoSuministro } from '../../types'
 import { TIPOS_UNIDAD, TIPOS_REGIMEN, ESTADOS_OCUPACIONALES, CONTRATOS_SUMINISTRO, TIPO_AGUA_LABELS } from './ui'
 import { EditModal } from '../shared/EditModal'
+import { ClienteSelector } from '../clientes/ClienteSelector'
 
 export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
   const { contadores, clientes, proyectos, form, setForm, selectedContadorIds, setSelectedContadorIds, editingId, loading, cancelForm, handleGuardar } = ctx
@@ -294,16 +295,13 @@ export function UnidadFormModal({ ctx }: { ctx: UnidadesCtx }) {
             <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--at-ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
               Cliente Asignado
             </div>
-            <select
-              style={inputStyle}
+            <ClienteSelector
+              clientes={clientes}
               value={form.cliente_id}
-              onChange={e => setForm(f => ({ ...f, cliente_id: e.target.value }))}
-            >
-              <option value="">— Sin cliente asignado —</option>
-              {clientes.map(c => (
-                <option key={c.id} value={c.id}>{c.nombre} ({c.codigo})</option>
-              ))}
-            </select>
+              onChange={id => setForm(f => ({ ...f, cliente_id: id }))}
+              label="Cliente asignado"
+              estiloEntrada={inputStyle}
+            />
           </div>
 
           {/* Contadores Asignados */}
