@@ -106,6 +106,16 @@ fi
 TOTAL=$(echo "$SALIDA" | grep -c "NOTICE:  OK")
 echo "  OK    $TOTAL comprobaciones"
 
+echo "── 3b · moneda por reserva, gasto y contrato (20261129000000), DOS veces ──"
+MONEDA="$MIGS/20261129000000_rentas_moneda.sql"
+aplicar rent "$MONEDA"
+H1=$(huella rent)
+aplicar rent "$MONEDA"
+H2=$(huella rent)
+[ "$H1" = "$H2" ] || { echo "❌ re-aplicar la migración de moneda cambió el catálogo"; exit 1; }
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d rent -f "$AQUI/assert_moneda.sql" 2>&1) || { echo "$SALIDA" | grep -E "ERROR|FALLO" | head -5; exit 1; }
+echo "$SALIDA" | sed -n 's/.*NOTICE:  OK/  OK/p'
+
 echo "── 4/4 · mutantes: sin cada compuerta, la suite debe fallar ────────────"
 mutante() {   # $1 = base · $2 = etiqueta · $3 = patrón que se quita · $4 = reemplazo
   grep -qF -- "$3" "$NUESTRA" || { echo "❌ el mutante «$2» no encuentra su línea en la migración: $3"; exit 1; }

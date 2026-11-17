@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import type { ConceptoRenta, ContratoRenta, GastoRenta, LiquidacionRenta, PropiedadRenta, ReservaUnificada } from '../../../types'
 import {
   calendarioMes, codigoDeConcepto, contratoCubreMes, diasDelMes, importesDeFormulario, liquidacionesPorReserva,
-  mesDesplazado, nochesEnMes, nombreMes, resumenCarteraMes, resumenMes, tieneDesglose, totalesDesglose,
+  mesDesplazado, monedaDeReserva, MONEDAS_RENTA, nochesEnMes, nombreMes, resumenCarteraMes, resumenMes, tieneDesglose, totalesDesglose,
 } from '../finanzas'
 
 const concepto = (bloque: 'huesped' | 'anfitrion', codigo: string, signo: 1 | -1, orden: number, extra: Partial<ConceptoRenta> = {}): ConceptoRenta => ({
@@ -34,7 +34,7 @@ const HOJA: [ReservaUnificada, number[], number[]][] = [
 ]
 const RESERVAS = HOJA.map(h => h[0])
 const LIQUIDACIONES: LiquidacionRenta[] = HOJA.map(([r, h, a]) => ({
-  id: `l-${r.id}`, company_id: 'c1', propiedad_id: 'p1', reserva_id: r.id, reserva_str_id: null, created_at: '', updated_at: '',
+  id: `l-${r.id}`, company_id: 'c1', propiedad_id: 'p1', reserva_id: r.id, reserva_str_id: null, moneda: 'USD', created_at: '', updated_at: '',
   importes: {
     'huesped:tarifa_habitacion': h[0], 'huesped:tarifa_limpieza': h[1], 'huesped:servicio_huesped': h[2], 'huesped:impuesto': h[3],
     'anfitrion:tarifa_habitacion': a[0], 'anfitrion:tarifa_limpieza': a[1], 'anfitrion:descuentos': a[2],
@@ -44,7 +44,7 @@ const LIQUIDACIONES: LiquidacionRenta[] = HOJA.map(([r, h, a]) => ({
 const propiedad = (extra: Partial<PropiedadRenta> = {}): PropiedadRenta =>
   ({ id: 'p1', company_id: 'c1', nombre: 'Apto 1D SQ', tipo_renta: 'corto_plazo', estado: 'activa', comision_pct: null, ...extra }) as PropiedadRenta
 const gasto = (fecha: string, monto: number, a_cargo_de: GastoRenta['a_cargo_de'] = 'propietario'): GastoRenta =>
-  ({ id: `g${fecha}${monto}`, company_id: 'c1', propiedad_id: 'p1', fecha, categoria: 'limpieza', descripcion: 'x', proveedor: null, monto, a_cargo_de, notas: null, created_at: '', updated_at: '' })
+  ({ id: `g${fecha}${monto}`, company_id: 'c1', propiedad_id: 'p1', fecha, categoria: 'limpieza', descripcion: 'x', proveedor: null, monto, moneda: 'USD', a_cargo_de, notas: null, created_at: '', updated_at: '' })
 const mes = (extra: Partial<Parameters<typeof resumenMes>[0]> = {}) => resumenMes({
   propiedad: propiedad(), mes: '2026-02', reservas: RESERVAS, contratos: [], gastos: [], conceptos: CONCEPTOS,
   liquidaciones: liquidacionesPorReserva(LIQUIDACIONES), ...extra,
@@ -147,7 +147,7 @@ describe('resumenMes — la hoja de febrero', () => {
 describe('contratos en el mes', () => {
   const contrato = (extra: Partial<ContratoRenta> = {}): ContratoRenta => ({
     id: 'k1', company_id: 'c1', propiedad_id: 'p1', inquilino_nombre: 'Inq', inquilino_identificacion: null, inquilino_telefono: null,
-    inquilino_email: null, fecha_inicio: '2026-01-15', fecha_fin: null, renta_mensual: 800, deposito: null, dia_pago: 5,
+    inquilino_email: null, fecha_inicio: '2026-01-15', fecha_fin: null, renta_mensual: 800, deposito: null, moneda: 'USD', dia_pago: 5,
     estado: 'vigente', notas: null, created_at: '', updated_at: '', ...extra,
   })
   it('cubre el mes si se cruza con él y no está cancelado', () => {
@@ -194,5 +194,27 @@ describe('captura', () => {
     expect(codigoDeConcepto('Propina extra', new Set())).toBe('propina_extra')
     expect(codigoDeConcepto('Comisión', new Set(['comision']))).toBe('comision_2')
     expect(codigoDeConcepto('¡¡!!', new Set())).toBe('concepto')
+  })
+})
+
+describe('moneda', () => {
+  it('una reserva sin ficha es USD; con ficha, la suya', () => {
+    expect(monedaDeReserva({ id: 'x', origen: 'rentas' }, new Map())).toBe('USD')
+    const m = liquidacionesPorReserva([{ ...LIQUIDACIONES[0], moneda: 'GTQ' }])
+    expect(monedaDeReserva(RESERVAS[0], m)).toBe('GTQ')
+    expect(MONEDAS_RENTA[0]).toBe('USD')
+    expect(MONEDAS_RENTA).toContain('GTQ')
+  })
+  it('no se mezclan: lo que está en otra moneda cuenta para la ocupación pero no para el dinero, y se avisa', () => {
+    const mixtas = liquidacionesPorReserva(LIQUIDACIONES.map((l, i) => (i === 4 ? { ...l, moneda: 'GTQ' } : l)))
+    const usd = mes({ liquidaciones: mixtas, gastos: [gasto('2026-02-03', 100), { ...gasto('2026-02-04', 50), moneda: 'GTQ' }] })
+    expect(usd).toMatchObject({ moneda: 'USD', estadias: 5, nochesOcupadas: 23, acreditado: 499.12, gastosPropietario: 100, otrasMonedas: ['GTQ'] })
+    const gtq = mes({ liquidaciones: mixtas, moneda: 'GTQ', gastos: [gasto('2026-02-03', 100), { ...gasto('2026-02-04', 50), moneda: 'GTQ' }] })
+    expect(gtq).toMatchObject({ moneda: 'GTQ', estadias: 5, acreditado: 896.89, gastosPropietario: 50, otrasMonedas: ['USD'] })
+  })
+  it('una reserva en otra moneda sin monto alguno no dispara el aviso', () => {
+    const sinMonto = reserva('VACIA', '2026-02-10', '2026-02-11', 1)
+    const m = liquidacionesPorReserva([...LIQUIDACIONES, { id: 'lv', company_id: 'c1', propiedad_id: 'p1', reserva_id: 'VACIA', reserva_str_id: null, importes: {}, moneda: 'MXN', created_at: '', updated_at: '' }])
+    expect(mes({ reservas: [...RESERVAS, sinMonto], liquidaciones: m }).otrasMonedas).toEqual([])
   })
 })

@@ -22,6 +22,7 @@ const reserva = (id: string, propiedad_id: string, entrada: string, salida: stri
 const contrato = (id: string, propiedad_id: string, extra: Partial<ContratoRenta> = {}): ContratoRenta => ({
   id, company_id: 'c1', propiedad_id, inquilino_nombre: 'Luis', inquilino_identificacion: null,
   inquilino_telefono: null, inquilino_email: null, fecha_inicio: '2026-01-01', fecha_fin: '2026-12-31',
+  moneda: 'USD',
   renta_mensual: 4500, deposito: null, dia_pago: 5, estado: 'vigente', notas: null, created_at: '', updated_at: '', ...extra,
 })
 const articulo = (id: string, extra: Partial<ArticuloInventarioRenta> = {}): ArticuloInventarioRenta => ({

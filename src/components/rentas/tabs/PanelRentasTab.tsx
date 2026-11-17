@@ -4,7 +4,7 @@ import {
   DIAS_AVISO_VENCIMIENTO, OCUPACION_LABEL, TIPO_RENTA_ICONO, TIPO_RENTA_LABEL, TIPOS_RENTA,
   diasParaVencer, ocupacionDePropiedad, resumenCartera,
 } from '../../../domain/rentas/logica'
-import { nombreMes, type resumenCarteraMes } from '../../../domain/rentas/finanzas'
+import { MONEDA_DEFECTO, nombreMes, type resumenCarteraMes } from '../../../domain/rentas/finanzas'
 import { formatCurrency, formatFechaCalendario } from '../../../lib/format'
 import { StatTile } from '../../shared/StatTile'
 import { StatusBadge } from '../../shared/StatusBadge'
@@ -72,7 +72,7 @@ export default function PanelRentasTab({
           <StatTile label="Estancias en curso" value={r.reservasEnCurso} icon="🛎️"
             hint={`${r.proximasLlegadas} llegada${r.proximasLlegadas === 1 ? '' : 's'} en 7 días`} />
         )}
-        {(permisos.reservas.ver || permisos.contratos.ver) && (
+        {!mesCartera && (permisos.reservas.ver || permisos.contratos.ver) && (
           <StatTile label="Ingreso del mes" value={formatCurrency(r.ingresoMes, moneda)} icon="💰"
             hint="Reservas que entran este mes + rentas de contratos vigentes" />
         )}
@@ -126,10 +126,10 @@ export default function PanelRentasTab({
           <div style={{ ...rejillaTiles, marginBottom: 0 }}>
             <StatTile label="Ocupación del mes" value={`${mesCartera.ocupacionPct}%`} icon="📆"
               hint={`${mesCartera.nochesOcupadas} de ${mesCartera.dias} noches · ${mesCartera.estadias} estadías`} />
-            <StatTile label="Acreditado" value={formatCurrency(mesCartera.acreditado, moneda)} icon="💵" hint="Recibido por reservas y contratos" />
-            <StatTile label="Comisión de administración" value={formatCurrency(mesCartera.comision, moneda)} icon="🏢" hint="Sobre lo acreditado, según cada propiedad" />
-            <StatTile label="A pagar a propietarios" value={formatCurrency(mesCartera.pagoPropietario, moneda)} icon="🤝"
-              hint={`Tras ${formatCurrency(mesCartera.gastosPropietario, moneda)} en gastos a su cargo`} />
+            <StatTile label="Acreditado" value={formatCurrency(mesCartera.acreditado, MONEDA_DEFECTO)} icon="💵" hint="Recibido por reservas y contratos" />
+            <StatTile label="Comisión de administración" value={formatCurrency(mesCartera.comision, MONEDA_DEFECTO)} icon="🏢" hint="Sobre lo acreditado, según cada propiedad" />
+            <StatTile label="A pagar a propietarios" value={formatCurrency(mesCartera.pagoPropietario, MONEDA_DEFECTO)} icon="🤝"
+              hint={`Tras ${formatCurrency(mesCartera.gastosPropietario, MONEDA_DEFECTO)} en gastos a su cargo`} />
           </div>
         </section>
       )}

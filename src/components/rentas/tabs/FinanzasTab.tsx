@@ -3,8 +3,8 @@ import type {
   ConceptoRenta, ContratoRenta, GastoRenta, LiquidacionRenta, PropiedadRenta, Proyecto, ReservaUnificada,
 } from '../../../types'
 import {
-  BLOQUE_TOTAL_LABEL, POLITICA_CANCELACION_LABEL, calendarioMes, claveReserva, conceptosDeBloque, esMes, mesDesplazado,
-  nombreMes, resumenCarteraMes, resumenMes, tieneDesglose, totalesDesglose,
+  BLOQUE_TOTAL_LABEL, MONEDA_DEFECTO, POLITICA_CANCELACION_LABEL, calendarioMes, claveReserva, conceptosDeBloque, esMes, mesDesplazado,
+  monedaDeReserva, nombreMes, resumenCarteraMes, resumenMes, tieneDesglose, totalesDesglose,
 } from '../../../domain/rentas/finanzas'
 import { TIPO_RENTA_ICONO } from '../../../domain/rentas/logica'
 import { formatCurrency } from '../../../lib/format'
@@ -17,6 +17,7 @@ import { ConceptosModal } from '../finanzas/ConceptosModal'
 import { GastosPanel } from '../finanzas/GastosPanel'
 import { IngresosMes, OcupacionMes } from '../finanzas/Graficas'
 import { ImportarReservasModal } from '../finanzas/ImportarReservasModal'
+import { SelectMoneda } from '../finanzas/SelectMoneda'
 import { barraFiltros, campo, encabezadoTab, fila, rejillaTiles, td, tenue, th, thead } from '../ui'
 
 interface Props {
@@ -28,7 +29,6 @@ interface Props {
   gastos: GastoRenta[]
   proyectos: Proyecto[]
   companyId: string
-  moneda: string
   hoy: string
   permisos: PermisosModulo
   /** Permisos del módulo Reservas: importar reservas es crearlas. */
@@ -45,11 +45,13 @@ const tarjeta = { border: '1px solid var(--at-line)', borderRadius: '10px', padd
  * cada reserva, ocupación, ingresos— más gastos y el estado del propietario.
  */
 export default function FinanzasTab({
-  propiedades, reservas, contratos, conceptos, liquidaciones, gastos, proyectos, companyId, moneda, hoy,
+  propiedades, reservas, contratos, conceptos, liquidaciones, gastos, proyectos, companyId, hoy,
   permisos, permisosReservas, cargando,
 }: Props) {
   const [mes, setMes] = useState(hoy.slice(0, 7))
   const [propiedadId, setPropiedadId] = useState('')
+  // No hay tipo de cambio: se ve una moneda a la vez.
+  const [moneda, setMoneda] = useState(MONEDA_DEFECTO)
   const [columnas, setColumnas] = useState(false)
   const [modal, setModal] = useState<'conceptos' | 'importar' | null>(null)
   const [generando, setGenerando] = useState(false)
@@ -59,8 +61,12 @@ export default function FinanzasTab({
   const $ = (n: number) => formatCurrency(n, moneda)
 
   const cartera = useMemo(
-    () => resumenCarteraMes(propiedades, mes, reservas, contratos, gastos, conceptos, liquidaciones),
-    [propiedades, mes, reservas, contratos, gastos, conceptos, liquidaciones])
+    () => resumenCarteraMes(propiedades, mes, reservas, contratos, gastos, conceptos, liquidaciones, moneda),
+    [propiedades, mes, reservas, contratos, gastos, conceptos, liquidaciones, moneda])
+  /** Monedas que aparecen en los datos (para ofrecerlas en el selector). */
+  const monedasUsadas = useMemo(() => [...new Set([
+    ...[...liquidaciones.values()].map(l => l.moneda), ...gastos.map(g => g.moneda), ...contratos.map(c => c.moneda),
+  ].filter((m): m is string => !!m))], [liquidaciones, gastos, contratos])
 
   const detalle = useMemo(() => {
     if (!propiedad) return null
@@ -71,12 +77,12 @@ export default function FinanzasTab({
       reservas: suyas, gastosMes,
       dias: calendarioMes(mes, suyas),
       resumen: resumenMes({
-        propiedad, mes, reservas: suyas, conceptos, liquidaciones,
+        propiedad, mes, reservas: suyas, conceptos, liquidaciones, moneda,
         contratos: contratos.filter(c => c.propiedad_id === propiedad.id),
         gastos: gastos.filter(g => g.propiedad_id === propiedad.id),
       }),
     }
-  }, [propiedad, mes, reservas, contratos, gastos, conceptos, liquidaciones])
+  }, [propiedad, mes, reservas, contratos, gastos, conceptos, liquidaciones, moneda])
 
   const delHuesped = useMemo(() => conceptosDeBloque(conceptos, 'huesped'), [conceptos])
   const delAnfitrion = useMemo(() => conceptosDeBloque(conceptos, 'anfitrion'), [conceptos])
@@ -87,8 +93,9 @@ export default function FinanzasTab({
     try {
       const { descargarEstadoMensual } = await import('../finanzas/estadoMensualPdf')
       await descargarEstadoMensual({
-        propiedad, resumen: detalle.resumen, liquidaciones, conceptos, moneda, gastos: detalle.gastosMes,
-        reservas: detalle.reservas.filter(r => r.estado !== 'cancelada' && r.fecha_entrada.slice(0, 7) === mes)
+        propiedad, resumen: detalle.resumen, liquidaciones, conceptos, moneda,
+        gastos: detalle.gastosMes.filter(g => (g.moneda ?? MONEDA_DEFECTO) === moneda),
+        reservas: detalle.reservas.filter(r => r.estado !== 'cancelada' && r.fecha_entrada.slice(0, 7) === mes && monedaDeReserva(r, liquidaciones) === moneda)
           .sort((a, b) => a.fecha_entrada.localeCompare(b.fecha_entrada)),
       })
     } catch {
@@ -128,8 +135,14 @@ export default function FinanzasTab({
           <option value="">Toda la cartera</option>
           {propiedades.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </select>
+        <SelectMoneda id="rf-moneda" ariaLabel="Moneda de los montos" value={moneda} onChange={setMoneda} extra={monedasUsadas} />
         <span style={{ ...tenue, fontSize: '13px' }}>{nombreMes(mes)}</span>
       </div>
+      {(detalle?.resumen.otrasMonedas ?? cartera.otrasMonedas).length > 0 && (
+        <p role="status" style={{ margin: '0 0 1rem', padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', fontSize: '13px' }}>
+          Este mes también hay montos en {(detalle?.resumen.otrasMonedas ?? cartera.otrasMonedas).join(', ')}. Aquí sólo se suman los de {moneda}: cambia la moneda arriba para verlos.
+        </p>
+      )}
 
       {!propiedad || !detalle ? (
         <>
@@ -254,10 +267,12 @@ export default function FinanzasTab({
                     {detalle.dias.map(d => {
                       const r = d.reserva
                       const importes = r && d.esEntrada ? liquidaciones.get(claveReserva(r))?.importes : undefined
+                      const suMoneda = r ? monedaDeReserva(r, liquidaciones) : moneda
+                      const $r = (n: number) => formatCurrency(n, suMoneda)
                       const con = tieneDesglose(importes)
                       const t = con ? totalesDesglose(conceptos, importes) : null
                       const celda = { padding: '0.35rem 0.75rem' } as const
-                      const monto = (id: string) => (con && typeof importes?.[id] === 'number' ? $(importes[id]) : '')
+                      const monto = (id: string) => (con && typeof importes?.[id] === 'number' ? $r(importes[id]) : '')
                       return (
                         <tr key={d.fecha} style={{ ...fila, background: r ? 'var(--at-primary-tint)' : undefined, fontWeight: d.esEntrada ? 600 : undefined }}>
                           <th scope="row" style={{ ...celda, textAlign: 'left', whiteSpace: 'nowrap', fontWeight: d.fecha === hoy ? 700 : 400 }}>{d.dia}{d.fecha === hoy ? ' · hoy' : ''}</th>
@@ -269,10 +284,10 @@ export default function FinanzasTab({
                           <td style={{ ...celda, ...num }}>{r && d.esEntrada ? r.num_huespedes : ''}</td>
                           <td style={celda}>{r && d.esEntrada && r.politica_cancelacion ? POLITICA_CANCELACION_LABEL[r.politica_cancelacion] : ''}</td>
                           {columnas && delHuesped.map(c => <td key={c.id} style={{ ...celda, ...num }}>{monto(c.id)}</td>)}
-                          <td style={{ ...celda, ...num }}>{t ? $(t.huesped) : ''}</td>
+                          <td style={{ ...celda, ...num }}>{t ? $r(t.huesped) : ''}</td>
                           {columnas && delAnfitrion.map(c => <td key={c.id} style={{ ...celda, ...num }}>{monto(c.id)}</td>)}
                           <td style={{ ...celda, ...num }}>
-                            {t ? $(t.anfitrion) : r && d.esEntrada && r.monto_total !== null ? <>{$(r.monto_total)} <span style={{ ...tenue, fontWeight: 400 }}>sin desglose</span></> : ''}
+                            {t ? $r(t.anfitrion) : r && d.esEntrada && r.monto_total !== null ? <>{$r(r.monto_total)} <span style={{ ...tenue, fontWeight: 400 }}>sin desglose</span></> : ''}
                           </td>
                         </tr>
                       )
@@ -307,7 +322,7 @@ export default function FinanzasTab({
 
       {modal === 'conceptos' && <ConceptosModal conceptos={conceptos} companyId={companyId} onClose={() => setModal(null)} />}
       {modal === 'importar' && propiedad && detalle && (
-        <ImportarReservasModal propiedad={propiedad} reservas={detalle.reservas} conceptos={conceptos} hoy={hoy} onClose={() => setModal(null)} />
+        <ImportarReservasModal propiedades={[propiedad]} propiedadFija={propiedad} reservas={detalle.reservas} conceptos={conceptos} hoy={hoy} onClose={() => setModal(null)} />
       )}
     </div>
   )

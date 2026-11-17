@@ -19558,6 +19558,7 @@ export type Database = {
           inquilino_identificacion: string | null
           inquilino_nombre: string
           inquilino_telefono: string | null
+          moneda: string
           notas: string | null
           propiedad_id: string
           renta_mensual: number
@@ -19577,6 +19578,7 @@ export type Database = {
           inquilino_identificacion?: string | null
           inquilino_nombre: string
           inquilino_telefono?: string | null
+          moneda?: string
           notas?: string | null
           propiedad_id: string
           renta_mensual: number
@@ -19596,6 +19598,7 @@ export type Database = {
           inquilino_identificacion?: string | null
           inquilino_nombre?: string
           inquilino_telefono?: string | null
+          moneda?: string
           notas?: string | null
           propiedad_id?: string
           renta_mensual?: number
@@ -19627,6 +19630,7 @@ export type Database = {
           created_at: string
           descripcion: string
           fecha: string
+          moneda: string
           id: string
           monto: number
           notas: string | null
@@ -19642,6 +19646,7 @@ export type Database = {
           created_at?: string
           descripcion: string
           fecha: string
+          moneda?: string
           id?: string
           monto: number
           notas?: string | null
@@ -19657,6 +19662,7 @@ export type Database = {
           created_at?: string
           descripcion?: string
           fecha?: string
+          moneda?: string
           id?: string
           monto?: number
           notas?: string | null
@@ -19757,6 +19763,7 @@ export type Database = {
           created_at: string
           id: string
           importes: Json
+          moneda: string
           propiedad_id: string
           reserva_id: string | null
           reserva_str_id: string | null
@@ -19768,6 +19775,7 @@ export type Database = {
           created_at?: string
           id?: string
           importes?: Json
+          moneda?: string
           propiedad_id: string
           reserva_id?: string | null
           reserva_str_id?: string | null
@@ -19779,6 +19787,7 @@ export type Database = {
           created_at?: string
           id?: string
           importes?: Json
+          moneda?: string
           propiedad_id?: string
           reserva_id?: string | null
           reserva_str_id?: string | null

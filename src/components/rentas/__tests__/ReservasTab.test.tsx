@@ -22,6 +22,7 @@ vi.mock('../../../domain/rentas/mutations', () => ({
     eliminar: { isPending: false, mutateAsync: h.eliminar },
   }),
 }))
+vi.mock('../finanzas/ImportarReservasModal', () => ({ ImportarReservasModal: () => null }))
 vi.mock('../../shared/Dialog', () => ({ notify: h.notify, confirm: h.confirm }))
 
 const { default: ReservasTab } = await import('../tabs/ReservasTab')
@@ -59,7 +60,7 @@ function montar(permisos = todos, lista = reservas) {
   return render(
     <MemoryRouter>
       <ReservasTab propiedades={propiedades} reservas={lista} proyectos={proyectos} conceptos={conceptos} liquidaciones={liquidaciones}
-        companyId="c1" moneda="Q" hoy="2026-11-16" permisos={permisos} />
+        companyId="c1" hoy="2026-11-16" permisos={permisos} />
     </MemoryRouter>,
   )
 }
@@ -137,7 +138,7 @@ describe('nueva reserva', () => {
     fireEvent.change(within(dialogo).getByLabelText('Huésped *'), { target: { value: '  Eva Ruiz ' } })
     fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2026-12-12' } })
     fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2026-12-15' } })
-    fireEvent.change(within(dialogo).getByLabelText('Monto por noche (Q)'), { target: { value: '850,50' } })
+    fireEvent.change(within(dialogo).getByLabelText('Monto por noche (USD)'), { target: { value: '850,50' } })
     expect(within(dialogo).getByRole('status').textContent).toMatch(/se cruzan con la reserva de Ana Pérez/)
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
@@ -147,6 +148,7 @@ describe('nueva reserva', () => {
         huesped_nombre: 'Eva Ruiz', fecha_entrada: '2026-12-12', fecha_salida: '2026-12-15',
         num_huespedes: 1, monto_noche: 850.5, monto_total: 2551.5, estado: 'confirmada', plataforma: 'directo',
       }),
+      moneda: 'USD',
     })
   })
 
@@ -182,6 +184,7 @@ describe('desglose de cobro', () => {
       propiedad: expect.objectContaining({ id: 'ind' }),
       datos: expect.objectContaining({ monto_total: 35.1, politica_cancelacion: 'no_reembolsable', num_mascotas: 0 }),
       importes: { h1: 35.1, a1: 39, a2: 3.9 },
+      moneda: 'USD',
     })
   })
 
@@ -200,7 +203,7 @@ describe('desglose de cobro', () => {
   })
 
   it('editar carga el desglose guardado; sin tocarlo, una reserva sin desglose no escribe ninguno', async () => {
-    liquidaciones = new Map([['rentas:r1', { id: 'l1', company_id: 'c1', propiedad_id: 'ind', reserva_id: 'r1', reserva_str_id: null, importes: { a1: 120 }, created_at: '', updated_at: '' }]])
+    liquidaciones = new Map([['rentas:r1', { id: 'l1', company_id: 'c1', propiedad_id: 'ind', reserva_id: 'r1', reserva_str_id: null, moneda: 'USD', importes: { a1: 120 }, created_at: '', updated_at: '' }]])
     montar()
     expect(within(fila('Ana Pérez')).getByText('con desglose')).toBeTruthy()
     fireEvent.click(within(fila('Ana Pérez')).getByRole('button', { name: /Editar/ }))
@@ -215,5 +218,38 @@ describe('desglose de cobro', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.actualizar).toHaveBeenCalledTimes(1))
     expect((h.actualizar.mock.calls[0] as unknown as [{ importes?: unknown }])[0].importes).toBeUndefined()
+  })
+})
+
+describe('moneda de la reserva', () => {
+  it('por defecto dólares; elegir otra la manda a la ficha aunque no haya desglose', async () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva reserva' }))
+    const dialogo = screen.getByRole('dialog')
+    expect((within(dialogo).getByLabelText('Moneda') as HTMLSelectElement).value).toBe('USD')
+    fireEvent.change(within(dialogo).getByLabelText('Propiedad *'), { target: { value: 'ind' } })
+    fireEvent.change(within(dialogo).getByLabelText('Huésped *'), { target: { value: 'Eva' } })
+    fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2027-02-02' } })
+    fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2027-02-03' } })
+    fireEvent.change(within(dialogo).getByLabelText('Moneda'), { target: { value: 'GTQ' } })
+    expect(within(dialogo).getByLabelText('Total (GTQ)')).toBeTruthy()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
+    expect(h.crear).toHaveBeenCalledWith(expect.objectContaining({ moneda: 'GTQ', importes: {} }))
+  })
+
+  it('la lista muestra cada total en la moneda de su reserva', () => {
+    liquidaciones = new Map([['rentas:r1', { id: 'l1', company_id: 'c1', propiedad_id: 'ind', reserva_id: 'r1', reserva_str_id: null, moneda: 'GTQ', importes: {}, created_at: '', updated_at: '' }]])
+    montar(todos, reservas.map(x => ({ ...x, monto_total: 500 })))
+    expect(fila('Ana Pérez').textContent).toMatch(/GTQ 500/)
+    expect(fila('Paola González').textContent).toMatch(/USD 500/)
+  })
+
+  it('carga masiva: se ofrece a quien puede crear', () => {
+    montar()
+    expect(screen.getByRole('button', { name: 'Carga masiva' })).toBeTruthy()
+    cleanup()
+    montar({ ver: true, crear: false, editar: true, eliminar: false })
+    expect(screen.queryByRole('button', { name: 'Carga masiva' })).toBeNull()
   })
 })

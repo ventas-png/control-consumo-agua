@@ -6,6 +6,7 @@ import type {
   BloqueConceptoRenta, CargoGastoRenta, CategoriaGastoRenta, ConceptoRenta, ContratoRenta, GastoRenta,
   ImportesRenta, LiquidacionRenta, PoliticaCancelacionRenta, PropiedadRenta, ReservaUnificada,
 } from '../../types'
+import { MONEDAS_ISO } from '../../lib/monedas'
 import { diasEntre } from './logica'
 
 export const BLOQUES: readonly BloqueConceptoRenta[] = ['huesped', 'anfitrion']
@@ -31,6 +32,20 @@ export const CATEGORIA_GASTO_LABEL: Record<CategoriaGastoRenta, string> = {
 }
 export const CARGO_GASTO_LABEL: Record<CargoGastoRenta, string> = {
   propietario: 'Propietario', administradora: 'Administradora',
+}
+
+/** Moneda de una reserva, un gasto o un contrato que no dice otra. */
+export const MONEDA_DEFECTO = 'USD'
+
+/** Códigos ISO que se ofrecen en los formularios (USD primero). */
+export const MONEDAS_RENTA: readonly string[] = [
+  'USD', ...MONEDAS_ISO.map(m => m.code.toUpperCase()).filter(c => c !== 'USD'),
+]
+export const esMoneda = (v: string): boolean => /^[A-Z]{3}$/.test(v)
+
+/** Moneda de una reserva: la de su ficha de liquidación; sin ficha, USD. */
+export function monedaDeReserva(r: Pick<ReservaUnificada, 'id' | 'origen'>, liquidaciones: Map<string, LiquidacionRenta>): string {
+  return liquidaciones.get(claveReserva(r))?.moneda ?? MONEDA_DEFECTO
 }
 
 /** Redondeo a centavos (evita 0.1 + 0.2). */
@@ -181,6 +196,10 @@ export interface ResumenMes {
   utilidad: number
   /** Estadías del mes sin desglose: suman su «monto total» tal cual. */
   reservasSinDesglose: number
+  /** Moneda en la que están todos los montos de este resumen. */
+  moneda: string
+  /** Otras monedas con montos en el mes (reservas, contratos o gastos) que este resumen NO suma. */
+  otrasMonedas: string[]
 }
 
 /** ¿El contrato cubre algún día del mes? Uno cancelado no cuenta. */
@@ -200,6 +219,8 @@ export interface DatosMes {
   gastos: GastoRenta[]
   conceptos: ConceptoRenta[]
   liquidaciones: Map<string, LiquidacionRenta>
+  /** Moneda del resumen (por defecto USD). No hay tipo de cambio: lo que está en otra moneda no se suma. */
+  moneda?: string
 }
 
 /**
@@ -207,8 +228,9 @@ export interface DatosMes {
  * entero en el mes en que ENTRA (igual que la hoja); la ocupación, en cambio,
  * cuenta sólo las noches que caen dentro del mes.
  */
-export function resumenMes({ propiedad, mes, reservas, contratos, gastos, conceptos, liquidaciones }: DatosMes): ResumenMes {
+export function resumenMes({ propiedad, mes, reservas, contratos, gastos, conceptos, liquidaciones, moneda = MONEDA_DEFECTO }: DatosMes): ResumenMes {
   const dias = diasDelMes(mes)
+  const otras = new Set<string>()
   const totalPorConcepto = new Map<string, number>()
   let noches = 0, estadias = 0, personas = 0, sinDesglose = 0
   let totalHuesped = 0, acreditadoReservas = 0, base = 0
@@ -220,6 +242,12 @@ export function resumenMes({ propiedad, mes, reservas, contratos, gastos, concep
     estadias += 1
     personas += r.num_huespedes
     const importes = liquidaciones.get(claveReserva(r))?.importes
+    // La estadía cuenta (ocupación, personas); su dinero sólo si está en la moneda del resumen.
+    const suMoneda = monedaDeReserva(r, liquidaciones)
+    if (suMoneda !== moneda) {
+      if (tieneDesglose(importes) || (r.monto_total ?? 0) !== 0) otras.add(suMoneda)
+      continue
+    }
     if (tieneDesglose(importes)) {
       const t = totalesDesglose(conceptos, importes)
       totalHuesped += t.huesped
@@ -239,7 +267,9 @@ export function resumenMes({ propiedad, mes, reservas, contratos, gastos, concep
   let rentaContratos = 0, diasContrato = 0
   for (const c of contratos) {
     if (!contratoCubreMes(c, mes)) continue
-    rentaContratos += c.renta_mensual
+    const enMoneda = (c.moneda ?? MONEDA_DEFECTO) === moneda
+    if (enMoneda) rentaContratos += c.renta_mensual
+    else otras.add(c.moneda)
     const fin = c.fecha_fin === null ? '9999-12-31' : c.fecha_fin
     // El contrato ocupa también su último día: se cuenta hasta el día siguiente.
     const finExclusivo = fin >= ultimoDia(mes) ? primerDia(mesDesplazado(mes, 1)) : sumarUnDia(fin)
@@ -250,6 +280,7 @@ export function resumenMes({ propiedad, mes, reservas, contratos, gastos, concep
   let gastosPropietario = 0, gastosAdministradora = 0
   for (const g of gastos) {
     if (g.fecha.slice(0, 7) !== mes) continue
+    if ((g.moneda ?? MONEDA_DEFECTO) !== moneda) { otras.add(g.moneda); continue }
     if (g.a_cargo_de === 'administradora') gastosAdministradora += g.monto
     else gastosPropietario += g.monto
   }
@@ -274,6 +305,7 @@ export function resumenMes({ propiedad, mes, reservas, contratos, gastos, concep
     ingresoAdministradora: r2(comision - gastosAdministradora),
     utilidad: r2(acreditado - gastosPropietario - gastosAdministradora),
     reservasSinDesglose: sinDesglose,
+    moneda, otrasMonedas: [...otras].sort(),
   }
 }
 
@@ -287,12 +319,12 @@ export interface FilaCartera { propiedad: PropiedadRenta; resumen: ResumenMes }
 /** El mes de TODA la cartera: una fila por propiedad y los totales. */
 export function resumenCarteraMes(
   propiedades: PropiedadRenta[], mes: string, reservas: ReservaUnificada[], contratos: ContratoRenta[],
-  gastos: GastoRenta[], conceptos: ConceptoRenta[], liquidaciones: Map<string, LiquidacionRenta>,
-): { filas: FilaCartera[]; total: Pick<ResumenMes, 'dias' | 'nochesOcupadas' | 'ocupacionPct' | 'estadias' | 'acreditado' | 'comision' | 'gastosPropietario' | 'gastosAdministradora' | 'pagoPropietario' | 'ingresoAdministradora'> } {
+  gastos: GastoRenta[], conceptos: ConceptoRenta[], liquidaciones: Map<string, LiquidacionRenta>, moneda: string = MONEDA_DEFECTO,
+): { filas: FilaCartera[]; otrasMonedas: string[]; total: Pick<ResumenMes, 'dias' | 'nochesOcupadas' | 'ocupacionPct' | 'estadias' | 'acreditado' | 'comision' | 'gastosPropietario' | 'gastosAdministradora' | 'pagoPropietario' | 'ingresoAdministradora'> } {
   const filas = propiedades.map(propiedad => ({
     propiedad,
     resumen: resumenMes({
-      propiedad, mes, conceptos, liquidaciones,
+      propiedad, mes, conceptos, liquidaciones, moneda,
       reservas: reservas.filter(r => r.propiedad_id === propiedad.id),
       contratos: contratos.filter(c => c.propiedad_id === propiedad.id),
       gastos: gastos.filter(g => g.propiedad_id === propiedad.id),
@@ -305,6 +337,7 @@ export function resumenCarteraMes(
   const ocupadas = enServicio.reduce((a, x) => a + x.resumen.nochesOcupadas, 0)
   return {
     filas,
+    otrasMonedas: [...new Set(filas.flatMap(f => f.resumen.otrasMonedas))].sort(),
     total: {
       dias, nochesOcupadas: ocupadas, ocupacionPct: dias > 0 ? Math.round((ocupadas / dias) * 100) : 0,
       estadias: suma(r => r.estadias), acreditado: suma(r => r.acreditado), comision: suma(r => r.comision),

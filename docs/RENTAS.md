@@ -106,6 +106,16 @@ Lleva dentro de la aplicación la hoja de Excel que las administradoras mantiene
 - **Permisos**: `rentas.finanzas.*` cubre gastos, conceptos y ver el estado mensual. El desglose es parte de la
   reserva: lo escribe quien crea o edita reservas y lo lee Reservas o Finanzas.
 
+## Moneda y carga masiva (migración `20261129000000_rentas_moneda`)
+
+- **Moneda por reserva, gasto y contrato**: columna `moneda` (ISO 4217 en mayúsculas, `USD` por defecto) en
+  `rentas_liquidaciones`, `rentas_gastos` y `rentas_contratos`. La de la reserva vive en su ficha de liquidación
+  —que sirve a las dos fuentes de reservas—; una reserva sin ficha se considera en USD (`monedaDeReserva`).
+- **Sin tipo de cambio**: Finanzas muestra una moneda a la vez (selector, USD por defecto) y avisa cuando el mes
+  tiene montos en otras. Una estadía en otra moneda cuenta para la ocupación, no para el dinero. El Panel resume en USD.
+- **Carga masiva** desde la pestaña Reservas: la misma plantilla de Finanzas con las columnas `Propiedad` (nombre o
+  código; se omite si hay una propiedad filtrada) y `Moneda`. Código de reserva repetido en la misma propiedad = actualización.
+
 ## Archivos
 
 | Qué | Dónde |
@@ -113,7 +123,7 @@ Lleva dentro de la aplicación la hoja de Excel que las administradoras mantiene
 | Migración | `supabase/migrations/20261125000000_rentas_modulo.sql` |
 | Suite SQL (Postgres real, 58 comprobaciones, 5 mutantes) | `supabase/tests/rentas_modulo/` |
 | Migración del plan y su suite (46 comprobaciones, 7 mutantes) | `supabase/migrations/20261126000000_rentas_tercer_modulo_del_plan.sql`, `supabase/tests/rentas_plan/` |
-| Finanzas: migración y suite (47 comprobaciones, 6 mutantes) | `supabase/migrations/20261128000000_rentas_finanzas.sql`, `supabase/tests/rentas_finanzas/` |
+| Finanzas y moneda: migraciones y suite (53 comprobaciones, 6 mutantes) | `supabase/migrations/20261128000000_rentas_finanzas.sql`, `20261129000000_rentas_moneda.sql`, `supabase/tests/rentas_finanzas/` |
 | Dominio | `src/domain/rentas/` (`logica.ts`, `finanzas.ts` e `importacion.ts` puras; `queries.ts`, `mutations.ts`) |
 | Pantallas | `src/components/rentas/` (`RentasSection.tsx` + `tabs/`) |
 | Permisos en el front | `src/lib/moduleConfig.ts` (`RENTAS_*`), `src/hooks/usePermissions.ts`, `src/lib/rentasPermissions.ts` |
