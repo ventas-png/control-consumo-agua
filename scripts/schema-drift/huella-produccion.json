@@ -1,18 +1,18 @@
 {
-  "_README": "Instantánea del CATÁLOGO de producción (proyecto nnsqmeigtgewatameexo, esquema public), capturada el 2026-11-16 mediante fingerprint.sql (guard centinela y CTE sin modificaciones) por el conector Supabase, solo SELECT. Refleja producción tras desplegar PR1113 (20261127000000_modulos_por_proyecto: módulos por proyecto, projects.modulo_agua / modulo_condominios / modulo_rentas, su guarda y la compuerta de Rentas al enlazar una propiedad).",
+  "_README": "Instantánea del CATÁLOGO de producción (proyecto nnsqmeigtgewatameexo, esquema public), capturada el 2026-11-16 mediante fingerprint.sql (guard centinela y CTE sin modificaciones) por el conector Supabase, solo SELECT. Refleja producción tras desplegar PR1113 (20261127000000_modulos_por_proyecto: projects.modulo_agua, modulo_condominios y modulo_rentas, la guarda de esos interruptores, el enlace de Rentas condicionado al módulo del proyecto y portal_mis_unidades por proyecto).",
   "_CANONICO": "La serialización que se hashea está definida en fingerprint.sql y es la MISMA consulta que corre contra la reconstrucción: orden por bytes (COLLATE \"C\"), separadores de control \\x1e/\\x1f que no pueden aparecer en DDL, y NULL explícito \\x1d distinto de la cadena vacía. NO se normalizan espacios en ninguna dimensión: el DDL se hashea en crudo, porque un colapso global borraría diferencias reales dentro de literales, cuerpos dollar-quoted y definiciones de vista. Ver la regla 6 de fingerprint.sql.",
   "_ADVERTENCIA": "Esta instantánea envejece. Para refrescarla, ejecutar manualmente `fingerprint.sql` en el SQL Editor del proyecto de producción, exportar el único resultado y reemplazar `grupos` sólo después de validar su formato y compararlo con la reconstrucción del repositorio.",
-  "_DELTA": "Respecto de la captura anterior (2026-11-16T20:33:52Z (medido)): 4 grupos cambiados, 4 nuevos, 0 desaparecidos; 3916 -> 3920. Cambiados: funcion:portal_mis_unidades(), tabla:projects/columnas, tabla:projects/triggers y tabla:rentas_propiedades/triggers. Nuevos: funcion:projects_modulos_guard() y funcion:rentas_propiedad_modulo_proyecto(), cada una con su /grants. Los 8 quedan con la huella exacta que ya producía la reconstrucción del repositorio (el auditor los reportaba como DRIFT NUEVO en PR1114 porque la instantánea había envejecido).",
-  "_PROCEDENCIA": "fingerprint.sql completo (guard centinela y CTE intactos; sólo la proyección final cambia para agregar, y se quitaron las líneas de comentario) ejecutado contra producción por el conector Supabase, solo SELECT y con SET TRANSACTION READ ONLY, en UNA consulta; el guard no abortó. La consulta devolvió el total de grupos (3920) y el sha256 del texto completo. El archivo se recompuso sobre los 3916 de la captura anterior, llevando a la huella de la reconstrucción del repositorio los 8 grupos que el auditor señalaba; el sha256 del texto completo así recompuesto coincide con el medido en producción: 05830ed6af8a44e562dc65e9782dfd7249bc744f3bf07c2ba377570f4922fe16. El historial de producción registra 20261127000000 (modulos_por_proyecto).",
+  "_DELTA": "Respecto de la captura anterior (2026-11-16T20:33:52Z (medido)): 4 grupos cambiados, 4 nuevos, 0 desaparecidos; 3916 -> 3920. Cambiados: funcion:portal_mis_unidades(), tabla:projects/columnas (las tres columnas modulo_*), tabla:projects/triggers y tabla:rentas_propiedades/triggers. Nuevos: funcion:projects_modulos_guard() y funcion:rentas_propiedad_modulo_proyecto(), cada una con su /grants. Los 8 quedan con la huella exacta que ya producía la reconstrucción del repositorio (el auditor los reportaba como CAMBIO PLANIFICADO en PR1113). Las 5 claves de drift ya declarado en las cubetas revisadas no cambiaron.",
+  "_PROCEDENCIA": "fingerprint.sql completo (guard centinela y CTE intactos; sólo la proyección final cambia para agregar, y se quitaron las líneas de comentario) ejecutado contra producción por el conector Supabase, solo SELECT y con SET TRANSACTION READ ONLY, en UNA consulta; el guard no abortó. La consulta recibió las 256 cubetas de la captura anterior (left(md5(clave completa), 2); sha256 de sus líneas, 16 hex) y devolvió: total (3920), sha256 del texto completo y las cubetas que difieren (09, 4a, 60, 7f, 8b, 9f, b1 y cb; 127 líneas). El archivo se recompuso sobre los 3916 de la captura anterior: en esas cubetas, la reconstrucción del repositorio salvo las claves de drift ya declarado, que conservan su valor de producción. El sha256 del texto completo coincide con el medido en producción: 05830ed6af8a44e562dc65e9782dfd7249bc744f3bf07c2ba377570f4922fe16. El historial de producción registra 20261127000000 (modulos_por_proyecto) con su propia versión.",
   "capturada": "2026-11-16",
-  "capturada_utc": "2026-11-16T22:19:54Z (medido)",
+  "capturada_utc": "2026-11-16T22:20:11Z (medido)",
   "main_sha": "c72e72b34fdd2834f4efe0bafff4178394996439",
   "proyecto": "nnsqmeigtgewatameexo",
   "postgres": "17.6",
   "postgres_medido": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 13.2.0, 64-bit",
   "migraciones_registradas": 939,
   "migracion_maxima": "20261127000000",
-  "_METADATOS_NO_MEDIDOS": "La versión de PostgreSQL (17.6), el total de migraciones (939) y la versión máxima (20261127000000) se midieron en la misma consulta SELECT que midió la huella; la fecha UTC (2026-11-16 22:19 UTC) es el now() de esa consulta.",
+  "_METADATOS_NO_MEDIDOS": "La versión de PostgreSQL (17.6), el total de migraciones (939) y la versión máxima (20261127000000) se midieron en la misma consulta SELECT que midió la huella; la fecha UTC (2026-11-16 22:20 UTC) es el now() de esa consulta.",
   "algoritmo": "sha256",
   "grupos": {
     "funcion:actividad_equipo(p_project_id uuid, p_desde date, p_hasta date)": "e1f035b14d4d717bd790f4840e713e51f784be01c73afbf9933f6334489a13ff:1",
@@ -1263,6 +1263,8 @@
     "funcion:presupuesto_tg_partida_mismo_ledger()/grants": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
     "funcion:presupuesto_vs_real(p_presupuesto_id uuid)": "eaacbabfcbf5df1c5b389e585bc51d96ac94fddad73056a40c8e90e2885febc9:1",
     "funcion:presupuesto_vs_real(p_presupuesto_id uuid)/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+    "funcion:projects_modulos_guard()": "bed398f6c960d6e16255f8991ccdf0d41a375aa7b11eeb19bf621fc0fe6dd5b5:1",
+    "funcion:projects_modulos_guard()/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
     "funcion:prov_imp_aplicar_fila(p_tipo text, p_company uuid, p_accion text, p_entidad uuid, p_datos jsonb, p_cambios jsonb)": "88f68bc5f8c52e071cf61cdb26bded5da99d96ae297b651471472289b31eadae:1",
     "funcion:prov_imp_aplicar_fila(p_tipo text, p_company uuid, p_accion text, p_entidad uuid, p_datos jsonb, p_cambios jsonb)/grants": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
     "funcion:prov_imp_err(p_lista jsonb, p_campo text, p_mensaje text)": "0cd008995ca45c8291dbb397107f9bc147354bfcd526d49f74e799f93d51635f:1",
@@ -1365,6 +1367,8 @@
     "funcion:rentas_propiedad_accesible(p_propiedad uuid)/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
     "funcion:rentas_propiedad_coherente()": "05d1f772f2997cf02b7071fad12cf0b1dd6583926d864086388f41a926cbd40f:1",
     "funcion:rentas_propiedad_coherente()/grants": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
+    "funcion:rentas_propiedad_modulo_proyecto()": "ae13344b98dcdcffac60df0026b505fc1d1267c3749f6181bc0ff3f6bca84a7f:1",
+    "funcion:rentas_propiedad_modulo_proyecto()/grants": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
     "funcion:rentas_propiedades_independientes(p_company_id uuid)": "0f55042d1a7ced980b65b841221725d56bf3d968d7c597948c525a2e336706ef:1",
     "funcion:rentas_propiedades_independientes(p_company_id uuid)/grants": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1",
     "funcion:rentas_servicio_activo()": "b503742a92456f42308da1806d7a7a44abd16bb41ef298bdfae28bd70d86a17f:1",
@@ -3930,10 +3934,6 @@
     "tabla:llamadas_atencion_personal/indices": "9f8a953ee3dbeb683e1a6702a69bdcf460964acf736cfe59acea26043ab6d510:4",
     "tabla:llamadas_atencion_personal/policies": "19e441d7ec66f31294171b4f260740286ad5751b0033066923c4a980cf0d4141:3",
     "tabla:llamadas_atencion_personal/rls": "69d139577e61955e905c297c740b9d5e2b0f06c7874bb5c77aed7bf34959c136:1",
-    "tabla:llamadas_atencion_personal/triggers": "0dec5ff2a2f803ea37c205a91f2b84c2f456abe535427fe2e3a16c04d5f94afb:5",
-    "funcion:projects_modulos_guard()": "bed398f6c960d6e16255f8991ccdf0d41a375aa7b11eeb19bf621fc0fe6dd5b5:1",
-    "funcion:projects_modulos_guard()/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
-    "funcion:rentas_propiedad_modulo_proyecto()": "ae13344b98dcdcffac60df0026b505fc1d1267c3749f6181bc0ff3f6bca84a7f:1",
-    "funcion:rentas_propiedad_modulo_proyecto()/grants": "4d108d236b1d742b1f693a1ece1179f4a604ca9c0b1dfff986c391b4b46e2e10:1"
+    "tabla:llamadas_atencion_personal/triggers": "0dec5ff2a2f803ea37c205a91f2b84c2f456abe535427fe2e3a16c04d5f94afb:5"
   }
 }
