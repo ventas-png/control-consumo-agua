@@ -59,6 +59,7 @@ export const NAV_COMMANDS: NavCommandDef[] = [
   { id: 'rentas_reservas',    label: 'Rentas: Reservas',    icon: '📅', category: 'Rentas', module: 'rentas_reservas' },
   { id: 'rentas_contratos',   label: 'Rentas: Contratos',   icon: '📝', category: 'Rentas', module: 'rentas_contratos' },
   { id: 'rentas_inventario',  label: 'Rentas: Inventario',  icon: '🛋️', category: 'Rentas', module: 'rentas_inventario' },
+  { id: 'rentas_finanzas',    label: 'Rentas: Finanzas',    icon: '💵', category: 'Rentas', module: 'rentas_finanzas' },
 
   // ── Cuenta ──
   { id: 'empresa_proyectos',label: 'Mis Proyectos',      icon: '📁', category: 'Cuenta',       shortcut: 'g p', roles: ['company_owner'] },

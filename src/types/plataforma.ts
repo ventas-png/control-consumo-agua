@@ -293,4 +293,5 @@ export type AppSection =
   | 'rentas_propiedades'
   | 'rentas_reservas'
   | 'rentas_contratos'
-  | 'rentas_inventario';
+  | 'rentas_inventario'
+  | 'rentas_finanzas';

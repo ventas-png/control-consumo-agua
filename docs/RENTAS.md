@@ -81,6 +81,31 @@ Lo que **no** hace: no cambia el plan de ninguna empresa existente hasta que alg
 en Stripe (los planes nuevos nacen sin `stripe_price_id_*`, como los tres actuales en producción); no toca
 `enforce_max_units` (drift declarado), así que el tope al crear una *unidad* sigue contando sólo unidades.
 
+## Finanzas (migración `20261128000000_rentas_finanzas`)
+
+Lleva dentro de la aplicación la hoja de Excel que las administradoras mantienen por apartamento.
+
+- **Conceptos** (`rentas_conceptos`): las columnas del desglose, por empresa, en dos bloques: «Cobro al huésped» y
+  «Recibido por el anfitrión». Cada uno suma o resta (`signo`) y entra o no en la base de la comisión
+  (`comisionable`). Al contratar Rentas se siembran los 13 de la hoja de Airbnb; la empresa los renombra, reordena,
+  desactiva o agrega propios desde **Finanzas › Configurar conceptos**. No se borran.
+- **Desglose de una reserva** (`rentas_liquidaciones.importes`: concepto → monto ≥ 0). Una fila por reserva, sea de
+  `rentas_reservas` o de `reservas_str` (propiedad enlazada): esta última no se toca. Se captura en el formulario
+  de la reserva; al guardar, el `monto_total` de la reserva pasa a ser el «Total recibido». Los totales no se
+  almacenan: se calculan con los conceptos vigentes (`totalesDesglose`).
+- **Gastos** (`rentas_gastos`): por propiedad y fecha, a cargo del propietario o de la administradora.
+- **El mes** (`resumenMes`, puro): el dinero de una reserva va entero al mes en que **entra**; la ocupación cuenta
+  las noches que caen en el mes. `acreditado − comisión − gastos del propietario = a pagar al propietario`. La
+  comisión es `comision_pct` de la propiedad sobre los conceptos comisionables (más la renta de contratos). Una
+  reserva sin desglose aporta su `monto_total`. El test `finanzas.test.ts` reproduce una hoja real (febrero 2026).
+- **Pantalla** `/rentas/finanzas`: cartera del mes (una fila por propiedad) y, por propiedad, calendario día por
+  día, ocupación, ingresos por concepto, estado del propietario, gastos y PDF del estado mensual. El Panel muestra
+  los totales del mes en curso a quien ve Finanzas.
+- **Importar reservas**: plantilla Excel/CSV con una columna por concepto activo; una fila con un código de reserva
+  que ya existe en la propiedad la actualiza. No lee el CSV de ganancias de Airbnb tal cual.
+- **Permisos**: `rentas.finanzas.*` cubre gastos, conceptos y ver el estado mensual. El desglose es parte de la
+  reserva: lo escribe quien crea o edita reservas y lo lee Reservas o Finanzas.
+
 ## Archivos
 
 | Qué | Dónde |
@@ -88,11 +113,12 @@ en Stripe (los planes nuevos nacen sin `stripe_price_id_*`, como los tres actual
 | Migración | `supabase/migrations/20261125000000_rentas_modulo.sql` |
 | Suite SQL (Postgres real, 58 comprobaciones, 5 mutantes) | `supabase/tests/rentas_modulo/` |
 | Migración del plan y su suite (46 comprobaciones, 7 mutantes) | `supabase/migrations/20261126000000_rentas_tercer_modulo_del_plan.sql`, `supabase/tests/rentas_plan/` |
-| Dominio | `src/domain/rentas/` (`logica.ts` pura, `queries.ts`, `mutations.ts`) |
+| Finanzas: migración y suite (47 comprobaciones, 6 mutantes) | `supabase/migrations/20261128000000_rentas_finanzas.sql`, `supabase/tests/rentas_finanzas/` |
+| Dominio | `src/domain/rentas/` (`logica.ts`, `finanzas.ts` e `importacion.ts` puras; `queries.ts`, `mutations.ts`) |
 | Pantallas | `src/components/rentas/` (`RentasSection.tsx` + `tabs/`) |
 | Permisos en el front | `src/lib/moduleConfig.ts` (`RENTAS_*`), `src/hooks/usePermissions.ts`, `src/lib/rentasPermissions.ts` |
 | Menú y rutas | `Sidebar.tsx` (grupo «Manejo Rentas»), `app/routes.tsx` (`/rentas`, `/rentas/<pestaña>`) |
-| Recuperación | `scripts/reversion-rentas-modulo.sql`, `scripts/reversion-rentas-plan.sql` |
+| Recuperación | `scripts/reversion-rentas-modulo.sql`, `scripts/reversion-rentas-plan.sql`, `scripts/reversion-rentas-finanzas.sql` |
 | CI | paso «Rentas — propiedades, reservas, contratos e inventario» en `coverage.yml` |
 
 ## Pruebas
@@ -100,7 +126,8 @@ en Stripe (los planes nuevos nacen sin `stripe_price_id_*`, como los tres actual
 ```bash
 supabase/tests/rentas_modulo/run.sh
 supabase/tests/rentas_plan/run.sh
-npx vitest run src/domain/rentas src/components/rentas src/hooks/__tests__/usePermissions.rentas.test.ts src/__tests__/rentasModuloMigracion.test.ts
+supabase/tests/rentas_finanzas/run.sh
+npx vitest run src/domain/rentas src/components/rentas src/hooks/__tests__/usePermissions.rentas.test.ts src/__tests__/rentasModuloMigracion.test.ts src/__tests__/rentasFinanzasMigracion.test.ts
 ```
 
 ## Despliegue
@@ -116,7 +143,11 @@ npx vitest run src/domain/rentas src/components/rentas src/hooks/__tests__/usePe
 - Los montos son informativos: Rentas no genera cargos, cobros ni asientos contables.
 - El selector de plan del perfil de la empresa lista todos los planes activos (ahora siete) sin filtrar por sus módulos; cambiar de plan desde ahí no enciende módulos.
 - El panel de plataforma refresca sus totales cada 15 minutos: tras mover un interruptor, el detalle de la empresa muestra el plan y el desglose al momento, el listado puede tardar.
-- No hay fotos de propiedades ni de artículos, ni carga masiva (la de reservas STR sigue en Condominios).
+- No hay fotos de propiedades ni de artículos.
+- Finanzas no cierra meses: el estado mensual se recalcula cada vez; cambiar una reserva, un gasto, el signo de un
+  concepto o la comisión de la propiedad cambia también los meses pasados. No registra el pago al propietario.
+- El importador de reservas usa su propia plantilla; el CSV de ganancias de Airbnb no se interpreta directamente.
+- La comisión es un único porcentaje por propiedad; no hay tramos ni comisión fija por estadía.
 - El solape de fechas entre reservas es un aviso, no un bloqueo (igual que en STR).
 - `locales_comerciales` y `contratos_arrendamiento` de Condominios no se migran: son registros por proyecto y siguen
   donde están.

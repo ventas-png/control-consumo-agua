@@ -4,6 +4,7 @@ import {
   DIAS_AVISO_VENCIMIENTO, OCUPACION_LABEL, TIPO_RENTA_ICONO, TIPO_RENTA_LABEL, TIPOS_RENTA,
   diasParaVencer, ocupacionDePropiedad, resumenCartera,
 } from '../../../domain/rentas/logica'
+import { nombreMes, type resumenCarteraMes } from '../../../domain/rentas/finanzas'
 import { formatCurrency, formatFechaCalendario } from '../../../lib/format'
 import { StatTile } from '../../shared/StatTile'
 import { StatusBadge } from '../../shared/StatusBadge'
@@ -27,10 +28,12 @@ interface Props {
   permisos: Record<'propiedades' | 'reservas' | 'contratos' | 'inventario', PermisosModulo>
   onIr: (tab: RentasTab) => void
   cargando: boolean
+  /** Totales del mes en curso de la cartera; null si la persona no ve Finanzas. */
+  mesCartera?: ReturnType<typeof resumenCarteraMes>['total'] | null
 }
 
 export default function PanelRentasTab({
-  propiedades, reservas, contratos, inventario, proyectos, moneda, hoy, permisos, onIr, cargando,
+  propiedades, reservas, contratos, inventario, proyectos, moneda, hoy, permisos, onIr, cargando, mesCartera = null,
 }: Props) {
   const r = useMemo(
     () => resumenCartera(propiedades, reservas, contratos, inventario, hoy),
@@ -110,6 +113,23 @@ export default function PanelRentasTab({
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
             {porVencer.length > 0 && <Button size="sm" variant="secondary" onClick={() => onIr('contratos')}>Ver contratos</Button>}
             {conProblema.length > 0 && <Button size="sm" variant="secondary" onClick={() => onIr('inventario')}>Ver inventario</Button>}
+          </div>
+        </section>
+      )}
+
+      {mesCartera && (
+        <section aria-label="El mes de la cartera" style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '16px', margin: 0 }}>El mes: {nombreMes(hoy.slice(0, 7))}</h2>
+            <Button size="sm" variant="secondary" onClick={() => onIr('finanzas')}>Ver finanzas por propiedad</Button>
+          </div>
+          <div style={{ ...rejillaTiles, marginBottom: 0 }}>
+            <StatTile label="Ocupación del mes" value={`${mesCartera.ocupacionPct}%`} icon="📆"
+              hint={`${mesCartera.nochesOcupadas} de ${mesCartera.dias} noches · ${mesCartera.estadias} estadías`} />
+            <StatTile label="Acreditado" value={formatCurrency(mesCartera.acreditado, moneda)} icon="💵" hint="Recibido por reservas y contratos" />
+            <StatTile label="Comisión de administración" value={formatCurrency(mesCartera.comision, moneda)} icon="🏢" hint="Sobre lo acreditado, según cada propiedad" />
+            <StatTile label="A pagar a propietarios" value={formatCurrency(mesCartera.pagoPropietario, moneda)} icon="🤝"
+              hint={`Tras ${formatCurrency(mesCartera.gastosPropietario, moneda)} en gastos a su cargo`} />
           </div>
         </section>
       )}

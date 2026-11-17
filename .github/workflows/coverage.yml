@@ -960,6 +960,20 @@ jobs:
           PGPORT_TEST: 55566
         run: supabase/tests/rentas_plan/run.sh
 
+      # 20261128000000: Finanzas de Rentas. Conceptos del desglose de cobro por empresa
+      # (se siembran al contratar el servicio, sin duplicar ni pisar los que la empresa
+      # cambió; no se borran), liquidación de una reserva de CUALQUIERA de las dos
+      # fuentes (rentas_reservas / reservas_str) validada contra la propiedad, la unidad
+      # y los conceptos de la empresa, gastos por propiedad y las claves
+      # rentas.finanzas.*. Ejercido como cada persona: quien captura reservas escribe el
+      # desglose pero no ve gastos ni configura conceptos; Finanzas lee todo sin capturar
+      # reservas; alcance por proyecto; servicio apagado. CONTROL NEGATIVO: seis mutantes.
+      - name: Rentas — finanzas (desglose de cobro, conceptos y gastos)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55593
+        run: supabase/tests/rentas_finanzas/run.sh
+
       # 20261127000000: módulos por PROYECTO. Cada proyecto elige en cuáles de los
       # módulos contratados por su empresa opera (projects.modulo_*, encendidos por
       # defecto). Ejercido como cada persona: la dueña y la plataforma mueven los

@@ -46,6 +46,7 @@ export const CONFIGURABLE_MODULES: readonly ModuleDefinition[] = [
   { key: 'rentas_reservas',    label: 'Rentas: Reservas',    actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'rentas_contratos',   label: 'Rentas: Contratos',   actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'rentas_inventario',  label: 'Rentas: Inventario',  actions: ['view', 'create', 'edit', 'delete'] },
+  { key: 'rentas_finanzas',    label: 'Rentas: Finanzas',    actions: ['view', 'create', 'edit', 'delete'] },
 ] as const
 
 /** Keys de módulos agrupados por línea de servicio (usados en Sidebar y modal de permisos). */
@@ -60,7 +61,7 @@ export const CONDOMINIOS_MODULE_KEYS = new Set(['condominios', 'condominios_dash
  * `rentas_<x>` usa las claves `rentas.<x>.<acción>`; `rentas_panel` no tiene
  * clave propia: se ve con cualquier `rentas.*.view`.
  */
-export const RENTAS_DATA_MODULE_KEYS = ['rentas_propiedades', 'rentas_reservas', 'rentas_contratos', 'rentas_inventario'] as const
+export const RENTAS_DATA_MODULE_KEYS = ['rentas_propiedades', 'rentas_reservas', 'rentas_contratos', 'rentas_inventario', 'rentas_finanzas'] as const
 export const RENTAS_MODULE_KEYS = new Set<string>(['rentas_panel', ...RENTAS_DATA_MODULE_KEYS])
 /** Acciones que existen en el catálogo RBAC de Rentas (no hay change_status ni approve). */
 export const RENTAS_ACTIONS: readonly ModuleAction[] = ['view', 'create', 'edit', 'delete'] as const

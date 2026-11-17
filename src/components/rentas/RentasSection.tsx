@@ -5,9 +5,10 @@ import { usePermissionsContext } from '../shared/PermissionsContext'
 import { TabStrip } from '../shared/TabStrip'
 import { useProyectosQuery, useUnidadesQuery } from '../../domain/agua/queries'
 import {
-  useContratosRentaQuery, useInventarioRentaQuery, usePropiedadesRentaQuery,
-  useReservasRentaQuery, useReservasStrEnlazadasQuery,
+  useConceptosRentaQuery, useContratosRentaQuery, useGastosRentaQuery, useInventarioRentaQuery, useLiquidacionesRentaQuery,
+  usePropiedadesRentaQuery, useReservasRentaQuery, useReservasStrEnlazadasQuery,
 } from '../../domain/rentas/queries'
+import { liquidacionesPorReserva, resumenCarteraMes } from '../../domain/rentas/finanzas'
 import { unificarReservas } from '../../domain/rentas/logica'
 import { deriveProyectoConfig } from '../../lib/proyectosAccess'
 import { hoyLocalISO } from '../../lib/format'
@@ -17,6 +18,7 @@ import PropiedadesTab from './tabs/PropiedadesTab'
 import ReservasTab from './tabs/ReservasTab'
 import ContratosTab from './tabs/ContratosTab'
 import InventarioTab from './tabs/InventarioTab'
+import FinanzasTab from './tabs/FinanzasTab'
 
 export interface PermisosModulo { ver: boolean; crear: boolean; editar: boolean; eliminar: boolean }
 
@@ -38,7 +40,7 @@ export default function RentasSection({ tab }: { tab: RentasTab }) {
     })
     return {
       propiedades: de('rentas_propiedades'), reservas: de('rentas_reservas'),
-      contratos: de('rentas_contratos'), inventario: de('rentas_inventario'),
+      contratos: de('rentas_contratos'), inventario: de('rentas_inventario'), finanzas: de('rentas_finanzas'),
     }
   }, [perms])
 
@@ -50,7 +52,14 @@ export default function RentasSection({ tab }: { tab: RentasTab }) {
     () => propiedades.filter(p => p.unidad_id && p.tipo_renta === 'corto_plazo').map(p => p.unidad_id as string),
     [propiedades])
   const { data: reservasStr = [] } = useReservasStrEnlazadasQuery(companyId, unidadesEnlazadas, permisos.reservas.ver)
-  const { data: contratos = [] } = useContratosRentaQuery(companyId, permisos.contratos.ver)
+  // Finanzas arma el mes con reservas y contratos: los pide aunque la persona no tenga esas pestañas
+  // (la RLS decide; sin permiso llegan vacíos).
+  const { data: contratos = [] } = useContratosRentaQuery(companyId, permisos.contratos.ver || permisos.finanzas.ver)
+  const verDesglose = permisos.reservas.ver || permisos.finanzas.ver
+  const { data: conceptos = [] } = useConceptosRentaQuery(companyId, verDesglose)
+  const { data: liquidacionesLista = [] } = useLiquidacionesRentaQuery(companyId, verDesglose)
+  const { data: gastos = [] } = useGastosRentaQuery(companyId, permisos.finanzas.ver)
+  const liquidaciones = useMemo(() => liquidacionesPorReserva(liquidacionesLista), [liquidacionesLista])
   const { data: inventario = [] } = useInventarioRentaQuery(companyId, permisos.inventario.ver)
   const { data: proyectos = [] } = useProyectosQuery(companyId)
   const { data: unidades = [] } = useUnidadesQuery(companyId)
@@ -60,6 +69,12 @@ export default function RentasSection({ tab }: { tab: RentasTab }) {
     [propiedades, reservasRentas, reservasStr])
   const { moneda } = useMemo(() => deriveProyectoConfig(proyectos), [proyectos])
   const hoy = hoyLocalISO()
+  // El mes en curso de toda la cartera, para el Panel (sólo con Finanzas a la vista).
+  const mesCartera = useMemo(
+    () => (permisos.finanzas.ver
+      ? resumenCarteraMes(propiedades, hoy.slice(0, 7), reservas, contratos, gastos, conceptos, liquidaciones).total
+      : null),
+    [permisos.finanzas.ver, propiedades, hoy, reservas, contratos, gastos, conceptos, liquidaciones])
 
   const tabsVisibles = RENTAS_TABS.filter(t => perms.canViewModule(t.modulo))
   const ir = (t: RentasTab) => navigate(rentasTabToPath(t))
@@ -90,7 +105,7 @@ export default function RentasSection({ tab }: { tab: RentasTab }) {
           <PanelRentasTab
             propiedades={propiedades} reservas={reservas} contratos={contratos} inventario={inventario}
             proyectos={proyectos} moneda={moneda} hoy={hoy} permisos={permisos} onIr={ir}
-            cargando={propiedadesQ.isLoading}
+            cargando={propiedadesQ.isLoading} mesCartera={mesCartera}
           />
         )}
         {tab === 'propiedades' && (
@@ -102,7 +117,7 @@ export default function RentasSection({ tab }: { tab: RentasTab }) {
         )}
         {tab === 'reservas' && (
           <ReservasTab
-            propiedades={propiedades} reservas={reservas} proyectos={proyectos}
+            propiedades={propiedades} reservas={reservas} proyectos={proyectos} conceptos={conceptos} liquidaciones={liquidaciones}
             companyId={companyId ?? ''} moneda={moneda} hoy={hoy} permisos={permisos.reservas}
           />
         )}
@@ -110,6 +125,14 @@ export default function RentasSection({ tab }: { tab: RentasTab }) {
           <ContratosTab
             propiedades={propiedades} contratos={contratos}
             companyId={companyId ?? ''} moneda={moneda} hoy={hoy} permisos={permisos.contratos}
+          />
+        )}
+        {tab === 'finanzas' && (
+          <FinanzasTab
+            propiedades={propiedades} reservas={reservas} contratos={contratos} conceptos={conceptos}
+            liquidaciones={liquidaciones} gastos={gastos} proyectos={proyectos}
+            companyId={companyId ?? ''} moneda={moneda} hoy={hoy}
+            permisos={permisos.finanzas} permisosReservas={permisos.reservas} cargando={propiedadesQ.isLoading}
           />
         )}
         {tab === 'inventario' && (

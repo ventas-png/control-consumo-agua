@@ -38,6 +38,7 @@ const PAGE_TITLES: Record<AppSection, string> = {
   rentas_reservas: 'Reservas',
   rentas_contratos: 'Contratos de renta',
   rentas_inventario: 'Inventario de propiedades',
+  rentas_finanzas: 'Finanzas de rentas',
 }
 
 const PAGE_ICONS: Record<AppSection, ReactNode> = {
@@ -71,6 +72,7 @@ const PAGE_ICONS: Record<AppSection, ReactNode> = {
   rentas_reservas: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3v4M16 3v4M4 9h16M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1zM9 14l2 2 4-4" /></svg>,
   rentas_contratos: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6M9 16h6M9 8h2M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5zM14 3v5h5" /></svg>,
   rentas_inventario: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7l8-4 8 4-8 4-8-4zM4 7v10l8 4 8-4V7M12 11v10" /></svg>,
+  rentas_finanzas: <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg>,
 }
 
 function getInitials(name: string): string {

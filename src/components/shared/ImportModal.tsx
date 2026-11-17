@@ -1,6 +1,15 @@
 import { useState, useRef, type ReactNode, type CSSProperties, type ChangeEvent, type DragEvent } from 'react'
 import { notify } from '../shared/Dialog'
 import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
+import { parsearCsv } from '../../lib/csv'
+
+/** CSV → objetos por encabezado (primera fila), como entrega `parseXlsxToObjects`. */
+export function csvAObjetos(texto: string): Record<string, string>[] {
+  const [encabezados, ...filas] = parsearCsv(texto)
+  if (!encabezados) return []
+  const claves = encabezados.map(h => h.trim())
+  return filas.map(f => Object.fromEntries(claves.flatMap((k, i) => (k ? [[k, (f[i] ?? '').trim()]] : []))))
+}
 import { EditModal } from './EditModal'
 
 // ── Tipos públicos ────────────────────────────────────────────────────────
@@ -166,7 +175,11 @@ export function ImportModal<T>({
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
-        const raw = await parseXlsxToObjects<Record<string, string | number | boolean>>(e.target!.result as ArrayBuffer)
+        const buffer = e.target!.result as ArrayBuffer
+        // Un .csv es texto, no un libro de Excel: se lee aparte.
+        const raw: Record<string, string | number | boolean>[] = /\.csv$/i.test(file.name)
+          ? csvAObjetos(new TextDecoder('utf-8').decode(buffer))
+          : await parseXlsxToObjects<Record<string, string | number | boolean>>(buffer)
         if (raw.length === 0) {
           notify({ variant: 'warning', title: 'Archivo vacío', text: 'El archivo no contiene filas de datos.' })
           return

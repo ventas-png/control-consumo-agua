@@ -17,6 +17,7 @@ vi.mock('../../../lib/supabase', () => {
     Object.assign(b, {
       insert: (p: unknown) => { reg.op = 'insert'; reg.payload = p; h.llamadas.push(reg); return b },
       update: (p: unknown) => { reg.op = 'update'; reg.payload = p; h.llamadas.push(reg); return b },
+      upsert: (p: unknown, o?: { onConflict?: string }) => { reg.op = 'upsert'; reg.payload = p; reg.id = o?.onConflict; h.llamadas.push(reg); return b },
       delete: () => { reg.op = 'delete'; h.llamadas.push(reg); return b },
       eq: (_c: string, v: string) => { reg.id = v; return b },
       select: () => b,
@@ -36,7 +37,7 @@ const wrapper = ({ children }: { children: ReactNode }) =>
 const datos = {
   huesped_nombre: 'Ana', huesped_email: null, huesped_telefono: null, fecha_entrada: '2026-12-10', fecha_salida: '2026-12-13',
   num_huespedes: 3, plataforma: 'airbnb' as const, codigo_confirmacion: 'HM1', monto_noche: 100, monto_total: 300,
-  estado: 'confirmada' as const, notas: null,
+  estado: 'confirmada' as const, notas: null, politica_cancelacion: null, num_mascotas: 0,
 }
 const independiente = { id: 'ind', company_id: 'c1', project_id: null, unidad_id: null } as PropiedadRenta
 const enlazada = { id: 'enl', company_id: 'c1', project_id: 'p1', unidad_id: 'u1' } as PropiedadRenta
@@ -91,5 +92,41 @@ describe('usePropiedadesRentaMutations', () => {
     const { result } = renderHook(() => usePropiedadesRentaMutations('c1'), { wrapper })
     await expect(result.current.eliminar.mutateAsync('p')).rejects.toThrow(/no tienes permiso/)
     expect(h.llamadas[0]).toMatchObject({ tabla: 'rentas_propiedades', op: 'delete', id: 'p' })
+  })
+})
+
+describe('desglose de cobro', () => {
+  it('crear con desglose: primero la reserva, luego su liquidación, colgada de la tabla que toca', async () => {
+    const { result } = renderHook(() => useReservasRentaMutations('c1'), { wrapper })
+    await result.current.crear.mutateAsync({ propiedad: independiente, datos, importes: { a1: 39 } })
+    expect(h.llamadas.map(l => `${l.tabla}:${l.op}`)).toEqual(['rentas_reservas:insert', 'rentas_liquidaciones:upsert'])
+    expect(h.llamadas[1]).toMatchObject({ id: 'reserva_id', payload: { company_id: 'c1', propiedad_id: 'ind', reserva_id: 'nuevo', importes: { a1: 39 } } })
+
+    h.llamadas.length = 0
+    await result.current.crear.mutateAsync({ propiedad: enlazada, datos, importes: { a1: 39 } })
+    expect(h.llamadas[0]).toMatchObject({ tabla: 'reservas_str', payload: { politica_cancelacion: null, mascotas: false } })
+    expect(h.llamadas[1]).toMatchObject({ tabla: 'rentas_liquidaciones', id: 'reserva_str_id', payload: { propiedad_id: 'enl', reserva_str_id: 'nuevo' } })
+  })
+
+  it('sin desglose (o vacío) no se escribe liquidación al crear', async () => {
+    const { result } = renderHook(() => useReservasRentaMutations('c1'), { wrapper })
+    await result.current.crear.mutateAsync({ propiedad: independiente, datos, importes: {} })
+    await result.current.crear.mutateAsync({ propiedad: independiente, datos })
+    expect(h.llamadas.map(l => l.tabla)).toEqual(['rentas_reservas', 'rentas_reservas'])
+  })
+
+  it('editar: un desglose vacío SÍ viaja (es vaciar el que había); el de condominio no pisa huéspedes ni mascotas', async () => {
+    const { result } = renderHook(() => useReservasRentaMutations('c1'), { wrapper })
+    await result.current.actualizar.mutateAsync({ reserva: { id: 's1', origen: 'condominio' }, datos: { ...datos }, propiedad: enlazada, importes: {} })
+    expect(h.llamadas.map(l => `${l.tabla}:${l.op}`)).toEqual(['reservas_str:update', 'rentas_liquidaciones:upsert'])
+    expect(h.llamadas[0].payload).not.toHaveProperty('num_huespedes')
+    expect(h.llamadas[0].payload).not.toHaveProperty('num_mascotas')
+    expect(h.llamadas[1]).toMatchObject({ id: 'reserva_str_id', payload: { reserva_str_id: 's1', importes: {} } })
+  })
+
+  it('un desglose que la RLS deja en 0 filas se reporta como fallo', async () => {
+    h.filas = []
+    const { result } = renderHook(() => useReservasRentaMutations('c1'), { wrapper })
+    await expect(result.current.crear.mutateAsync({ propiedad: independiente, datos, importes: { a1: 1 } })).rejects.toThrow(/guardar el desglose/)
   })
 })

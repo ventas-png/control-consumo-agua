@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
-  ArticuloInventarioRenta, ContratoRenta, EstadoReservaRenta, PropiedadRenta, ReservaUnificada,
+  ArticuloInventarioRenta, ConceptoRenta, ContratoRenta, EstadoReservaRenta, GastoRenta, ImportesRenta,
+  PoliticaCancelacionRenta, PropiedadRenta, ReservaUnificada,
 } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { QueryError, runQuery } from '../queryFetch'
 import { rentasKeys } from './keys'
 
-type Tabla = 'rentas_propiedades' | 'rentas_contratos' | 'rentas_inventario'
+type Tabla = 'rentas_propiedades' | 'rentas_contratos' | 'rentas_inventario' | 'rentas_gastos' | 'rentas_conceptos'
 
 // Las tres tablas de catálogo comparten forma de escritura. `creado_por`,
 // `created_at` y `updated_at` los sella la base: no viajan.
@@ -64,6 +65,15 @@ export function useInventarioRentaMutations(companyId?: string) {
   return useGuardar<ArticuloInventarioRenta>('rentas_inventario', c => [rentasKeys.inventario(c) as unknown as unknown[]], companyId)
 }
 
+export function useGastosRentaMutations(companyId?: string) {
+  return useGuardar<GastoRenta>('rentas_gastos', c => [rentasKeys.gastos(c) as unknown as unknown[]], companyId)
+}
+/** Conceptos del desglose: se crean y se editan; no se eliminan (se desactivan). */
+export function useConceptosRentaMutations(companyId?: string) {
+  const { crear, actualizar } = useGuardar<ConceptoRenta>('rentas_conceptos', c => [rentasKeys.conceptos(c) as unknown as unknown[]], companyId)
+  return { crear, actualizar }
+}
+
 // ── Reservas: dos tablas detrás de una sola pantalla ─────────────────────────
 
 /** Lo que el formulario de reserva captura, sea cual sea la tabla de destino. */
@@ -80,6 +90,8 @@ export interface DatosReserva {
   monto_total: number | null
   estado: EstadoReservaRenta
   notas: string | null
+  politica_cancelacion: PoliticaCancelacionRenta | null
+  num_mascotas: number
 }
 
 /**
@@ -93,8 +105,52 @@ function aReservaStr(d: DatosReserva, incluirHuespedes: boolean) {
     fecha_entrada: d.fecha_entrada, fecha_salida: d.fecha_salida,
     plataforma: d.plataforma, codigo_confirmacion: d.codigo_confirmacion,
     monto_noche: d.monto_noche, monto_total: d.monto_total, estado: d.estado, notas: d.notas,
+    politica_cancelacion: d.politica_cancelacion, mascotas: d.num_mascotas > 0,
     ...(incluirHuespedes ? { num_adultos: d.num_huespedes } : {}),
   }
+}
+
+/** A qué fila de qué tabla apunta una reserva de Rentas. */
+export type RefReserva = Pick<ReservaUnificada, 'id' | 'origen'>
+
+/** Propiedad enlazada → `reservas_str` (la misma que ve Condominios › STR); independiente → `rentas_reservas`. */
+export async function insertarReserva(p: PropiedadRenta, datos: DatosReserva): Promise<RefReserva> {
+  if (p.unidad_id && p.project_id) {
+    const fila = await runQuery<{ id: string }>((signal) =>
+      supabase.from('reservas_str')
+        .insert({ company_id: p.company_id, project_id: p.project_id as string, unidad_id: p.unidad_id, ...aReservaStr(datos, true) })
+        .select('id').abortSignal(signal).single())
+    if (!fila) throw new QueryError('No se pudo guardar la reserva')
+    return { id: fila.id, origen: 'condominio' }
+  }
+  const fila = await runQuery<{ id: string }>((signal) =>
+    supabase.from('rentas_reservas')
+      .insert({ company_id: p.company_id, propiedad_id: p.id, ...datos })
+      .select('id').abortSignal(signal).single())
+  if (!fila) throw new QueryError('No se pudo guardar la reserva')
+  return { id: fila.id, origen: 'rentas' }
+}
+
+export async function actualizarReserva(reserva: RefReserva, datos: Partial<DatosReserva>): Promise<void> {
+  const filas = reserva.origen === 'condominio'
+    ? await runQuery<{ id: string }[]>((signal) => {
+        // La cuenta de huéspedes y las mascotas se llevan en Condominios (adultos / niños / bebés).
+        const { num_huespedes: _h, num_mascotas: _m, ...resto } = datos
+        return supabase.from('reservas_str').update(resto).eq('id', reserva.id).select('id').abortSignal(signal)
+      })
+    : await runQuery<{ id: string }[]>((signal) =>
+        supabase.from('rentas_reservas').update(datos).eq('id', reserva.id).select('id').abortSignal(signal))
+  exigirFila(filas, 'guardar el cambio')
+}
+
+/** Guarda (crea o reemplaza) el desglose de cobro de una reserva. */
+export async function guardarLiquidacion(p: Pick<PropiedadRenta, 'id' | 'company_id'>, reserva: RefReserva, importes: ImportesRenta): Promise<void> {
+  const columna = reserva.origen === 'condominio' ? 'reserva_str_id' : 'reserva_id'
+  const filas = await runQuery<{ id: string }[]>((signal) =>
+    supabase.from('rentas_liquidaciones')
+      .upsert({ company_id: p.company_id, propiedad_id: p.id, [columna]: reserva.id, importes }, { onConflict: columna })
+      .select('id').abortSignal(signal))
+  exigirFila(filas, 'guardar el desglose')
 }
 
 export function useReservasRentaMutations(companyId?: string) {
@@ -102,38 +158,29 @@ export function useReservasRentaMutations(companyId?: string) {
   const invalidar = () => {
     void qc.invalidateQueries({ queryKey: rentasKeys.reservas(companyId) })
     void qc.invalidateQueries({ queryKey: [...rentasKeys.all, 'reservas_str'] })
+    void qc.invalidateQueries({ queryKey: rentasKeys.liquidaciones(companyId) })
   }
 
-  /** Propiedad enlazada → `reservas_str` (la misma que ve Condominios › STR); independiente → `rentas_reservas`. */
+  /**
+   * `importes` (opcional) es el desglose de cobro: se guarda después de la
+   * reserva. `undefined` no lo toca.
+   */
   const crear = useMutation({
-    mutationFn: async (vars: { propiedad: PropiedadRenta; datos: DatosReserva }) => {
-      const { propiedad: p, datos } = vars
-      if (p.unidad_id && p.project_id) {
-        await runQuery((signal) =>
-          supabase.from('reservas_str')
-            .insert({ company_id: p.company_id, project_id: p.project_id as string, unidad_id: p.unidad_id, ...aReservaStr(datos, true) })
-            .select('id').abortSignal(signal).single())
-        return
-      }
-      await runQuery((signal) =>
-        supabase.from('rentas_reservas')
-          .insert({ company_id: p.company_id, propiedad_id: p.id, ...datos })
-          .select('id').abortSignal(signal).single())
+    mutationFn: async (vars: { propiedad: PropiedadRenta; datos: DatosReserva; importes?: ImportesRenta }) => {
+      const ref = await insertarReserva(vars.propiedad, vars.datos)
+      if (vars.importes && Object.keys(vars.importes).length > 0) await guardarLiquidacion(vars.propiedad, ref, vars.importes)
+      return ref
     },
     onSuccess: invalidar,
   })
 
   const actualizar = useMutation({
-    mutationFn: async (vars: { reserva: Pick<ReservaUnificada, 'id' | 'origen'>; datos: Partial<DatosReserva> }) => {
-      const { reserva, datos } = vars
-      const filas = reserva.origen === 'condominio'
-        ? await runQuery<{ id: string }[]>((signal) => {
-            const { num_huespedes: _sinUso, ...resto } = datos
-            return supabase.from('reservas_str').update(resto).eq('id', reserva.id).select('id').abortSignal(signal)
-          })
-        : await runQuery<{ id: string }[]>((signal) =>
-            supabase.from('rentas_reservas').update(datos).eq('id', reserva.id).select('id').abortSignal(signal))
-      exigirFila(filas, 'guardar el cambio')
+    mutationFn: async (vars: {
+      reserva: RefReserva; datos: Partial<DatosReserva>
+      propiedad?: Pick<PropiedadRenta, 'id' | 'company_id'>; importes?: ImportesRenta
+    }) => {
+      await actualizarReserva(vars.reserva, vars.datos)
+      if (vars.importes && vars.propiedad) await guardarLiquidacion(vars.propiedad, vars.reserva, vars.importes)
     },
     onSuccess: invalidar,
   })

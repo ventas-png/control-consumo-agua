@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import type { PropiedadRenta, Proyecto, ReservaUnificada } from '../../../types'
+import type { ConceptoRenta, LiquidacionRenta, PropiedadRenta, Proyecto, ReservaUnificada } from '../../../types'
 
 const h = vi.hoisted(() => ({
   crear: vi.fn(async (_vars: unknown) => undefined),
@@ -40,25 +40,32 @@ const proyectos = [{ id: 'p1', nombre: '21B+' }] as Proyecto[]
 const r = (id: string, origen: 'rentas' | 'condominio', propiedad_id: string, huesped: string, entrada: string, salida: string): ReservaUnificada => ({
   id, origen, propiedad_id, huesped_nombre: huesped, huesped_email: null, huesped_telefono: null,
   fecha_entrada: entrada, fecha_salida: salida, num_huespedes: 2, plataforma: 'directo', codigo_confirmacion: null,
-  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null,
+  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0,
 })
 const reservas = [
   r('r1', 'rentas', 'ind', 'Ana Pérez', '2026-12-10', '2026-12-13'),
   r('s1', 'condominio', 'enl', 'Paola González', '2026-12-20', '2026-12-27'),
 ]
 const todos = { ver: true, crear: true, editar: true, eliminar: true }
+const con = (id: string, bloque: 'huesped' | 'anfitrion', nombre: string, signo: 1 | -1, orden: number): ConceptoRenta =>
+  ({ id, company_id: 'c1', codigo: id, nombre, bloque, signo, comisionable: true, orden, activo: true, created_at: '', updated_at: '' })
+const conceptos = [
+  con('h1', 'huesped', 'Tarifa al huésped', 1, 10),
+  con('a1', 'anfitrion', 'Tarifa de la habitación', 1, 10), con('a2', 'anfitrion', 'Descuentos aplicados', -1, 20),
+]
+let liquidaciones = new Map<string, LiquidacionRenta>()
 
 function montar(permisos = todos, lista = reservas) {
   return render(
     <MemoryRouter>
-      <ReservasTab propiedades={propiedades} reservas={lista} proyectos={proyectos}
+      <ReservasTab propiedades={propiedades} reservas={lista} proyectos={proyectos} conceptos={conceptos} liquidaciones={liquidaciones}
         companyId="c1" moneda="Q" hoy="2026-11-16" permisos={permisos} />
     </MemoryRouter>,
   )
 }
 const fila = (texto: string) => screen.getByText(texto).closest('tr') as HTMLElement
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => { vi.clearAllMocks(); liquidaciones = new Map() })
 afterEach(cleanup)
 
 describe('lista unificada', () => {
@@ -152,5 +159,61 @@ describe('nueva reserva', () => {
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
     expect(h.crear.mock.calls[0][0]).toMatchObject({ propiedad: { id: 'enl', unidad_id: 'u1', project_id: 'p1' } })
+  })
+})
+
+describe('desglose de cobro', () => {
+  it('al guardar viaja el desglose y el total de la reserva pasa a ser lo recibido', async () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva reserva' }))
+    const dialogo = screen.getByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Propiedad *'), { target: { value: 'ind' } })
+    fireEvent.change(within(dialogo).getByLabelText('Huésped *'), { target: { value: 'Eva' } })
+    fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2027-02-02' } })
+    fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2027-02-03' } })
+    fireEvent.change(within(dialogo).getByLabelText('Política de cancelación'), { target: { value: 'no_reembolsable' } })
+    fireEvent.change(within(dialogo).getByLabelText('Tarifa al huésped'), { target: { value: '35.10' } })
+    fireEvent.change(within(dialogo).getByLabelText('Tarifa de la habitación'), { target: { value: '39' } })
+    fireEvent.change(within(dialogo).getByLabelText('− Descuentos aplicados'), { target: { value: '3,90' } })
+    expect(within(dialogo).getByText('Total recibido').parentElement?.textContent).toMatch(/35[.,]10/)
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
+    expect(h.crear).toHaveBeenCalledWith({
+      propiedad: expect.objectContaining({ id: 'ind' }),
+      datos: expect.objectContaining({ monto_total: 35.1, politica_cancelacion: 'no_reembolsable', num_mascotas: 0 }),
+      importes: { h1: 35.1, a1: 39, a2: 3.9 },
+    })
+  })
+
+  it('un monto que no es número no llega al servidor', async () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva reserva' }))
+    const dialogo = screen.getByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Propiedad *'), { target: { value: 'ind' } })
+    fireEvent.change(within(dialogo).getByLabelText('Huésped *'), { target: { value: 'Eva' } })
+    fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2027-02-02' } })
+    fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2027-02-03' } })
+    fireEvent.change(within(dialogo).getByLabelText('Tarifa de la habitación'), { target: { value: 'treinta' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'Revisa el desglose de cobro' })))
+    expect(h.crear).not.toHaveBeenCalled()
+  })
+
+  it('editar carga el desglose guardado; sin tocarlo, una reserva sin desglose no escribe ninguno', async () => {
+    liquidaciones = new Map([['rentas:r1', { id: 'l1', company_id: 'c1', propiedad_id: 'ind', reserva_id: 'r1', reserva_str_id: null, importes: { a1: 120 }, created_at: '', updated_at: '' }]])
+    montar()
+    expect(within(fila('Ana Pérez')).getByText('con desglose')).toBeTruthy()
+    fireEvent.click(within(fila('Ana Pérez')).getByRole('button', { name: /Editar/ }))
+    expect((within(screen.getByRole('dialog')).getByLabelText('Tarifa de la habitación') as HTMLInputElement).value).toBe('120')
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.actualizar).toHaveBeenCalledTimes(1))
+    expect(h.actualizar).toHaveBeenCalledWith(expect.objectContaining({ importes: { a1: 120 }, datos: expect.objectContaining({ monto_total: 120 }) }))
+
+    cleanup(); vi.clearAllMocks(); liquidaciones = new Map()
+    montar()
+    fireEvent.click(within(fila('Paola González')).getByRole('button', { name: /Editar/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.actualizar).toHaveBeenCalledTimes(1))
+    expect((h.actualizar.mock.calls[0] as unknown as [{ importes?: unknown }])[0].importes).toBeUndefined()
   })
 })

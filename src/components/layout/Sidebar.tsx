@@ -311,6 +311,16 @@ const NAV: NavEntry[] = [
           </svg>
         ),
       },
+      {
+        id: 'rentas_finanzas',
+        label: 'Finanzas',
+        roles: ['admin', 'super_admin', 'company_owner', 'operator'],
+        icon: (
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 3v18h18M7 15l4-4 3 3 5-6" />
+          </svg>
+        ),
+      },
     ],
   },
   // ── Config. del sistema (standalone) ────────────────────────────────────────
