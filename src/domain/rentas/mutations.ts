@@ -5,6 +5,7 @@ import type {
 } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { QueryError, runQuery } from '../queryFetch'
+import { MONEDA_DEFECTO } from './finanzas'
 import { rentasKeys } from './keys'
 
 type Tabla = 'rentas_propiedades' | 'rentas_contratos' | 'rentas_inventario' | 'rentas_gastos' | 'rentas_conceptos'
@@ -143,12 +144,14 @@ export async function actualizarReserva(reserva: RefReserva, datos: Partial<Dato
   exigirFila(filas, 'guardar el cambio')
 }
 
-/** Guarda (crea o reemplaza) el desglose de cobro de una reserva. */
-export async function guardarLiquidacion(p: Pick<PropiedadRenta, 'id' | 'company_id'>, reserva: RefReserva, importes: ImportesRenta): Promise<void> {
+/** Guarda (crea o reemplaza) la ficha de una reserva: su moneda y su desglose de cobro. */
+export async function guardarLiquidacion(
+  p: Pick<PropiedadRenta, 'id' | 'company_id'>, reserva: RefReserva, importes: ImportesRenta, moneda: string = MONEDA_DEFECTO,
+): Promise<void> {
   const columna = reserva.origen === 'condominio' ? 'reserva_str_id' : 'reserva_id'
   const filas = await runQuery<{ id: string }[]>((signal) =>
     supabase.from('rentas_liquidaciones')
-      .upsert({ company_id: p.company_id, propiedad_id: p.id, [columna]: reserva.id, importes }, { onConflict: columna })
+      .upsert({ company_id: p.company_id, propiedad_id: p.id, [columna]: reserva.id, importes, moneda }, { onConflict: columna })
       .select('id').abortSignal(signal))
   exigirFila(filas, 'guardar el desglose')
 }
@@ -162,13 +165,18 @@ export function useReservasRentaMutations(companyId?: string) {
   }
 
   /**
-   * `importes` (opcional) es el desglose de cobro: se guarda después de la
-   * reserva. `undefined` no lo toca.
+   * `importes` (opcional) es el desglose de cobro y `moneda` la de la reserva:
+   * van a su ficha, que se guarda después de la reserva. Al crear, la ficha
+   * sólo se escribe si hay desglose o la moneda no es la de por defecto; al
+   * editar, `importes: undefined` no la toca.
    */
   const crear = useMutation({
-    mutationFn: async (vars: { propiedad: PropiedadRenta; datos: DatosReserva; importes?: ImportesRenta }) => {
+    mutationFn: async (vars: { propiedad: PropiedadRenta; datos: DatosReserva; importes?: ImportesRenta; moneda?: string }) => {
       const ref = await insertarReserva(vars.propiedad, vars.datos)
-      if (vars.importes && Object.keys(vars.importes).length > 0) await guardarLiquidacion(vars.propiedad, ref, vars.importes)
+      const moneda = vars.moneda ?? MONEDA_DEFECTO
+      if ((vars.importes && Object.keys(vars.importes).length > 0) || moneda !== MONEDA_DEFECTO) {
+        await guardarLiquidacion(vars.propiedad, ref, vars.importes ?? {}, moneda)
+      }
       return ref
     },
     onSuccess: invalidar,
@@ -177,10 +185,10 @@ export function useReservasRentaMutations(companyId?: string) {
   const actualizar = useMutation({
     mutationFn: async (vars: {
       reserva: RefReserva; datos: Partial<DatosReserva>
-      propiedad?: Pick<PropiedadRenta, 'id' | 'company_id'>; importes?: ImportesRenta
+      propiedad?: Pick<PropiedadRenta, 'id' | 'company_id'>; importes?: ImportesRenta; moneda?: string
     }) => {
       await actualizarReserva(vars.reserva, vars.datos)
-      if (vars.importes && vars.propiedad) await guardarLiquidacion(vars.propiedad, vars.reserva, vars.importes)
+      if (vars.importes && vars.propiedad) await guardarLiquidacion(vars.propiedad, vars.reserva, vars.importes, vars.moneda)
     },
     onSuccess: invalidar,
   })

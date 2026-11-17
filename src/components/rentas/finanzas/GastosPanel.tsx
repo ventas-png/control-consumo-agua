@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CargoGastoRenta, CategoriaGastoRenta, GastoRenta, PropiedadRenta } from '../../../types'
-import { CARGO_GASTO_LABEL, CATEGORIA_GASTO_LABEL, CATEGORIAS_GASTO, primerDia, ultimoDia } from '../../../domain/rentas/finanzas'
+import { CARGO_GASTO_LABEL, CATEGORIA_GASTO_LABEL, CATEGORIAS_GASTO, MONEDA_DEFECTO, primerDia, ultimoDia } from '../../../domain/rentas/finanzas'
 import { mensajeErrorRentas, numeroONulo } from '../../../domain/rentas/logica'
 import { useGastosRentaMutations } from '../../../domain/rentas/mutations'
 import { formatCurrency, formatFechaCalendario } from '../../../lib/format'
@@ -8,6 +8,7 @@ import { confirm, notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
 import { Button } from '../../shared/Button'
 import type { PermisosModulo } from '../RentasSection'
+import { SelectMoneda } from './SelectMoneda'
 import { accionesFila, campo, etiqueta, fila, rejilla, td, tenue, th, thead } from '../ui'
 
 interface Props {
@@ -17,13 +18,14 @@ interface Props {
   mes: string
   hoy: string
   companyId: string
+  /** Moneda que se está viendo en Finanzas: la de un gasto nuevo. */
   moneda: string
   permisos: PermisosModulo
 }
 
 interface Form {
   fecha: string; categoria: CategoriaGastoRenta; descripcion: string; proveedor: string
-  monto: string; a_cargo_de: CargoGastoRenta; notas: string
+  monto: string; moneda: string; a_cargo_de: CargoGastoRenta; notas: string
 }
 const nulo = (v: string) => (v.trim() === '' ? null : v.trim())
 
@@ -38,8 +40,8 @@ export function GastosPanel({ propiedad, gastos, mes, hoy, companyId, moneda, pe
     // Un gasto nuevo nace en el mes que se está viendo (hoy, si es el mes en curso).
     const fechaNueva = hoy.slice(0, 7) === mes ? hoy : hoy < primerDia(mes) ? primerDia(mes) : ultimoDia(mes)
     setForm(g === 'nuevo'
-      ? { fecha: fechaNueva, categoria: 'limpieza', descripcion: '', proveedor: '', monto: '', a_cargo_de: 'propietario', notas: '' }
-      : { fecha: g.fecha, categoria: g.categoria, descripcion: g.descripcion, proveedor: g.proveedor ?? '', monto: String(g.monto), a_cargo_de: g.a_cargo_de, notas: g.notas ?? '' })
+      ? { fecha: fechaNueva, categoria: 'limpieza', descripcion: '', proveedor: '', monto: '', moneda, a_cargo_de: 'propietario', notas: '' }
+      : { fecha: g.fecha, categoria: g.categoria, descripcion: g.descripcion, proveedor: g.proveedor ?? '', monto: String(g.monto), moneda: g.moneda ?? MONEDA_DEFECTO, a_cargo_de: g.a_cargo_de, notas: g.notas ?? '' })
     setEditando(g)
   }
   const cerrar = () => { if (!guardando) setEditando(null) }
@@ -52,7 +54,7 @@ export function GastosPanel({ propiedad, gastos, mes, hoy, companyId, moneda, pe
     if (typeof monto !== 'number' || monto <= 0) { notify({ variant: 'error', title: 'El monto debe ser mayor que cero' }); return }
     const datos = {
       fecha: form.fecha, categoria: form.categoria, descripcion: form.descripcion.trim(), proveedor: nulo(form.proveedor),
-      monto, a_cargo_de: form.a_cargo_de, notas: nulo(form.notas),
+      monto, moneda: form.moneda, a_cargo_de: form.a_cargo_de, notas: nulo(form.notas),
     }
     try {
       if (editando === 'nuevo') await crear.mutateAsync({ company_id: companyId, propiedad_id: propiedad.id, ...datos })
@@ -66,7 +68,7 @@ export function GastosPanel({ propiedad, gastos, mes, hoy, companyId, moneda, pe
 
   const borrar = async (g: GastoRenta) => {
     const { isConfirmed } = await confirm({
-      title: '¿Eliminar el gasto?', text: `${g.descripcion} — ${formatCurrency(g.monto, moneda)}.`,
+      title: '¿Eliminar el gasto?', text: `${g.descripcion} — ${formatCurrency(g.monto, g.moneda ?? MONEDA_DEFECTO)}.`,
       icon: 'warning', variant: 'danger', confirmText: 'Eliminar',
     })
     if (!isConfirmed) return
@@ -106,7 +108,7 @@ export function GastosPanel({ propiedad, gastos, mes, hoy, companyId, moneda, pe
                     <div style={tenue}>{[CATEGORIA_GASTO_LABEL[g.categoria], g.proveedor].filter(Boolean).join(' · ')}</div>
                   </td>
                   <td data-label="A cargo de" style={td}>{CARGO_GASTO_LABEL[g.a_cargo_de]}</td>
-                  <td data-label="Monto" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(g.monto, moneda)}</td>
+                  <td data-label="Monto" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(g.monto, g.moneda ?? MONEDA_DEFECTO)}</td>
                   {(permisos.editar || permisos.eliminar) && (
                     <td style={{ ...td, textAlign: 'center' }}>
                       <div style={accionesFila}>
@@ -140,8 +142,12 @@ export function GastosPanel({ propiedad, gastos, mes, hoy, companyId, moneda, pe
                 <input id="rg-fecha" type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)} style={campo} />
               </div>
               <div>
-                <label htmlFor="rg-monto" style={etiqueta}>Monto ({moneda}) *</label>
+                <label htmlFor="rg-monto" style={etiqueta}>Monto ({form.moneda}) *</label>
                 <input id="rg-monto" type="text" inputMode="decimal" value={form.monto} onChange={e => set('monto', e.target.value)} style={campo} />
+              </div>
+              <div>
+                <label htmlFor="rg-moneda" style={etiqueta}>Moneda</label>
+                <SelectMoneda id="rg-moneda" value={form.moneda} onChange={m => set('moneda', m)} />
               </div>
               <div>
                 <label htmlFor="rg-categoria" style={etiqueta}>Categoría</label>

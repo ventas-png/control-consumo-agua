@@ -1,13 +1,15 @@
 // Importación de reservas con su desglose de cobro desde una hoja (Excel o CSV)
 // — lógica pura: qué columnas lleva la plantilla y cómo se lee cada fila.
 import type { ConceptoRenta, EstadoReservaRenta, ImportesRenta, PlataformaRenta, PoliticaCancelacionRenta } from '../../types'
-import { conceptosDeBloque, POLITICA_CANCELACION_LABEL, POLITICAS_CANCELACION, r2 } from './finanzas'
+import { conceptosDeBloque, esMoneda, MONEDA_DEFECTO, POLITICA_CANCELACION_LABEL, POLITICAS_CANCELACION, r2 } from './finanzas'
 import { PLATAFORMAS } from './logica'
 import type { DatosReserva } from './mutations'
 
 export const COL = {
   codigo: 'Código de reserva', huesped: 'Huésped', entrada: 'Entrada', salida: 'Salida', huespedes: 'Huéspedes',
-  plataforma: 'Plataforma', politica: 'Política de cancelación', mascotas: 'Mascotas',
+  plataforma: 'Plataforma', politica: 'Política de cancelación', mascotas: 'Mascotas', moneda: 'Moneda',
+  /** Sólo en la carga de varias propiedades a la vez: nombre o código de la propiedad. */
+  propiedad: 'Propiedad',
 } as const
 
 /** Encabezado de la columna de un concepto: «Cobro huésped · Tarifa de limpieza». */
@@ -56,6 +58,10 @@ export function leerMonto(v: unknown): number | null | undefined {
 export interface FilaReservaImportada {
   datos: DatosReserva
   importes: ImportesRenta
+  /** ISO 4217 en mayúsculas; USD si la hoja no la trae. */
+  moneda: string
+  /** Texto de la columna «Propiedad» ('' si no viene). */
+  propiedad: string
 }
 
 const POLITICA_POR_TEXTO = new Map<string, PoliticaCancelacionRenta>(
@@ -96,6 +102,9 @@ export function leerFilaReserva(
   const politicaTxt = normalizar(texto(COL.politica))
   const politica = politicaTxt === '' ? null : POLITICA_POR_TEXTO.get(politicaTxt) ?? 'otra'
 
+  const moneda = texto(COL.moneda).toUpperCase() || MONEDA_DEFECTO
+  if (!esMoneda(moneda)) errores.push('Moneda: usa el código de tres letras (USD, GTQ, MXN…)')
+
   const importes: ImportesRenta = {}
   for (const c of conceptosDePlantilla(conceptos)) {
     const monto = leerMonto(celda(columnaDeConcepto(c)))
@@ -108,7 +117,7 @@ export function leerFilaReserva(
   return {
     ok: true,
     data: {
-      importes,
+      importes, moneda, propiedad: texto(COL.propiedad),
       datos: {
         huesped_nombre: huesped || codigo, huesped_email: null, huesped_telefono: null,
         fecha_entrada: entrada, fecha_salida: salida, num_huespedes: huespedes, plataforma,

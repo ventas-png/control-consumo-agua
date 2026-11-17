@@ -33,16 +33,16 @@ const reservas: ReservaUnificada[] = [{
   fecha_entrada: '2026-02-02', fecha_salida: '2026-02-04', num_huespedes: 2, plataforma: 'airbnb', codigo_confirmacion: 'HM34',
   monto_noche: null, monto_total: 90, estado: 'completada', notas: null, politica_cancelacion: 'no_reembolsable', num_mascotas: 0,
 }]
-const lista: LiquidacionRenta[] = [{ id: 'l1', company_id: 'c1', propiedad_id: 'p1', reserva_id: 'r1', reserva_str_id: null, importes: { h1: 110, a1: 100, a2: 10 }, created_at: '', updated_at: '' }]
+const lista: LiquidacionRenta[] = [{ id: 'l1', company_id: 'c1', propiedad_id: 'p1', reserva_id: 'r1', reserva_str_id: null, moneda: 'USD', importes: { h1: 110, a1: 100, a2: 10 }, created_at: '', updated_at: '' }]
 const liquidaciones = liquidacionesPorReserva(lista)
-const gastos: GastoRenta[] = [{ id: 'g1', company_id: 'c1', propiedad_id: 'p1', fecha: '2026-02-03', categoria: 'limpieza', descripcion: 'Limpieza de salida', proveedor: null, monto: 22, a_cargo_de: 'propietario', notas: null, created_at: '', updated_at: '' }]
+const gastos: GastoRenta[] = [{ id: 'g1', company_id: 'c1', propiedad_id: 'p1', fecha: '2026-02-03', categoria: 'limpieza', descripcion: 'Limpieza de salida', proveedor: null, monto: 22, moneda: 'USD', a_cargo_de: 'propietario', notas: null, created_at: '', updated_at: '' }]
 const todos = { ver: true, crear: true, editar: true, eliminar: true }
 const soloVer = { ver: true, crear: false, editar: false, eliminar: false }
 
 function montar(permisos = todos, permisosReservas = todos) {
   return render(
     <FinanzasTab propiedades={propiedades} reservas={reservas} contratos={[]} conceptos={conceptos} liquidaciones={liquidaciones}
-      gastos={gastos} proyectos={[]} companyId="c1" moneda="USD" hoy="2026-02-10" permisos={permisos} permisosReservas={permisosReservas} cargando={false} />,
+      gastos={gastos} proyectos={[]} companyId="c1" hoy="2026-02-10" permisos={permisos} permisosReservas={permisosReservas} cargando={false} />,
   )
 }
 const fila = (texto: RegExp) => screen.getAllByRole('row').find(r => texto.test(r.textContent ?? '')) as HTMLElement
@@ -148,5 +148,21 @@ describe('contenido del PDF', () => {
     expect(c.liquidacion.map(l => l[0])).toEqual(['Acreditación del mes', expect.stringMatching(/Comisión de administración \(20% de /), '− Gastos a cargo del propietario'])
     expect(c.aPagar[1]).toMatch(/50[.,]00/)
     expect(c.archivo).toBe('estado_apto_1d_sq_2026-02.pdf')
+  })
+})
+
+describe('moneda', () => {
+  it('se ve una moneda a la vez y se avisa de las otras', () => {
+    const { unmount } = render(
+      <FinanzasTab propiedades={propiedades} reservas={reservas} contratos={[]} conceptos={conceptos} liquidaciones={liquidaciones}
+        gastos={[...gastos, { ...gastos[0], id: 'g2', monto: 300, moneda: 'GTQ' }]} proyectos={[]} companyId="c1" hoy="2026-02-10"
+        permisos={todos} permisosReservas={todos} cargando={false} />,
+    )
+    expect(screen.getByRole('status').textContent).toMatch(/también hay montos en GTQ/)
+    expect(fila(/Apto 1D SQ/).textContent).toMatch(/USD 50[.,]00/)
+    fireEvent.change(screen.getByLabelText('Moneda de los montos'), { target: { value: 'GTQ' } })
+    expect(fila(/Apto 1D SQ/).textContent).toMatch(/GTQ -300[.,]00/)
+    expect(screen.getByRole('status').textContent).toMatch(/también hay montos en USD/)
+    unmount()
   })
 })

@@ -13,13 +13,14 @@ import { EmptyState } from '../../shared/EmptyState'
 import { FilterChips } from '../../shared/FilterChips'
 import { StatusBadge } from '../../shared/StatusBadge'
 import type { PermisosModulo } from '../RentasSection'
+import { MONEDA_DEFECTO } from '../../../domain/rentas/finanzas'
+import { SelectMoneda } from '../finanzas/SelectMoneda'
 import { TONO_CONTRATO, accionesFila, barraFiltros, campo, encabezadoTab, etiqueta, fila, rejilla, td, tenue, th, thead } from '../ui'
 
 interface Props {
   propiedades: PropiedadRenta[]
   contratos: ContratoRenta[]
   companyId: string
-  moneda: string
   hoy: string
   permisos: PermisosModulo
 }
@@ -28,7 +29,7 @@ interface Form {
   propiedad_id: string
   inquilino_nombre: string; inquilino_identificacion: string; inquilino_telefono: string; inquilino_email: string
   fecha_inicio: string; fecha_fin: string
-  renta_mensual: string; deposito: string; dia_pago: string
+  renta_mensual: string; deposito: string; dia_pago: string; moneda: string
   estado: EstadoContratoRenta; notas: string
 }
 
@@ -42,13 +43,14 @@ function formDe(c: ContratoRenta | undefined, hoy: string): Form {
     inquilino_telefono: txt(c?.inquilino_telefono), inquilino_email: txt(c?.inquilino_email),
     fecha_inicio: c?.fecha_inicio ?? hoy, fecha_fin: txt(c?.fecha_fin),
     renta_mensual: txt(c?.renta_mensual), deposito: txt(c?.deposito), dia_pago: txt(c?.dia_pago),
+    moneda: c?.moneda ?? MONEDA_DEFECTO,
     estado: c?.estado ?? 'vigente', notas: txt(c?.notas),
   }
 }
 
 type Filtro = 'todos' | EstadoContratoRenta
 
-export default function ContratosTab({ propiedades, contratos, companyId, moneda, hoy, permisos }: Props) {
+export default function ContratosTab({ propiedades, contratos, companyId, hoy, permisos }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('vigente')
   const [editando, setEditando] = useState<ContratoRenta | 'nuevo' | null>(null)
   const [form, setForm] = useState<Form>(formDe(undefined, hoy))
@@ -91,7 +93,7 @@ export default function ContratosTab({ propiedades, contratos, companyId, moneda
       inquilino_nombre: form.inquilino_nombre.trim(), inquilino_identificacion: nulo(form.inquilino_identificacion),
       inquilino_telefono: nulo(form.inquilino_telefono), inquilino_email: nulo(form.inquilino_email),
       fecha_inicio: form.fecha_inicio, fecha_fin: nulo(form.fecha_fin),
-      renta_mensual: renta, deposito, dia_pago: dia, estado: form.estado, notas: nulo(form.notas),
+      renta_mensual: renta, deposito, dia_pago: dia, moneda: form.moneda, estado: form.estado, notas: nulo(form.notas),
     }
     try {
       if (editando === 'nuevo') await crear.mutateAsync(payload)
@@ -200,8 +202,8 @@ export default function ContratosTab({ propiedades, contratos, companyId, moneda
                       {c.dia_pago !== null && <div style={tenue}>Paga el día {c.dia_pago}</div>}
                     </td>
                     <td data-label="Renta mensual" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(c.renta_mensual, moneda)}
-                      {c.deposito !== null && <div style={tenue}>Depósito {formatCurrency(c.deposito, moneda)}</div>}
+                      {formatCurrency(c.renta_mensual, c.moneda ?? MONEDA_DEFECTO)}
+                      {c.deposito !== null && <div style={tenue}>Depósito {formatCurrency(c.deposito, c.moneda ?? MONEDA_DEFECTO)}</div>}
                     </td>
                     <td data-label="Estado" style={td}>
                       <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -288,11 +290,15 @@ export default function ContratosTab({ propiedades, contratos, companyId, moneda
             </div>
             <div style={rejilla(150)}>
               <div>
-                <label htmlFor="rc-renta" style={etiqueta}>Renta mensual ({moneda}) *</label>
+                <label htmlFor="rc-moneda" style={etiqueta}>Moneda</label>
+                <SelectMoneda id="rc-moneda" value={form.moneda} onChange={m => set('moneda', m)} />
+              </div>
+              <div>
+                <label htmlFor="rc-renta" style={etiqueta}>Renta mensual ({form.moneda}) *</label>
                 <input id="rc-renta" type="text" inputMode="decimal" value={form.renta_mensual} onChange={e => set('renta_mensual', e.target.value)} style={campo} />
               </div>
               <div>
-                <label htmlFor="rc-deposito" style={etiqueta}>Depósito ({moneda})</label>
+                <label htmlFor="rc-deposito" style={etiqueta}>Depósito ({form.moneda})</label>
                 <input id="rc-deposito" type="text" inputMode="decimal" value={form.deposito} onChange={e => set('deposito', e.target.value)} style={campo} />
               </div>
               <div>

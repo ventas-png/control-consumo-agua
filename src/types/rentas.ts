@@ -103,6 +103,8 @@ export interface ContratoRenta {
   fecha_fin: string | null
   renta_mensual: number
   deposito: number | null
+  /** Moneda de la renta y el depósito (ISO 4217, mayúsculas). */
+  moneda: string
   dia_pago: number | null
   estado: EstadoContratoRenta
   notas: string | null
@@ -165,6 +167,8 @@ export interface LiquidacionRenta {
   reserva_id: string | null
   reserva_str_id: string | null
   importes: ImportesRenta
+  /** Moneda de la reserva (ISO 4217, mayúsculas): aplica al total y a todo el desglose. */
+  moneda: string
   created_at: string
   updated_at: string
 }
@@ -181,6 +185,8 @@ export interface GastoRenta {
   descripcion: string
   proveedor: string | null
   monto: number
+  /** ISO 4217, mayúsculas. */
+  moneda: string
   /** propietario: se le descuenta en su estado mensual; administradora: lo absorbe la empresa. */
   a_cargo_de: CargoGastoRenta
   notas: string | null

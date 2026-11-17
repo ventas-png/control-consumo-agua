@@ -118,20 +118,20 @@ export default function RentasSection({ tab }: { tab: RentasTab }) {
         {tab === 'reservas' && (
           <ReservasTab
             propiedades={propiedades} reservas={reservas} proyectos={proyectos} conceptos={conceptos} liquidaciones={liquidaciones}
-            companyId={companyId ?? ''} moneda={moneda} hoy={hoy} permisos={permisos.reservas}
+            companyId={companyId ?? ''} hoy={hoy} permisos={permisos.reservas}
           />
         )}
         {tab === 'contratos' && (
           <ContratosTab
             propiedades={propiedades} contratos={contratos}
-            companyId={companyId ?? ''} moneda={moneda} hoy={hoy} permisos={permisos.contratos}
+            companyId={companyId ?? ''} hoy={hoy} permisos={permisos.contratos}
           />
         )}
         {tab === 'finanzas' && (
           <FinanzasTab
             propiedades={propiedades} reservas={reservas} contratos={contratos} conceptos={conceptos}
             liquidaciones={liquidaciones} gastos={gastos} proyectos={proyectos}
-            companyId={companyId ?? ''} moneda={moneda} hoy={hoy}
+            companyId={companyId ?? ''} hoy={hoy}
             permisos={permisos.finanzas} permisosReservas={permisos.reservas} cargando={propiedadesQ.isLoading}
           />
         )}

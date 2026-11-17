@@ -8,7 +8,8 @@ import {
   mensajeErrorRentas, noches, numeroONulo, reservasSolapadas,
 } from '../../../domain/rentas/logica'
 import {
-  POLITICA_CANCELACION_LABEL, POLITICAS_CANCELACION, claveReserva, importesDeFormulario, tieneDesglose, totalesDesglose,
+  MONEDA_DEFECTO, POLITICA_CANCELACION_LABEL, POLITICAS_CANCELACION, claveReserva, importesDeFormulario, monedaDeReserva,
+  tieneDesglose, totalesDesglose,
 } from '../../../domain/rentas/finanzas'
 import { useReservasRentaMutations, type DatosReserva } from '../../../domain/rentas/mutations'
 import { formatCurrency, formatFechaCalendario } from '../../../lib/format'
@@ -20,6 +21,8 @@ import { FilterChips } from '../../shared/FilterChips'
 import { StatusBadge } from '../../shared/StatusBadge'
 import type { PermisosModulo } from '../RentasSection'
 import { DesgloseCampos } from '../finanzas/DesgloseCampos'
+import { ImportarReservasModal } from '../finanzas/ImportarReservasModal'
+import { SelectMoneda } from '../finanzas/SelectMoneda'
 import { TONO_RESERVA, accionesFila, barraFiltros, campo, encabezadoTab, etiqueta, fila, rejilla, td, tenue, th, thead } from '../ui'
 
 interface Props {
@@ -31,7 +34,6 @@ interface Props {
   /** Desglose guardado de cada reserva, por `claveReserva`. */
   liquidaciones: Map<string, LiquidacionRenta>
   companyId: string
-  moneda: string
   hoy: string
   permisos: PermisosModulo
 }
@@ -46,6 +48,8 @@ interface Form {
   politica_cancelacion: PoliticaCancelacionRenta | ''; num_mascotas: string
   /** Concepto → texto. */
   desglose: Record<string, string>
+  /** Moneda de la reserva (ISO): aplica al total y al desglose. */
+  moneda: string
 }
 
 const txt = (v: string | number | null | undefined) => (v === null || v === undefined ? '' : String(v))
@@ -54,6 +58,7 @@ const nulo = (v: string) => (v.trim() === '' ? null : v.trim())
 function formDe(r?: ReservaUnificada, propiedadId = '', liquidacion?: LiquidacionRenta): Form {
   return {
     politica_cancelacion: r?.politica_cancelacion ?? '', num_mascotas: txt(r?.num_mascotas ?? 0),
+    moneda: liquidacion?.moneda ?? MONEDA_DEFECTO,
     desglose: Object.fromEntries(Object.entries(liquidacion?.importes ?? {}).map(([k, v]) => [k, String(v)])),
     propiedad_id: r?.propiedad_id ?? propiedadId,
     huesped_nombre: r?.huesped_nombre ?? '', huesped_telefono: txt(r?.huesped_telefono), huesped_email: txt(r?.huesped_email),
@@ -66,10 +71,11 @@ function formDe(r?: ReservaUnificada, propiedadId = '', liquidacion?: Liquidacio
 
 type Filtro = 'todas' | EstadoReservaRenta
 
-export default function ReservasTab({ propiedades, reservas, proyectos, conceptos, liquidaciones, companyId, moneda, hoy, permisos }: Props) {
+export default function ReservasTab({ propiedades, reservas, proyectos, conceptos, liquidaciones, companyId, hoy, permisos }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('todas')
   const [propiedadFiltro, setPropiedadFiltro] = useState('')
   const [editando, setEditando] = useState<ReservaUnificada | 'nueva' | null>(null)
+  const [importando, setImportando] = useState(false)
   const [form, setForm] = useState<Form>(formDe())
   const { crear, actualizar, eliminar } = useReservasRentaMutations(companyId)
   const guardando = crear.isPending || actualizar.isPending
@@ -119,9 +125,9 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
     const conDesglose = tieneDesglose(importes)
     // Con desglose, el total de la reserva ES lo recibido por el anfitrión.
     const recibido = conDesglose ? totalesDesglose(conceptos, importes).anfitrion : null
-    // Sólo se toca el desglose si hay algo que guardar o algo que vaciar.
-    const habiaDesglose = editando !== 'nueva' && liquidaciones.has(claveReserva(editando))
-    const importesAGuardar = conDesglose || habiaDesglose ? importes : undefined
+    // La ficha (moneda + desglose) sólo se toca si hay algo que guardar o algo que cambiar.
+    const habiaFicha = editando !== 'nueva' && liquidaciones.has(claveReserva(editando))
+    const importesAGuardar = conDesglose || habiaFicha || form.moneda !== MONEDA_DEFECTO ? importes : undefined
     const datos: DatosReserva = {
       huesped_nombre: form.huesped_nombre.trim(), huesped_email: nulo(form.huesped_email), huesped_telefono: nulo(form.huesped_telefono),
       fecha_entrada: form.fecha_entrada, fecha_salida: form.fecha_salida, num_huespedes: huespedes,
@@ -131,8 +137,8 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
       politica_cancelacion: form.politica_cancelacion === '' ? null : form.politica_cancelacion, num_mascotas: mascotas,
     }
     try {
-      if (editando === 'nueva') await crear.mutateAsync({ propiedad, datos, importes: importesAGuardar })
-      else await actualizar.mutateAsync({ reserva: editando, datos, propiedad, importes: importesAGuardar })
+      if (editando === 'nueva') await crear.mutateAsync({ propiedad, datos, importes: importesAGuardar, moneda: form.moneda })
+      else await actualizar.mutateAsync({ reserva: editando, datos, propiedad, importes: importesAGuardar, moneda: form.moneda })
       setEditando(null)
       notify({ variant: 'success', title: editando === 'nueva' ? 'Reserva registrada' : 'Reserva actualizada', duration: 1500 })
     } catch (e) {
@@ -174,7 +180,12 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
     <div>
       <div style={encabezadoTab}>
         <h2 style={{ margin: 0 }}>Reservas de corto plazo</h2>
-        {permisos.crear && deCortoPlazo.length > 0 && <Button onClick={() => abrir('nueva')}>+ Nueva reserva</Button>}
+        {permisos.crear && deCortoPlazo.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Button variant="secondary" onClick={() => setImportando(true)}>Carga masiva</Button>
+            <Button onClick={() => abrir('nueva')}>+ Nueva reserva</Button>
+          </div>
+        )}
       </div>
 
       <div style={barraFiltros}>
@@ -241,7 +252,7 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
                       {r.codigo_confirmacion && <div style={tenue}>{r.codigo_confirmacion}</div>}
                     </td>
                     <td data-label="Total" style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {r.monto_total === null ? '—' : formatCurrency(r.monto_total, moneda)}
+                      {r.monto_total === null ? '—' : formatCurrency(r.monto_total, monedaDeReserva(r, liquidaciones))}
                       {tieneDesglose(liquidaciones.get(claveReserva(r))?.importes) && <div style={tenue}>con desglose</div>}
                     </td>
                     <td data-label="Estado" style={td}>
@@ -276,6 +287,14 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
           🏢 Las reservas de propiedades enlazadas a un condominio son las mismas de su pestaña STR: el check-in, los huéspedes y el
           housekeeping se llevan allá, en <Link to="/condominios/str">Condominios › STR</Link>.
         </p>
+      )}
+
+      {importando && (
+        <ImportarReservasModal
+          propiedades={deCortoPlazo.filter(p => p.estado !== 'inactiva')}
+          propiedadFija={propiedadPorId.get(propiedadFiltro)}
+          reservas={reservas} conceptos={conceptos} hoy={hoy} onClose={() => setImportando(false)}
+        />
       )}
 
       {editando && (
@@ -366,6 +385,10 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
                   {POLITICAS_CANCELACION.map(p => <option key={p} value={p}>{POLITICA_CANCELACION_LABEL[p]}</option>)}
                 </select>
               </div>
+              <div>
+                <label htmlFor="rr-moneda" style={etiqueta}>Moneda</label>
+                <SelectMoneda id="rr-moneda" value={form.moneda} onChange={m => set('moneda', m)} />
+              </div>
               {(editando === 'nueva' || editando.origen === 'rentas') && (
                 <div>
                   <label htmlFor="rr-mascotas" style={etiqueta}>Mascotas</label>
@@ -379,17 +402,17 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
                 <p style={{ ...tenue, margin: '0 0 0.6rem' }}>
                   Lo que la plataforma le cobró al huésped y lo que recibió el anfitrión. Al guardar, el total de la reserva pasa a ser el «Total recibido».
                 </p>
-                <DesgloseCampos conceptos={conceptos} valores={form.desglose} moneda={moneda} idPrefijo="rr-dg"
+                <DesgloseCampos conceptos={conceptos} valores={form.desglose} moneda={form.moneda} idPrefijo="rr-dg"
                   onChange={(id, texto) => setForm(prev => ({ ...prev, desglose: { ...prev.desglose, [id]: texto } }))} />
               </details>
             )}
             <div style={rejilla(150)}>
               <div>
-                <label htmlFor="rr-noche" style={etiqueta}>Monto por noche ({moneda})</label>
+                <label htmlFor="rr-noche" style={etiqueta}>Monto por noche ({form.moneda})</label>
                 <input id="rr-noche" type="text" inputMode="decimal" value={form.monto_noche} onChange={e => set('monto_noche', e.target.value)} style={campo} />
               </div>
               <div>
-                <label htmlFor="rr-total" style={etiqueta}>Total ({moneda})</label>
+                <label htmlFor="rr-total" style={etiqueta}>Total ({form.moneda})</label>
                 <input id="rr-total" type="text" inputMode="decimal" value={form.monto_total} onChange={e => set('monto_total', e.target.value)} style={campo}
                   placeholder={totalSugerido !== null ? String(totalSugerido) : ''} />
               </div>
@@ -397,7 +420,7 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
             {nNoches > 0 && (
               <p style={{ ...tenue, margin: 0 }}>
                 {nNoches} noche{nNoches === 1 ? '' : 's'}
-                {totalSugerido !== null && form.monto_total.trim() === '' ? ` · si dejas el total vacío se guarda ${formatCurrency(totalSugerido, moneda)}` : ''}
+                {totalSugerido !== null && form.monto_total.trim() === '' ? ` · si dejas el total vacío se guarda ${formatCurrency(totalSugerido, form.moneda)}` : ''}
               </p>
             )}
             <div>
