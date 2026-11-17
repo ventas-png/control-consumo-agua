@@ -1,7 +1,7 @@
 import { useState, useMemo, Suspense } from 'react'
 import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { confirm, notify } from '../shared/Dialog'
-import type { Contador, Tarifa, TipoAgua, Unidad } from '../../types'
+import type { Contador, Proyecto, Tarifa, TipoAgua, Unidad } from '../../types'
 import { useSession } from '../shared/SessionContext'
 import { updateContador, setContadorActivo, deleteContador } from '../../domain/contadores/mutations'
 import { validatedInsert } from '../../lib/validatedInsert'
@@ -21,11 +21,14 @@ import { ContadorFormModal } from './ContadorFormModal'
 import { buildContadoresColumns } from './columnas'
 
 const ImportContadoresModal = lazy(() => import('./ImportContadoresModal').then(m => ({ default: m.ImportContadoresModal })))
+const ImportHistorialLecturasModal = lazy(() => import('./ImportHistorialLecturasModal').then(m => ({ default: m.ImportHistorialLecturasModal })))
 
 interface Props {
   contadores: Contador[]
   tarifas: Tarifa[]
   unidades: Unidad[]
+  /** Proyectos del módulo, para elegir a cuál va el historial importado. */
+  proyectos?: Proyecto[]
   moneda?: string
   onContadorAdded: (contador: Contador) => void
   onContadorUpdated: (id: string, partial: Partial<Contador>) => void
@@ -37,6 +40,7 @@ export function ContadoresSection({
   contadores,
   tarifas,
   unidades,
+  proyectos = [],
   moneda = 'Q',
   onContadorAdded,
   onContadorUpdated,
@@ -52,6 +56,7 @@ export function ContadoresSection({
   const [filterTipo, setFilterTipo] = useState<TipoAgua | ''>('')
   const [filterUnidad, setFilterUnidad] = useState<string>('')
   const [showImport, setShowImport] = useState(false)
+  const [showImportHistorial, setShowImportHistorial] = useState(false)
 
   const canEdit = !['viewer', 'visor', 'cliente'].includes(currentUser.role)
   // Eliminar conserva la condición de rol y además exige el permiso granular (RBAC)
@@ -289,6 +294,23 @@ export function ContadoresSection({
                 Importar Excel
               </button>
               <button
+                onClick={() => setShowImportHistorial(true)}
+                title="Cargar lecturas que se llevaban a mano, para comparar las nuevas (no genera cobros)"
+                style={{
+                  padding: '10px 18px',
+                  background: 'var(--at-surface)',
+                  color: 'var(--at-primary)',
+                  border: '2px solid var(--at-primary)',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Importar historial
+              </button>
+              <button
                 onClick={startCreate}
                 style={{
                   padding: '10px 20px',
@@ -375,6 +397,18 @@ export function ContadoresSection({
       </div>
     </div>
 
+    {showImportHistorial && (
+      <Suspense fallback={null}>
+      <ImportHistorialLecturasModal
+        proyectos={proyectos}
+        contadores={contadores}
+        onClose={() => setShowImportHistorial(false)}
+        onLecturaInicialActualizada={(cambios) => {
+          cambios.forEach(c => onContadorUpdated(c.id, { lectura_inicial: Number(c.lectura_inicial) }))
+        }}
+      />
+      </Suspense>
+    )}
     {showImport && (
       <Suspense fallback={null}>
       <ImportContadoresModal

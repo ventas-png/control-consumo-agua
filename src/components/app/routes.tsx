@@ -112,6 +112,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         tarifas={agua.tarifas}
         moneda={agua.moneda}
         onRegistroAdded={agua.addRegistro}
+        proyectos={agua.proyectos}
         rutaActiva={rutaActivaParaLecturas}
         onClearRuta={clearRutaActiva}
         onRutaCompletada={id => {
@@ -125,7 +126,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/historial', sectionName: 'historial', module: 'tabla',
-    render: ({ currentUser, aguaModulo: agua, canEdit, canChangeStatus, canDelete }) => (
+    render: ({ currentUser, aguaModulo: agua, canCreate, canEdit, canChangeStatus, canDelete }) => (
       <HistorialSection
         registros={agua.registros}
         clientes={agua.clientes}
@@ -139,6 +140,10 @@ export const APP_ROUTES: AppRouteDef[] = [
         canEdit={canEdit('tabla')}
         canChangeStatus={canChangeStatus('tabla')}
         canDelete={canDelete('tabla')}
+        canCargarLecturas={canCreate('lecturas')}
+        tarifas={agua.tarifas}
+        onRegistroAdded={agua.addRegistro}
+        onContadorUpdated={agua.updateContador}
       />
     ),
   },
@@ -298,6 +303,7 @@ export const APP_ROUTES: AppRouteDef[] = [
         contadores={agua.contadores}
         tarifas={agua.tarifas}
         unidades={agua.unidades}
+        proyectos={agua.proyectos}
         moneda={agua.moneda}
         onContadorAdded={agua.addContador}
         onContadorUpdated={agua.updateContador}

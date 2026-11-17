@@ -558,6 +558,8 @@ export function UnidadesSection({
         <Suspense fallback={null}>
         <ImportUnidadesModal
           currentUser={currentUser}
+          proyectos={proyectos}
+          proyectoInicial={filterProyecto}
           onClose={() => setShowImportModal(false)}
           onImportado={(nuevas) => {
             nuevas.forEach(u => onUnidadAdded(u))

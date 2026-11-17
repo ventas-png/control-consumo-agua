@@ -1,12 +1,15 @@
-import { useState, useEffect, useMemo, type CSSProperties, type ChangeEvent} from 'react'
+import { useState, useEffect, useMemo, Suspense, type CSSProperties, type ChangeEvent} from 'react'
+import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad } from '../../types'
+import type { Cliente, Registro, GPS, Ruta, Tarifa, Contador, Unidad, Proyecto } from '../../types'
 import { usePermissionsContext } from '../shared/PermissionsContext'
 import { registrarLectura, uploadRegistroFoto, type LecturaCaptura } from '../../domain/agua/mutations'
 import { hoyLocalISO, formatFechaCalendario } from '../../lib/format'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularCostoTarifa, validarLectura } from '../../lib/business'
+import { fetchHistorialLecturas, type HistorialLectura } from '../../domain/agua/historialLecturas'
+import { estadisticasConsumo, serieConsumo } from '../../lib/historialConsumo'
 import {
   localStorageOutbox,
   leerPendientes,
@@ -17,6 +20,8 @@ import {
 import { APP_CONFIG } from '../../lib/config'
 import { watchLocation } from '../../lib/nativeGeo'
 import { isNative } from '../../lib/platform'
+
+const CargaMasivaLecturasModal = lazy(() => import('./CargaMasivaLecturasModal').then(m => ({ default: m.CargaMasivaLecturasModal })))
 
 interface Props {
   clientes: Cliente[]
@@ -29,6 +34,8 @@ interface Props {
   rutaActiva?: Ruta | null
   onClearRuta?: () => void
   onRutaCompletada?: (rutaId: string) => void
+  /** Para la carga masiva desde Excel (sin proyectos no se ofrece). */
+  proyectos?: Proyecto[]
 }
 
 export function LecturasSection({
@@ -42,6 +49,7 @@ export function LecturasSection({
   rutaActiva,
   onClearRuta,
   onRutaCompletada,
+  proyectos = [],
 }: Props) {
   const canCreate = usePermissionsContext().canCreate('lecturas')
   // Derive project_id from selected unidad/contador, then fall back to single-project context
@@ -76,6 +84,7 @@ export function LecturasSection({
   const outbox = useMemo(() => localStorageOutbox(), [])
   const [pendientes, setPendientes] = useState(() => leerPendientes(outbox))
   const [sincronizando, setSincronizando] = useState(false)
+  const [showCargaMasiva, setShowCargaMasiva] = useState(false)
 
   // En modo ruta, derivar unidades según el tipo de ruta
   const unidadesOrdenadas: Unidad[] = rutaActiva
@@ -165,6 +174,17 @@ export function LecturasSection({
 
   const contadorSeleccionado = contadores.find(c => c.id === selectedContadorId) ?? null
 
+  // Historial que la empresa llevaba a mano (importado en Contadores). No es un
+  // cobro: sólo se usa para comparar la lectura nueva con su tendencia.
+  const [historialContador, setHistorialContador] = useState<HistorialLectura[]>([])
+  useEffect(() => {
+    const id = contadorSeleccionado?.id
+    if (!id) { setHistorialContador([]); return }
+    let vigente = true
+    void fetchHistorialLecturas([id]).then(h => { if (vigente) setHistorialContador(h) })
+    return () => { vigente = false }
+  }, [contadorSeleccionado?.id])
+
   // El `project_id` de la lectura ya NO lo deriva el navegador: lo resuelve el
   // servidor desde el contador (20260910000200). Derivarlo aquí era, además de
   // redundante, la puerta por la que una lectura podía acabar contabilizada en
@@ -214,14 +234,16 @@ export function LecturasSection({
     : null
   const lecturaNum = parseFloat(lecturaActual)
   const consumo = !isNaN(lecturaNum) ? lecturaNum - ultimaLectura : null
-  // Promedio histórico de consumo del contador → detección de salto anómalo.
-  const promedioHistorico = (() => {
-    if (!contadorSeleccionado) return undefined
-    const consumos = registros
-      .filter(r => r.contador_id === contadorSeleccionado.id && typeof r.consumo === 'number' && r.consumo > 0)
-      .map(r => r.consumo)
-    return consumos.length ? consumos.reduce((a, b) => a + b, 0) / consumos.length : undefined
-  })()
+  // Tendencia del contador → detección de salto anómalo. La serie une el
+  // historial importado con las lecturas del sistema, y la referencia es el
+  // promedio de los últimos 6 periodos antes de la fecha de esta lectura.
+  const tendencia = useMemo(() => {
+    if (!contadorSeleccionado) return null
+    const delContador = registros.filter(r => r.contador_id === contadorSeleccionado.id && !r.deleted_at)
+    const serie = serieConsumo(historialContador, delContador)
+    return estadisticasConsumo(serie, fechaLecturaActual || hoyLocalISO())
+  }, [contadorSeleccionado, registros, historialContador, fechaLecturaActual])
+  const promedioHistorico = tendencia?.promedioReciente ?? undefined
   // validarLectura: fuente única de validación (retroceso/reset + anomalía).
   const validacion = !isNaN(lecturaNum)
     ? validarLectura(ultimaLectura, lecturaNum, { resetContador, promedioHistorico })
@@ -638,8 +660,18 @@ export function LecturasSection({
       </div>
 
       <div style={{ background: 'var(--at-surface)', borderRadius: '24px', padding: '32px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}>
-        <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
-          Ingreso de Lectura
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '20px', borderBottom: '2px solid var(--at-line)', paddingBottom: '12px' }}>
+          <span style={{ fontSize: '20px', fontWeight: 700 }}>Ingreso de Lectura</span>
+          {canEdit && proyectos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowCargaMasiva(true)}
+              title="Registrar muchas lecturas a la vez desde un Excel (generan su cobro como cualquier lectura)"
+              style={{ padding: '8px 16px', background: 'var(--at-surface)', color: 'var(--at-primary)', border: '2px solid var(--at-primary)', borderRadius: '8px', fontWeight: 600, fontSize: '14px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              📥 Carga masiva (Excel)
+            </button>
+          )}
         </div>
 
         {/* Selector de unidad */}
@@ -787,6 +819,25 @@ export function LecturasSection({
                       ⚠️ {validacion.warning}
                     </div>
                   )}
+                  {tendencia && (tendencia.promedioReciente !== null || tendencia.mismoMesAnterior !== null) && (
+                    <div data-testid="tendencia-consumo" style={{ gridColumn: '1 / -1', background: 'var(--at-surface-2)', border: '1px solid var(--at-line)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: 'var(--at-ink-2)', display: 'flex', flexWrap: 'wrap', gap: '6px 18px' }}>
+                      {tendencia.promedioReciente !== null && (
+                        <span>
+                          Promedio de los últimos {tendencia.nReciente} periodo{tendencia.nReciente === 1 ? '' : 's'}:{' '}
+                          <strong>{tendencia.promedioReciente.toFixed(2)} m³</strong>
+                          {consumoEfectivo !== null && consumoEfectivo > 0 && tendencia.promedioReciente > 0 && (
+                            <> · esta lectura: <strong>{(consumoEfectivo / tendencia.promedioReciente).toFixed(1)}×</strong></>
+                          )}
+                        </span>
+                      )}
+                      {tendencia.mismoMesAnterior !== null && (
+                        <span>Mismo mes del año anterior ({tendencia.etiquetaMismoMes}): <strong>{tendencia.mismoMesAnterior.toFixed(2)} m³</strong></span>
+                      )}
+                      {tendencia.nHistorial > 0 && (
+                        <span style={{ color: 'var(--at-ink-3)', fontSize: 12 }}>Incluye {tendencia.nHistorial} lectura{tendencia.nHistorial === 1 ? '' : 's'} del historial importado.</span>
+                      )}
+                    </div>
+                  )}
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Desglose de Cobro</label>
                     {calculo ? (
@@ -901,6 +952,19 @@ export function LecturasSection({
           </>
         )}
       </div>
+      {showCargaMasiva && (
+        <Suspense fallback={null}>
+          <CargaMasivaLecturasModal
+            proyectos={proyectos}
+            contadores={contadores}
+            tarifas={tarifas}
+            registros={registros}
+            moneda={moneda}
+            onClose={() => setShowCargaMasiva(false)}
+            onRegistroAdded={onRegistroAdded}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

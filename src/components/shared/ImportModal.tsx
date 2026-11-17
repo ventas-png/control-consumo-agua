@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode, type CSSProperties, type ChangeEvent, type DragEvent } from 'react'
+import { useState, useRef, useEffect, type ReactNode, type CSSProperties, type ChangeEvent, type DragEvent } from 'react'
 import { notify } from '../shared/Dialog'
 import { parseXlsxToObjects, writeXlsx } from '../../lib/xlsx'
 import { parsearCsv } from '../../lib/csv'
@@ -86,6 +86,24 @@ export interface ImportModalProps<T> {
   importDisabled?: boolean
   /** Motivo mostrado junto al botón cuando `importDisabled`. */
   importDisabledReason?: string
+
+  /**
+   * Cuando cambia, las filas ya leídas se vuelven a validar con el
+   * `validateRow` vigente. Sirve cuando la validación depende de algo del
+   * `optionsPanel` (el proyecto, una fecha por defecto) que se puede cambiar
+   * DESPUÉS de subir el archivo: sin esto el preview seguía mostrando lo que se
+   * validó con la opción anterior.
+   */
+  revalidarCon?: unknown
+  /**
+   * Contenido extra del preview con las filas válidas (p. ej. cómo quedarían).
+   * Va antes del listado de filas con error.
+   */
+  renderValidas?: (filas: T[]) => ReactNode
+  /** Detalle mientras importa (p. ej. «35 de 120»). */
+  progreso?: ReactNode
+  /** Detalle al terminar (p. ej. las filas que el servidor rechazó). */
+  resultado?: ReactNode
 }
 
 // ── Estado interno ────────────────────────────────────────────────────────
@@ -117,6 +135,10 @@ export function ImportModal<T>({
   optionsPanel,
   importDisabled = false,
   importDisabledReason,
+  revalidarCon,
+  renderValidas,
+  progreso,
+  resultado,
 }: ImportModalProps<T>) {
   const plural = entityLabelPlural ?? `${entityLabel}s`
   const sheetN = sheetName ?? plural.charAt(0).toUpperCase() + plural.slice(1)
@@ -130,6 +152,17 @@ export function ImportModal<T>({
 
   const validCount = rows.filter(r => r.valid).length
   const invalidCount = rows.length - validCount
+
+  // Re-validar lo ya leído cuando cambia una opción de la que depende la
+  // validación. La primera pasada no cuenta: la hace processFile al leer.
+  const validateRowRef = useRef(validateRow)
+  validateRowRef.current = validateRow
+  const revalidarPrevio = useRef(revalidarCon)
+  useEffect(() => {
+    if (Object.is(revalidarPrevio.current, revalidarCon)) return
+    revalidarPrevio.current = revalidarCon
+    setRows(prev => prev.map(r => validarFila(r.raw, r.index, validateRowRef.current)))
+  }, [revalidarCon])
 
   // ── Descarga de plantilla ───────────────────────────────────────────────
   function descargarPlantilla() {
@@ -184,17 +217,8 @@ export function ImportModal<T>({
           notify({ variant: 'warning', title: 'Archivo vacío', text: 'El archivo no contiene filas de datos.' })
           return
         }
-        const parsed: InternalRow<T>[] = raw.map((row, i) => {
-          const rowNumber = i + 2 // header = fila 1
-          const r = validateRow(row, rowNumber)
-          return {
-            index: rowNumber,
-            raw: row,
-            data: r.ok ? r.data : (r.data as T | undefined),
-            errors: r.ok ? [] : r.errors,
-            valid: r.ok,
-          }
-        })
+        // header = fila 1
+        const parsed: InternalRow<T>[] = raw.map((row, i) => validarFila(row, i + 2, validateRow))
         setRows(parsed)
         setStep('preview')
       } catch {
@@ -293,6 +317,12 @@ export function ImportModal<T>({
             />
           )}
 
+          {step === 'preview' && renderValidas && validCount > 0 && (
+            <div style={{ marginBottom: '16px' }}>
+              {renderValidas(rows.filter(r => r.valid).map(r => r.data as T))}
+            </div>
+          )}
+
           {step === 'preview' && (
             <PreviewStep
               rows={rows}
@@ -307,6 +337,7 @@ export function ImportModal<T>({
             <div style={{ padding: '40px', textAlign: 'center', color: 'var(--at-ink-3)' }}>
               <div style={{ fontSize: '32px', marginBottom: '10px' }}>⏳</div>
               <p>Guardando {validCount} {plural} en la base de datos…</p>
+              {progreso}
             </div>
           )}
 
@@ -318,6 +349,7 @@ export function ImportModal<T>({
               </p>
             </div>
           )}
+          {step === 'done' && resultado}
 
         <input
           ref={fileInputRef}
@@ -448,6 +480,21 @@ function PreviewStep<T>({
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+function validarFila<T>(
+  raw: Record<string, unknown>,
+  index: number,
+  validateRow: (row: Record<string, unknown>, rowNumber: number) => RowValidationResult<T>,
+): InternalRow<T> {
+  const r = validateRow(raw, index)
+  return {
+    index,
+    raw,
+    data: r.ok ? r.data : (r.data as T | undefined),
+    errors: r.ok ? [] : r.errors,
+    valid: r.ok,
+  }
+}
 
 function normalizeCell(v: unknown): string | number | boolean | null | undefined {
   if (v === null || v === undefined) return ''
