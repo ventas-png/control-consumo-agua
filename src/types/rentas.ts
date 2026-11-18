@@ -59,6 +59,13 @@ export interface ReservaRenta {
   notas: string | null
   politica_cancelacion: PoliticaCancelacionRenta | null
   num_mascotas: number
+  /** Día en que se hizo la reserva. */
+  fecha_reservacion: string | null
+  /** `HH:MM[:SS]`. */
+  hora_llegada_estimada: string | null
+  hora_salida_estimada: string | null
+  num_ninos: number
+  num_bebes: number
   created_at: string
   updated_at: string
 }
@@ -86,6 +93,18 @@ export interface ReservaUnificada {
   notas: string | null
   politica_cancelacion: PoliticaCancelacionRenta | null
   num_mascotas: number
+  /** Día en que se hizo la reserva. */
+  fecha_reservacion: string | null
+  /** `HH:MM[:SS]`. */
+  hora_llegada_estimada: string | null
+  hora_salida_estimada: string | null
+  /** `num_huespedes` = adultos + niños + bebés. */
+  num_adultos: number
+  num_ninos: number
+  num_bebes: number
+  /** Rutas en el bucket de Condominios; sólo las reservas de propiedades enlazadas llevan fotos. */
+  foto_url: string | null
+  foto_documento_url: string | null
 }
 
 export type EstadoContratoRenta = 'vigente' | 'finalizado' | 'cancelado'

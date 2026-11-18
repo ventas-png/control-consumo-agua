@@ -88,7 +88,10 @@ export function useConceptosRentaMutations(companyId?: string) {
 
 // ── Reservas: dos tablas detrás de una sola pantalla ─────────────────────────
 
-/** Lo que el formulario de reserva captura, sea cual sea la tabla de destino. */
+/**
+ * Lo que el formulario de reserva captura, sea cual sea la tabla de destino.
+ * `num_huespedes` es el TOTAL (adultos + niños + bebés).
+ */
 export interface DatosReserva {
   huesped_nombre: string
   huesped_email: string | null
@@ -104,22 +107,40 @@ export interface DatosReserva {
   notas: string | null
   politica_cancelacion: PoliticaCancelacionRenta | null
   num_mascotas: number
+  /** Datos de la estancia. Quien no los captura (la carga masiva) los omite y no se tocan. */
+  fecha_reservacion?: string | null
+  hora_llegada_estimada?: string | null
+  hora_salida_estimada?: string | null
+  num_adultos?: number
+  num_ninos?: number
+  num_bebes?: number
+  /** Sólo propiedades enlazadas (`reservas_str`). */
+  foto_url?: string | null
+  foto_documento_url?: string | null
 }
 
+const definidos = <T extends Record<string, unknown>>(o: T): Partial<T> =>
+  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>
+
 /**
- * Columnas de `reservas_str` para una reserva escrita desde Rentas. La cuenta
- * de huéspedes va a `num_adultos` sólo al CREAR: al editar no se toca, porque
- * en Condominios se desglosa en adultos / niños / bebés y pisarla lo perdería.
+ * Columnas de `reservas_str` para lo que viene de Rentas. Allá el grupo se
+ * lleva como adultos / niños / bebés y las mascotas como sí/no: si el
+ * formulario trae el desglose se escribe; si sólo trae el total (carga masiva),
+ * va a `num_adultos` únicamente al CREAR, para no pisar un desglose existente.
  */
-function aReservaStr(d: DatosReserva, incluirHuespedes: boolean) {
-  return {
-    huesped_nombre: d.huesped_nombre, huesped_email: d.huesped_email, huesped_telefono: d.huesped_telefono,
-    fecha_entrada: d.fecha_entrada, fecha_salida: d.fecha_salida,
-    plataforma: d.plataforma, codigo_confirmacion: d.codigo_confirmacion,
-    monto_noche: d.monto_noche, monto_total: d.monto_total, estado: d.estado, notas: d.notas,
-    politica_cancelacion: d.politica_cancelacion, mascotas: d.num_mascotas > 0,
-    ...(incluirHuespedes ? { num_adultos: d.num_huespedes } : {}),
-  }
+function aReservaStr(d: Partial<DatosReserva>, alCrear: boolean) {
+  const { num_huespedes, num_mascotas, num_adultos, ...resto } = d
+  return definidos({
+    ...resto,
+    num_adultos: num_adultos ?? (alCrear ? num_huespedes : undefined),
+    mascotas: num_mascotas === undefined ? undefined : num_mascotas > 0,
+  })
+}
+
+/** Columnas de `rentas_reservas`: sin adultos (se derivan del total) ni fotos (no las lleva). */
+function aReservaRentas(d: Partial<DatosReserva>) {
+  const { num_adultos: _a, foto_url: _f, foto_documento_url: _d, ...resto } = d
+  return definidos(resto)
 }
 
 /** A qué fila de qué tabla apunta una reserva de Rentas. */
@@ -130,14 +151,14 @@ export async function insertarReserva(p: PropiedadRenta, datos: DatosReserva): P
   if (p.unidad_id && p.project_id) {
     const fila = await runQuery<{ id: string }>((signal) =>
       supabase.from('reservas_str')
-        .insert({ company_id: p.company_id, project_id: p.project_id as string, unidad_id: p.unidad_id, ...aReservaStr(datos, true) })
+        .insert({ company_id: p.company_id, project_id: p.project_id as string, unidad_id: p.unidad_id, ...aReservaStr(datos, true) } as never)
         .select('id').abortSignal(signal).single())
     if (!fila) throw new QueryError('No se pudo guardar la reserva')
     return { id: fila.id, origen: 'condominio' }
   }
   const fila = await runQuery<{ id: string }>((signal) =>
     supabase.from('rentas_reservas')
-      .insert({ company_id: p.company_id, propiedad_id: p.id, ...datos })
+      .insert({ company_id: p.company_id, propiedad_id: p.id, ...aReservaRentas(datos) } as never)
       .select('id').abortSignal(signal).single())
   if (!fila) throw new QueryError('No se pudo guardar la reserva')
   return { id: fila.id, origen: 'rentas' }
@@ -145,13 +166,10 @@ export async function insertarReserva(p: PropiedadRenta, datos: DatosReserva): P
 
 export async function actualizarReserva(reserva: RefReserva, datos: Partial<DatosReserva>): Promise<void> {
   const filas = reserva.origen === 'condominio'
-    ? await runQuery<{ id: string }[]>((signal) => {
-        // La cuenta de huéspedes y las mascotas se llevan en Condominios (adultos / niños / bebés).
-        const { num_huespedes: _h, num_mascotas: _m, ...resto } = datos
-        return supabase.from('reservas_str').update(resto).eq('id', reserva.id).select('id').abortSignal(signal)
-      })
+    ? await runQuery<{ id: string }[]>((signal) =>
+        supabase.from('reservas_str').update(aReservaStr(datos, false) as never).eq('id', reserva.id).select('id').abortSignal(signal))
     : await runQuery<{ id: string }[]>((signal) =>
-        supabase.from('rentas_reservas').update(datos).eq('id', reserva.id).select('id').abortSignal(signal))
+        supabase.from('rentas_reservas').update(aReservaRentas(datos) as never).eq('id', reserva.id).select('id').abortSignal(signal))
   exigirFila(filas, 'guardar el cambio')
 }
 

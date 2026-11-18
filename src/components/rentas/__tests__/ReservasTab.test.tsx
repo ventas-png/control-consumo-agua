@@ -23,6 +23,16 @@ vi.mock('../../../domain/rentas/mutations', () => ({
   }),
 }))
 vi.mock('../finanzas/ImportarReservasModal', () => ({ ImportarReservasModal: () => null }))
+vi.mock('../../shared/ImageUploader', () => ({
+  ImageUploader: (p: { label?: string; value: string | null; onChange: (v: string | null) => void }) => (
+    <button type="button" onClick={() => p.onChange(`ruta/${p.label}.jpg`)}>{p.value ? `${p.label}: ${p.value}` : `Subir ${p.label}`}</button>
+  ),
+}))
+const g = vi.hoisted(() => ({ cargar: vi.fn(async (_id: string) => [] as unknown[]), guardar: vi.fn(async (..._a: unknown[]) => undefined) }))
+vi.mock('../../../domain/rentas/grupo', () => ({
+  cargarGrupo: g.cargar, guardarGrupo: g.guardar,
+  personaVacia: () => ({ nombre: '', identificacion: '', es_menor: false, fecha_nacimiento: '', foto_url: null, foto_documento_url: null }),
+}))
 vi.mock('../../shared/Dialog', () => ({ notify: h.notify, confirm: h.confirm }))
 
 const { default: ReservasTab } = await import('../tabs/ReservasTab')
@@ -41,7 +51,7 @@ const proyectos = [{ id: 'p1', nombre: '21B+' }] as Proyecto[]
 const r = (id: string, origen: 'rentas' | 'condominio', propiedad_id: string, huesped: string, entrada: string, salida: string): ReservaUnificada => ({
   id, origen, propiedad_id, huesped_nombre: huesped, huesped_email: null, huesped_telefono: null,
   fecha_entrada: entrada, fecha_salida: salida, num_huespedes: 2, plataforma: 'directo', codigo_confirmacion: null,
-  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0,
+  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0, fecha_reservacion: null, hora_llegada_estimada: null, hora_salida_estimada: null, num_adultos: 1, num_ninos: 0, num_bebes: 0, foto_url: null, foto_documento_url: null,
 })
 const reservas = [
   r('r1', 'rentas', 'ind', 'Ana Pérez', '2026-12-10', '2026-12-13'),
@@ -251,5 +261,90 @@ describe('moneda de la reserva', () => {
     cleanup()
     montar({ ver: true, crear: false, editar: true, eliminar: false })
     expect(screen.queryByRole('button', { name: 'Carga masiva' })).toBeNull()
+  })
+})
+
+describe('datos de la estancia (como en la pestaña STR)', () => {
+  const llenar = (dialogo: HTMLElement, propiedad: string) => {
+    fireEvent.change(within(dialogo).getByLabelText('Propiedad *'), { target: { value: propiedad } })
+    fireEvent.change(within(dialogo).getByLabelText('Huésped *'), { target: { value: 'Eva' } })
+    fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2027-02-02' } })
+    fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2027-02-05' } })
+  }
+
+  it('adultos, niños y bebés suman el total; viajan la fecha de reservación y las horas', async () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva reserva' }))
+    const dialogo = screen.getByRole('dialog')
+    llenar(dialogo, 'ind')
+    fireEvent.change(within(dialogo).getByLabelText('Adultos'), { target: { value: '2' } })
+    fireEvent.change(within(dialogo).getByLabelText('Niños'), { target: { value: '1' } })
+    fireEvent.change(within(dialogo).getByLabelText('Bebés'), { target: { value: '1' } })
+    fireEvent.change(within(dialogo).getByLabelText('Fecha de reservación'), { target: { value: '2027-01-15' } })
+    fireEvent.change(within(dialogo).getByLabelText('Hora estimada de llegada'), { target: { value: '15:00' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
+    const datos = (h.crear.mock.calls[0][0] as { datos: Record<string, unknown> }).datos
+    expect(datos).toMatchObject({
+      num_huespedes: 4, num_adultos: 2, num_ninos: 1, num_bebes: 1,
+      fecha_reservacion: '2027-01-15', hora_llegada_estimada: '15:00', hora_salida_estimada: null,
+    })
+    // Una propiedad independiente no lleva fotos: ni se ofrecen ni viajan.
+    expect(datos).not.toHaveProperty('foto_url')
+    expect(within(dialogo).queryByRole('region', { name: 'Personas del grupo' })).toBeNull()
+    expect(within(dialogo).getByText(/se registran en las propiedades enlazadas/)).toBeTruthy()
+  })
+
+  it('sin adultos no se guarda', async () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva reserva' }))
+    const dialogo = screen.getByRole('dialog')
+    llenar(dialogo, 'ind')
+    fireEvent.change(within(dialogo).getByLabelText('Adultos'), { target: { value: '0' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'Indica cuántos adultos son (al menos 1)' })))
+    expect(h.crear).not.toHaveBeenCalled()
+  })
+
+  it('propiedad enlazada: fotos del huésped y personas del grupo, guardadas con la reserva', async () => {
+    h.crear.mockResolvedValueOnce({ id: 'nueva-str', origen: 'condominio' } as never)
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva reserva' }))
+    const dialogo = screen.getByRole('dialog')
+    llenar(dialogo, 'enl')
+    fireEvent.change(within(dialogo).getByLabelText('Adultos'), { target: { value: '2' } })
+    expect((within(dialogo).getByLabelText('Mascotas') as HTMLSelectElement).tagName).toBe('SELECT')
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Subir Foto del huésped' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: '+ Agregar persona' }))
+    fireEvent.change(within(dialogo).getByLabelText('Nombre *'), { target: { value: ' Luis ' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Agregar' }))
+    // Con 2 adultos sólo cabe UNA persona adicional.
+    expect(within(dialogo).queryByRole('button', { name: '+ Agregar persona' })).toBeNull()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(g.guardar).toHaveBeenCalledTimes(1))
+    expect((h.crear.mock.calls[0][0] as { datos: Record<string, unknown> }).datos)
+      .toMatchObject({ foto_url: 'ruta/Foto del huésped.jpg', foto_documento_url: null, num_adultos: 2 })
+    expect(g.guardar).toHaveBeenCalledWith('nueva-str', [], [expect.objectContaining({ nombre: 'Luis' })])
+  })
+
+  it('editar una reserva de condominio carga su grupo; sin grupo no se escribe nada', async () => {
+    g.cargar.mockResolvedValueOnce([{ id: 'h1', nombre: 'Marta', identificacion: '', es_menor: false, fecha_nacimiento: '', foto_url: null, foto_documento_url: null }])
+    montar()
+    fireEvent.click(within(fila('Paola González')).getByRole('button', { name: /Editar/ }))
+    expect(g.cargar).toHaveBeenCalledWith('s1')
+    const dialogo = screen.getByRole('dialog')
+    expect(await within(dialogo).findByText('Marta')).toBeTruthy()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Quitar a Marta' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(g.guardar).toHaveBeenCalledTimes(1))
+    expect(g.guardar).toHaveBeenCalledWith('s1', [expect.objectContaining({ id: 'h1' })], [])
+
+    cleanup(); vi.clearAllMocks()
+    montar()
+    fireEvent.click(within(fila('Ana Pérez')).getByRole('button', { name: /Editar/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.actualizar).toHaveBeenCalledTimes(1))
+    expect(g.cargar).not.toHaveBeenCalled()
+    expect(g.guardar).not.toHaveBeenCalled()
   })
 })

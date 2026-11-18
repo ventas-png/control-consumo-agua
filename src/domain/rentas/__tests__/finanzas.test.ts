@@ -22,7 +22,7 @@ const CONCEPTOS: ConceptoRenta[] = [
 const reserva = (id: string, entrada: string, salida: string, personas: number, extra: Partial<ReservaUnificada> = {}): ReservaUnificada => ({
   id, origen: 'rentas', propiedad_id: 'p1', huesped_nombre: id, huesped_email: null, huesped_telefono: null,
   fecha_entrada: entrada, fecha_salida: salida, num_huespedes: personas, plataforma: 'airbnb', codigo_confirmacion: id,
-  monto_noche: null, monto_total: null, estado: 'completada', notas: null, politica_cancelacion: 'no_reembolsable', num_mascotas: 0, ...extra,
+  monto_noche: null, monto_total: null, estado: 'completada', notas: null, politica_cancelacion: 'no_reembolsable', num_mascotas: 0, fecha_reservacion: null, hora_llegada_estimada: null, hora_salida_estimada: null, num_adultos: 1, num_ninos: 0, num_bebes: 0, foto_url: null, foto_documento_url: null, ...extra,
 })
 // [huésped: habitación, limpieza, servicio, impuesto] · [anfitrión: habitación, limpieza, descuentos, servicio, impuesto]
 const HOJA: [ReservaUnificada, number[], number[]][] = [
