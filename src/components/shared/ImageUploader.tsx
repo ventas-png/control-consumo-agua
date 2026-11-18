@@ -155,6 +155,13 @@ interface MultiProps {
    */
   bucket?: string
   /**
+   * Primer segmento de la ruta. Por defecto, el proyecto del contexto
+   * (`useMediaScope`). Los buckets que no se acotan por proyecto lo pasan: el
+   * inventario de Rentas sube a `<empresa>/<propiedad>/…` porque una propiedad
+   * independiente no tiene proyecto (20261202000000).
+   */
+  alcance?: string
+  /**
    * Por defecto, quitar una foto la borra del bucket al instante. Con `false`
    * sólo la saca de la lista y el que llama decide al guardar o cancelar (las
    * minutas: una fila guardada nunca debe apuntar a un archivo ya borrado).
@@ -164,12 +171,13 @@ interface MultiProps {
   onSubiendo?: (subiendo: boolean) => void
 }
 
-export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false, bucket = BUCKET_MEDIA, borrarAlQuitar = true, onSubiendo }: MultiProps) {
+export function MultiImageUploader({ values, onChange, folder, label = 'Fotos', maxFiles = 10, maxSizeMB = 5, capture = false, bucket = BUCKET_MEDIA, alcance, borrarAlQuitar = true, onSubiendo }: MultiProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
-  const projectId = useMediaScope()
+  const proyectoDelContexto = useMediaScope()
+  const projectId = alcance ?? proyectoDelContexto
   // La lista vigente, no la del render en que empezó la subida o se tocó la ✕:
   // con dos acciones seguidas, la segunda pisaba a la primera con una lista vieja.
   const valuesRef = useRef(values)

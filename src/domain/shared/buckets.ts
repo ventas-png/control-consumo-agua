@@ -70,3 +70,12 @@ export const BUCKET_PADRON_DOCS = 'padron-docs'
  * quien ve el tab; sube quien emite o registra el acuse; nadie sustituye.
  */
 export const BUCKET_RRHH_LLAMADAS = 'rrhh-llamadas-atencion'
+
+/**
+ * Fotos del inventario de Rentas (20261202000000). Bucket PRIVADO propio porque
+ * `condominios-media` autoriza por PROYECTO y una propiedad de Rentas puede no
+ * tener proyecto. Ruta `<company_id>/<propiedad_id>/<archivo>.jpg`: la policy
+ * aplica la misma regla que la RLS de `rentas_inventario`, y sólo deja borrar
+ * una foto que ninguna fila nombra (se guarda la fila primero, se borra después).
+ */
+export const BUCKET_RENTAS_INVENTARIO = 'rentas-inventario'

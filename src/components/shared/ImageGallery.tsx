@@ -5,9 +5,11 @@ import { ModalPortal } from './ModalPortal'
 interface Props {
   urls: string[]
   maxVisible?: number
+  /** Bucket de las rutas. Por defecto `condominios-media` (el de SecureImage). */
+  bucket?: string
 }
 
-export function ImageGallery({ urls, maxVisible = 4 }: Props) {
+export function ImageGallery({ urls, maxVisible = 4, bucket }: Props) {
   const [lightbox, setLightbox] = useState<number | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   // Quién abrió la foto, para devolverle el foco al cerrarla.
@@ -59,6 +61,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
             style={{ position: 'relative', cursor: 'zoom-in', flexShrink: 0, padding: 0, border: 'none', background: 'none', borderRadius: 7, display: 'block', minWidth: 64, minHeight: 48 }}>
             <SecureImage
               src={url}
+              bucket={bucket}
               alt=""
               style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 7, border: '1.5px solid var(--at-line)', display: 'block' }}
             />
@@ -105,6 +108,7 @@ export function ImageGallery({ urls, maxVisible = 4 }: Props) {
           {/* Image */}
           <SecureImage
             src={urls[lightbox]}
+            bucket={bucket}
             alt={`foto ${lightbox + 1}`}
             onClick={e => e.stopPropagation()}
             style={{ maxWidth: '88vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 10, boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}

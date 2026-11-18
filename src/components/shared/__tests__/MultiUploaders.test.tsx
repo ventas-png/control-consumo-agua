@@ -66,6 +66,16 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('MultiImageUploader', () => {
+  it('con `alcance`, la ruta empieza por él y no por el proyecto del contexto (inventario de Rentas)', async () => {
+    const espia = vi.fn()
+    const { container } = render(
+      <MultiImageUploader values={[]} onChange={espia} folder="prop-1" alcance="empresa-1" bucket="rentas-inventario" />)
+    elegir(container.querySelector('input[type=file]')!, [archivo('sofa.jpg')])
+    await act(async () => {})
+    expect(mocks.uploadMedia).toHaveBeenCalledWith('rentas-inventario', 'empresa-1/prop-1/sofa.jpg', expect.anything(), expect.anything())
+    expect(espia).toHaveBeenLastCalledWith(['empresa-1/prop-1/sofa.jpg'])
+  })
+
   it('quitar dos fotos seguidas antes de que responda Storage no revive la primera', async () => {
     const borrados = [diferida<{ error: null }>(), diferida<{ error: null }>()]
     let n = 0
