@@ -130,3 +130,28 @@ describe('desglose de cobro', () => {
     await expect(result.current.crear.mutateAsync({ propiedad: independiente, datos, importes: { a1: 1 } })).rejects.toThrow(/guardar el desglose/)
   })
 })
+
+describe('datos de la estancia: qué columna va a qué tabla', () => {
+  const estancia = { ...datos, num_huespedes: 4, num_adultos: 2, num_ninos: 1, num_bebes: 1, fecha_reservacion: '2026-11-01', hora_llegada_estimada: '15:00', hora_salida_estimada: null, foto_url: 'f.jpg', foto_documento_url: null }
+  it('independiente: total, niños y bebés; ni adultos ni fotos (rentas_reservas no los tiene)', async () => {
+    const { result } = renderHook(() => useReservasRentaMutations('c1'), { wrapper })
+    await result.current.crear.mutateAsync({ propiedad: independiente, datos: estancia })
+    const p = h.llamadas[0].payload as Record<string, unknown>
+    expect(p).toMatchObject({ num_huespedes: 4, num_ninos: 1, num_bebes: 1, fecha_reservacion: '2026-11-01', hora_llegada_estimada: '15:00' })
+    expect(p).not.toHaveProperty('num_adultos')
+    expect(p).not.toHaveProperty('foto_url')
+  })
+  it('enlazada: desglose, fotos y mascotas como sí/no; sin el total ni el número de mascotas', async () => {
+    const { result } = renderHook(() => useReservasRentaMutations('c1'), { wrapper })
+    await result.current.actualizar.mutateAsync({ reserva: { id: 's1', origen: 'condominio' }, datos: { ...estancia, num_mascotas: 2 } })
+    const p = h.llamadas[0].payload as Record<string, unknown>
+    expect(p).toMatchObject({ num_adultos: 2, num_ninos: 1, num_bebes: 1, foto_url: 'f.jpg', foto_documento_url: null, mascotas: true })
+    expect(p).not.toHaveProperty('num_huespedes')
+    expect(p).not.toHaveProperty('num_mascotas')
+  })
+  it('un cambio parcial (sólo el estado) no arrastra columnas que no vinieron', async () => {
+    const { result } = renderHook(() => useReservasRentaMutations('c1'), { wrapper })
+    await result.current.actualizar.mutateAsync({ reserva: { id: 's1', origen: 'condominio' }, datos: { estado: 'en_curso' } })
+    expect(h.llamadas[0].payload).toEqual({ estado: 'en_curso' })
+  })
+})

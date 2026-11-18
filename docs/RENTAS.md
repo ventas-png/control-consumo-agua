@@ -124,6 +124,21 @@ del periodo (acreditado, ocupación, ingreso por noche ocupada, mejor mes, a pag
 la que se salta al detalle de un mes. Es el mismo cálculo de `resumenCarteraMes` repetido por mes (`tendenciaMeses`,
 puro), en la moneda elegida. Se alimenta del historial cargado con «Carga masiva».
 
+## La reserva con los datos de la estancia (migración `20261203000000_rentas_reservas_estancia`)
+
+El formulario de reserva de Rentas captura lo mismo que el de la pestaña STR de Condominios:
+
+- **Todas las propiedades**: fecha de reservación, hora estimada de llegada y de salida, y el grupo como adultos /
+  niños / bebés (`num_huespedes` sigue siendo el total). Para las independientes son columnas nuevas de
+  `rentas_reservas`; para las enlazadas, las de `reservas_str` que ya existían.
+- **Sólo propiedades enlazadas a un condominio**: fotos del huésped principal y de su documento, y las personas del
+  grupo. Son las mismas columnas `foto_url` / `foto_documento_url` y las mismas filas `huespedes_str` de la pestaña
+  STR (bucket `condominios-media`, que autoriza por proyecto), así que lo capturado en un lado se ve en el otro y
+  sirve al control de ingreso. Las independientes no las llevan todavía: necesitan su propio bucket y tabla.
+- Una persona del grupo que ya registró su ingreso no se quita. Si la reserva se guarda y el grupo falla, se avisa
+  aparte y la reserva queda.
+- La carga masiva no trae estos campos y no los pisa al actualizar una reserva existente.
+
 ## Archivos
 
 | Qué | Dónde |

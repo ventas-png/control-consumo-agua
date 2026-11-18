@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type {
   ConceptoRenta, EstadoReservaRenta, LiquidacionRenta, PlataformaRenta, PoliticaCancelacionRenta, PropiedadRenta, Proyecto, ReservaUnificada,
@@ -12,6 +12,7 @@ import {
   tieneDesglose, totalesDesglose,
 } from '../../../domain/rentas/finanzas'
 import { useReservasRentaMutations, type DatosReserva } from '../../../domain/rentas/mutations'
+import { cargarGrupo, guardarGrupo, type PersonaGrupo } from '../../../domain/rentas/grupo'
 import { formatCurrency, formatFechaCalendario } from '../../../lib/format'
 import { confirm, notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
@@ -19,6 +20,9 @@ import { Button } from '../../shared/Button'
 import { EmptyState } from '../../shared/EmptyState'
 import { FilterChips } from '../../shared/FilterChips'
 import { StatusBadge } from '../../shared/StatusBadge'
+import { ImageUploader } from '../../shared/ImageUploader'
+import { MediaScopeProvider } from '../../shared/MediaScopeContext'
+import { GrupoHuespedes } from '../GrupoHuespedes'
 import type { PermisosModulo } from '../RentasSection'
 import { DesgloseCampos } from '../finanzas/DesgloseCampos'
 import { ImportarReservasModal } from '../finanzas/ImportarReservasModal'
@@ -41,7 +45,10 @@ interface Props {
 interface Form {
   propiedad_id: string
   huesped_nombre: string; huesped_telefono: string; huesped_email: string
-  fecha_entrada: string; fecha_salida: string; num_huespedes: string
+  fecha_entrada: string; fecha_salida: string
+  num_adultos: string; num_ninos: string; num_bebes: string
+  fecha_reservacion: string; hora_llegada: string; hora_salida: string
+  foto_url: string | null; foto_documento_url: string | null
   plataforma: PlataformaRenta; codigo_confirmacion: string
   monto_noche: string; monto_total: string
   estado: EstadoReservaRenta; notas: string
@@ -62,7 +69,10 @@ function formDe(r?: ReservaUnificada, propiedadId = '', liquidacion?: Liquidacio
     desglose: Object.fromEntries(Object.entries(liquidacion?.importes ?? {}).map(([k, v]) => [k, String(v)])),
     propiedad_id: r?.propiedad_id ?? propiedadId,
     huesped_nombre: r?.huesped_nombre ?? '', huesped_telefono: txt(r?.huesped_telefono), huesped_email: txt(r?.huesped_email),
-    fecha_entrada: r?.fecha_entrada ?? '', fecha_salida: r?.fecha_salida ?? '', num_huespedes: txt(r?.num_huespedes ?? 1),
+    fecha_entrada: r?.fecha_entrada ?? '', fecha_salida: r?.fecha_salida ?? '',
+    num_adultos: txt(r?.num_adultos ?? 1), num_ninos: txt(r?.num_ninos ?? 0), num_bebes: txt(r?.num_bebes ?? 0),
+    fecha_reservacion: txt(r?.fecha_reservacion), hora_llegada: txt(r?.hora_llegada_estimada).slice(0, 5), hora_salida: txt(r?.hora_salida_estimada).slice(0, 5),
+    foto_url: r?.foto_url ?? null, foto_documento_url: r?.foto_documento_url ?? null,
     plataforma: r?.plataforma ?? 'directo', codigo_confirmacion: txt(r?.codigo_confirmacion),
     monto_noche: txt(r?.monto_noche), monto_total: txt(r?.monto_total),
     estado: r?.estado ?? 'confirmada', notas: txt(r?.notas),
@@ -76,6 +86,18 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
   const [propiedadFiltro, setPropiedadFiltro] = useState('')
   const [editando, setEditando] = useState<ReservaUnificada | 'nueva' | null>(null)
   const [importando, setImportando] = useState(false)
+  // Personas del grupo (sólo reservas de propiedades enlazadas): como estaban y como quedan.
+  const [grupoInicial, setGrupoInicial] = useState<PersonaGrupo[]>([])
+  const [grupo, setGrupo] = useState<PersonaGrupo[]>([])
+  const [subiendo, setSubiendo] = useState(false)
+  const idEnEdicion = editando && editando !== 'nueva' && editando.origen === 'condominio' ? editando.id : null
+  useEffect(() => {
+    setGrupo([]); setGrupoInicial([])
+    if (!idEnEdicion) return
+    let vigente = true
+    void cargarGrupo(idEnEdicion).then(g => { if (vigente) { setGrupo(g); setGrupoInicial(g) } }).catch(() => undefined)
+    return () => { vigente = false }
+  }, [idEnEdicion])
   const [form, setForm] = useState<Form>(formDe())
   const { crear, actualizar, eliminar } = useReservasRentaMutations(companyId)
   const guardando = crear.isPending || actualizar.isPending
@@ -113,8 +135,10 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
     if (!form.huesped_nombre.trim()) { notify({ variant: 'error', title: 'Falta el nombre del huésped' }); return }
     if (!form.fecha_entrada || !form.fecha_salida) { notify({ variant: 'error', title: 'Faltan las fechas de entrada y salida' }); return }
     if (form.fecha_salida <= form.fecha_entrada) { notify({ variant: 'error', title: 'La salida debe ser posterior a la entrada' }); return }
-    const huespedes = Number(form.num_huespedes)
-    if (!Number.isInteger(huespedes) || huespedes < 1) { notify({ variant: 'error', title: 'Indica cuántos huéspedes son (al menos 1)' }); return }
+    const adultos = Number(form.num_adultos), ninos = Number(form.num_ninos || '0'), bebes = Number(form.num_bebes || '0')
+    if (!Number.isInteger(adultos) || adultos < 1) { notify({ variant: 'error', title: 'Indica cuántos adultos son (al menos 1)' }); return }
+    if (!Number.isInteger(ninos) || ninos < 0 || !Number.isInteger(bebes) || bebes < 0) { notify({ variant: 'error', title: 'Revisa cuántos niños y bebés son' }); return }
+    const enlazada = !!(propiedad.unidad_id && propiedad.project_id)
     const noche = numeroONulo(form.monto_noche)
     const total = numeroONulo(form.monto_total)
     if (noche === undefined || total === undefined) { notify({ variant: 'error', title: 'Revisa los montos', text: 'Deben ser números positivos.' }); return }
@@ -130,15 +154,32 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
     const importesAGuardar = conDesglose || habiaFicha || form.moneda !== MONEDA_DEFECTO ? importes : undefined
     const datos: DatosReserva = {
       huesped_nombre: form.huesped_nombre.trim(), huesped_email: nulo(form.huesped_email), huesped_telefono: nulo(form.huesped_telefono),
-      fecha_entrada: form.fecha_entrada, fecha_salida: form.fecha_salida, num_huespedes: huespedes,
+      fecha_entrada: form.fecha_entrada, fecha_salida: form.fecha_salida,
+      num_huespedes: adultos + ninos + bebes, num_adultos: adultos, num_ninos: ninos, num_bebes: bebes,
+      fecha_reservacion: nulo(form.fecha_reservacion), hora_llegada_estimada: nulo(form.hora_llegada), hora_salida_estimada: nulo(form.hora_salida),
+      ...(enlazada ? { foto_url: form.foto_url, foto_documento_url: form.foto_documento_url } : {}),
       plataforma: form.plataforma, codigo_confirmacion: nulo(form.codigo_confirmacion),
       monto_noche: noche, monto_total: recibido ?? total ?? totalSugerido,
       estado: form.estado, notas: nulo(form.notas),
       politica_cancelacion: form.politica_cancelacion === '' ? null : form.politica_cancelacion, num_mascotas: mascotas,
     }
     try {
-      if (editando === 'nueva') await crear.mutateAsync({ propiedad, datos, importes: importesAGuardar, moneda: form.moneda })
-      else await actualizar.mutateAsync({ reserva: editando, datos, propiedad, importes: importesAGuardar, moneda: form.moneda })
+      let reservaStrId: string | null = null
+      if (editando === 'nueva') {
+        const ref = await crear.mutateAsync({ propiedad, datos, importes: importesAGuardar, moneda: form.moneda })
+        if (ref?.origen === 'condominio') reservaStrId = ref.id
+      } else {
+        await actualizar.mutateAsync({ reserva: editando, datos, propiedad, importes: importesAGuardar, moneda: form.moneda })
+        if (editando.origen === 'condominio') reservaStrId = editando.id
+      }
+      // La reserva ya quedó guardada: si el grupo falla se avisa aparte, sin perderla.
+      if (reservaStrId && (grupo.length > 0 || grupoInicial.length > 0)) {
+        try {
+          await guardarGrupo(reservaStrId, grupoInicial, grupo)
+        } catch (e) {
+          notify({ variant: 'warning', title: 'La reserva se guardó, pero no las personas del grupo', text: mensajeErrorRentas(e, 'Edita la reserva e intenta de nuevo.') })
+        }
+      }
       setEditando(null)
       notify({ variant: 'success', title: editando === 'nueva' ? 'Reserva registrada' : 'Reserva actualizada', duration: 1500 })
     } catch (e) {
@@ -304,7 +345,7 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
           closeOnBackdropClick={!guardando} closeOnEscape={!guardando}
           footer={<>
             <Button variant="secondary" onClick={cerrar} disabled={guardando}>Cancelar</Button>
-            <Button type="submit" form="rentas-reserva-form" loading={guardando} loadingText="Guardando...">Guardar</Button>
+            <Button type="submit" form="rentas-reserva-form" loading={guardando} loadingText="Guardando..." disabled={subiendo}>Guardar</Button>
           </>}
         >
           <form id="rentas-reserva-form" onSubmit={e => { e.preventDefault(); void guardar() }}
@@ -345,12 +386,45 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
                 <label htmlFor="rr-salida" style={etiqueta}>Salida *</label>
                 <input id="rr-salida" type="date" value={form.fecha_salida} min={form.fecha_entrada || undefined} onChange={e => set('fecha_salida', e.target.value)} style={campo} />
               </div>
-              {(editando === 'nueva' || editando.origen === 'rentas') && (
-                <div>
-                  <label htmlFor="rr-huespedes" style={etiqueta}>Huéspedes</label>
-                  <input id="rr-huespedes" type="text" inputMode="numeric" value={form.num_huespedes} onChange={e => set('num_huespedes', e.target.value)} style={campo} />
-                </div>
-              )}
+              <div>
+                <label htmlFor="rr-reservacion" style={etiqueta}>Fecha de reservación</label>
+                <input id="rr-reservacion" type="date" value={form.fecha_reservacion} onChange={e => set('fecha_reservacion', e.target.value)} style={campo} />
+              </div>
+            </div>
+            <div style={rejilla(200)}>
+              <div>
+                <label htmlFor="rr-llegada" style={etiqueta}>Hora estimada de llegada</label>
+                <input id="rr-llegada" type="time" value={form.hora_llegada} onChange={e => set('hora_llegada', e.target.value)} style={campo} />
+              </div>
+              <div>
+                <label htmlFor="rr-hsalida" style={etiqueta}>Hora estimada de salida</label>
+                <input id="rr-hsalida" type="time" value={form.hora_salida} onChange={e => set('hora_salida', e.target.value)} style={campo} />
+              </div>
+            </div>
+            <div style={rejilla(110)}>
+              <div>
+                <label htmlFor="rr-adultos" style={etiqueta}>Adultos</label>
+                <input id="rr-adultos" type="text" inputMode="numeric" value={form.num_adultos} onChange={e => set('num_adultos', e.target.value)} style={campo} />
+              </div>
+              <div>
+                <label htmlFor="rr-ninos" style={etiqueta}>Niños</label>
+                <input id="rr-ninos" type="text" inputMode="numeric" value={form.num_ninos} onChange={e => set('num_ninos', e.target.value)} style={campo} />
+              </div>
+              <div>
+                <label htmlFor="rr-bebes" style={etiqueta}>Bebés</label>
+                <input id="rr-bebes" type="text" inputMode="numeric" value={form.num_bebes} onChange={e => set('num_bebes', e.target.value)} style={campo} />
+              </div>
+              <div>
+                <label htmlFor="rr-mascotas" style={etiqueta}>Mascotas</label>
+                {propiedadForm?.unidad_id ? (
+                  <select id="rr-mascotas" value={Number(form.num_mascotas) > 0 ? '1' : '0'} onChange={e => set('num_mascotas', e.target.value)} style={campo}>
+                    <option value="0">No</option>
+                    <option value="1">Sí</option>
+                  </select>
+                ) : (
+                  <input id="rr-mascotas" type="text" inputMode="numeric" value={form.num_mascotas} onChange={e => set('num_mascotas', e.target.value)} style={campo} />
+                )}
+              </div>
             </div>
             {solapes.length > 0 && (
               <p role="status" style={{ margin: 0, padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', fontSize: '13px' }}>
@@ -389,12 +463,6 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
                 <label htmlFor="rr-moneda" style={etiqueta}>Moneda</label>
                 <SelectMoneda id="rr-moneda" value={form.moneda} onChange={m => set('moneda', m)} />
               </div>
-              {(editando === 'nueva' || editando.origen === 'rentas') && (
-                <div>
-                  <label htmlFor="rr-mascotas" style={etiqueta}>Mascotas</label>
-                  <input id="rr-mascotas" type="text" inputMode="numeric" value={form.num_mascotas} onChange={e => set('num_mascotas', e.target.value)} style={campo} />
-                </div>
-              )}
             </div>
             {conceptos.length > 0 && (
               <details open={tieneDesglose(importesDeFormulario(form.desglose)) || undefined}>
@@ -427,6 +495,25 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
               <label htmlFor="rr-notas" style={etiqueta}>Notas</label>
               <textarea id="rr-notas" value={form.notas} onChange={e => set('notas', e.target.value)} rows={3} style={campo} maxLength={1000} />
             </div>
+            {propiedadForm?.unidad_id && propiedadForm.project_id ? (
+              <MediaScopeProvider projectId={propiedadForm.project_id}>
+                <section aria-label="Fotografías del huésped principal" style={{ borderTop: '1px solid var(--at-line)', paddingTop: '0.75rem' }}>
+                  <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '0.5rem' }}>
+                    Fotografías del huésped principal <span style={{ ...tenue, fontWeight: 400 }}>(opcional — se pueden completar al ingreso)</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 200px))', gap: '0.75rem' }}>
+                    <ImageUploader value={form.foto_url} onChange={v => set('foto_url', v)} folder="str_guests" label="Foto del huésped" capture onSubiendo={setSubiendo} />
+                    <ImageUploader value={form.foto_documento_url} onChange={v => set('foto_documento_url', v)} folder="str_guests" label="DPI / Documento" capture onSubiendo={setSubiendo} />
+                  </div>
+                </section>
+                <GrupoHuespedes personas={grupo} onChange={setGrupo} principal={form.huesped_nombre} onSubiendo={setSubiendo}
+                  maximo={(Number(form.num_adultos) || 0) + (Number(form.num_ninos) || 0) - 1} />
+              </MediaScopeProvider>
+            ) : propiedadForm ? (
+              <p style={{ ...tenue, margin: 0 }}>
+                Las fotos del huésped y las personas del grupo se registran en las propiedades enlazadas a un condominio.
+              </p>
+            ) : null}
           </form>
         </EditModal>
       )}

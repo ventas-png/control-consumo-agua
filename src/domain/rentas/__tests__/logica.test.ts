@@ -17,7 +17,7 @@ const prop = (id: string, extra: Partial<PropiedadRenta> = {}): PropiedadRenta =
 const reserva = (id: string, propiedad_id: string, entrada: string, salida: string, extra: Partial<ReservaUnificada> = {}): ReservaUnificada => ({
   id, origen: 'rentas', propiedad_id, huesped_nombre: 'Ana', huesped_email: null, huesped_telefono: null,
   fecha_entrada: entrada, fecha_salida: salida, num_huespedes: 2, plataforma: 'directo', codigo_confirmacion: null,
-  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0, ...extra,
+  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0, fecha_reservacion: null, hora_llegada_estimada: null, hora_salida_estimada: null, num_adultos: 1, num_ninos: 0, num_bebes: 0, foto_url: null, foto_documento_url: null, ...extra,
 })
 const contrato = (id: string, propiedad_id: string, extra: Partial<ContratoRenta> = {}): ContratoRenta => ({
   id, company_id: 'c1', propiedad_id, inquilino_nombre: 'Luis', inquilino_identificacion: null,

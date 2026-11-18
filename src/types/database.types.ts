@@ -20002,7 +20002,10 @@ export type Database = {
           created_at: string
           estado: string
           fecha_entrada: string
+          fecha_reservacion: string | null
           fecha_salida: string
+          hora_llegada_estimada: string | null
+          hora_salida_estimada: string | null
           huesped_email: string | null
           huesped_nombre: string
           huesped_telefono: string | null
@@ -20010,8 +20013,10 @@ export type Database = {
           monto_noche: number | null
           monto_total: number | null
           notas: string | null
+          num_bebes: number
           num_huespedes: number
           num_mascotas: number
+          num_ninos: number
           plataforma: string
           politica_cancelacion: string | null
           propiedad_id: string
@@ -20024,7 +20029,10 @@ export type Database = {
           created_at?: string
           estado?: string
           fecha_entrada: string
+          fecha_reservacion?: string | null
           fecha_salida: string
+          hora_llegada_estimada?: string | null
+          hora_salida_estimada?: string | null
           huesped_email?: string | null
           huesped_nombre: string
           huesped_telefono?: string | null
@@ -20032,8 +20040,10 @@ export type Database = {
           monto_noche?: number | null
           monto_total?: number | null
           notas?: string | null
+          num_bebes?: number
           num_huespedes?: number
           num_mascotas?: number
+          num_ninos?: number
           plataforma?: string
           politica_cancelacion?: string | null
           propiedad_id: string
@@ -20046,7 +20056,10 @@ export type Database = {
           created_at?: string
           estado?: string
           fecha_entrada?: string
+          fecha_reservacion?: string | null
           fecha_salida?: string
+          hora_llegada_estimada?: string | null
+          hora_salida_estimada?: string | null
           huesped_email?: string | null
           huesped_nombre?: string
           huesped_telefono?: string | null
@@ -20054,8 +20067,10 @@ export type Database = {
           monto_noche?: number | null
           monto_total?: number | null
           notas?: string | null
+          num_bebes?: number
           num_huespedes?: number
           num_mascotas?: number
+          num_ninos?: number
           plataforma?: string
           politica_cancelacion?: string | null
           propiedad_id?: string

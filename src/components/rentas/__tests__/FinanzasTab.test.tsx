@@ -31,7 +31,7 @@ const propiedades = [prop('p1', 'Apto 1D SQ', { propietario_nombre: 'Doña Marta
 const reservas: ReservaUnificada[] = [{
   id: 'r1', origen: 'rentas', propiedad_id: 'p1', huesped_nombre: 'Ana', huesped_email: null, huesped_telefono: null,
   fecha_entrada: '2026-02-02', fecha_salida: '2026-02-04', num_huespedes: 2, plataforma: 'airbnb', codigo_confirmacion: 'HM34',
-  monto_noche: null, monto_total: 90, estado: 'completada', notas: null, politica_cancelacion: 'no_reembolsable', num_mascotas: 0,
+  monto_noche: null, monto_total: 90, estado: 'completada', notas: null, politica_cancelacion: 'no_reembolsable', num_mascotas: 0, fecha_reservacion: null, hora_llegada_estimada: null, hora_salida_estimada: null, num_adultos: 1, num_ninos: 0, num_bebes: 0, foto_url: null, foto_documento_url: null,
 }]
 const lista: LiquidacionRenta[] = [{ id: 'l1', company_id: 'c1', propiedad_id: 'p1', reserva_id: 'r1', reserva_str_id: null, moneda: 'USD', importes: { h1: 110, a1: 100, a2: 10 }, created_at: '', updated_at: '' }]
 const liquidaciones = liquidacionesPorReserva(lista)

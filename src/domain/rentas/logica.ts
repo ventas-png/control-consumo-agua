@@ -89,6 +89,11 @@ export function unificarReservas(
       plataforma: r.plataforma, codigo_confirmacion: r.codigo_confirmacion,
       monto_noche: r.monto_noche, monto_total: r.monto_total, estado: r.estado, notas: r.notas,
       politica_cancelacion: r.politica_cancelacion ?? null, num_mascotas: r.num_mascotas ?? 0,
+      fecha_reservacion: r.fecha_reservacion ?? null,
+      hora_llegada_estimada: r.hora_llegada_estimada ?? null, hora_salida_estimada: r.hora_salida_estimada ?? null,
+      num_adultos: Math.max(1, r.num_huespedes - (r.num_ninos ?? 0) - (r.num_bebes ?? 0)),
+      num_ninos: r.num_ninos ?? 0, num_bebes: r.num_bebes ?? 0,
+      foto_url: null, foto_documento_url: null,
     }))
 
   const enlazadas: ReservaUnificada[] = []
@@ -106,6 +111,10 @@ export function unificarReservas(
       estado: ESTADOS_RESERVA_SET.has(r.estado) ? (r.estado as EstadoReservaRenta) : 'confirmada',
       notas: r.notas ?? null,
       politica_cancelacion: r.politica_cancelacion ?? null, num_mascotas: r.mascotas ? 1 : 0,
+      fecha_reservacion: r.fecha_reservacion ?? null,
+      hora_llegada_estimada: r.hora_llegada_estimada ?? null, hora_salida_estimada: r.hora_salida_estimada ?? null,
+      num_adultos: r.num_adultos ?? 0, num_ninos: r.num_ninos ?? 0, num_bebes: r.num_bebes ?? 0,
+      foto_url: r.foto_url ?? null, foto_documento_url: r.foto_documento_url ?? null,
     })
   }
 
