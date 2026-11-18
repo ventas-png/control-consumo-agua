@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { ArticuloInventarioRenta, ContratoRenta, PropiedadRenta, ReservaRenta, ReservaSTR, ReservaUnificada } from '../../../types'
 import {
   contratoActivo, diasEntre, diasParaVencer, mensajeErrorRentas, noches, numeroONulo, ocupacionDePropiedad,
-  reservaCubre, reservasSolapadas, resumenCartera, resumenInventario, unificarReservas,
+  fotosPorBorrar, reservaCubre, reservasSolapadas, resumenCartera, resumenInventario, unificarReservas,
 } from '../logica'
 
 const HOY = '2026-11-16'
@@ -28,7 +28,7 @@ const contrato = (id: string, propiedad_id: string, extra: Partial<ContratoRenta
 const articulo = (id: string, extra: Partial<ArticuloInventarioRenta> = {}): ArticuloInventarioRenta => ({
   id, company_id: 'c1', propiedad_id: 'a', nombre: 'Sofá', categoria: 'mobiliario', ambiente: null,
   cantidad: 1, estado: 'bueno', valor_unitario: null, numero_serie: null, fecha_revision: null, notas: null,
-  created_at: '', updated_at: '', ...extra,
+  fotos: [], created_at: '', updated_at: '', ...extra,
 })
 
 describe('fechas', () => {
@@ -131,6 +131,21 @@ describe('contratos por vencer', () => {
     expect(diasParaVencer(contrato('c', 'a', { fecha_fin: '2026-11-10' }), HOY)).toBe(-6)
     expect(diasParaVencer(contrato('c', 'a', { fecha_fin: null }), HOY)).toBeNull()
     expect(diasParaVencer(contrato('c', 'a', { estado: 'finalizado' }), HOY)).toBeNull()
+  })
+})
+
+describe('fotosPorBorrar', () => {
+  it('sin guardar (cancelar) sólo se van las subidas en esta edición; las de la fila se quedan', () => {
+    expect(fotosPorBorrar(['e/p/a.jpg'], ['e/p/a.jpg', 'e/p/n1.jpg', 'e/p/n2.jpg'], null)).toEqual(['e/p/n1.jpg', 'e/p/n2.jpg'])
+  })
+  it('guardando, se va todo lo que la fila ya no nombra: quitadas y subidas descartadas', () => {
+    expect(fotosPorBorrar(['e/p/a.jpg', 'e/p/b.jpg'], ['e/p/n1.jpg', 'e/p/n2.jpg'], ['e/p/b.jpg', 'e/p/n2.jpg']).sort())
+      .toEqual(['e/p/a.jpg', 'e/p/n1.jpg'])
+  })
+  it('un alta guardada con sus fotos no borra nada; sin tocar nada tampoco', () => {
+    expect(fotosPorBorrar([], ['e/p/n1.jpg'], ['e/p/n1.jpg'])).toEqual([])
+    expect(fotosPorBorrar(['e/p/a.jpg'], [], null)).toEqual([])
+    expect(fotosPorBorrar(['e/p/a.jpg'], ['e/p/a.jpg'], ['e/p/a.jpg'])).toEqual([])
   })
 })
 

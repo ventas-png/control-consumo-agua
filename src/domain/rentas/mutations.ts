@@ -5,6 +5,8 @@ import type {
 } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { QueryError, runQuery } from '../queryFetch'
+import { removeMedia } from '../shared/storage'
+import { BUCKET_RENTAS_INVENTARIO } from '../shared/buckets'
 import { MONEDA_DEFECTO } from './finanzas'
 import { rentasKeys } from './keys'
 
@@ -64,6 +66,15 @@ export function useContratosRentaMutations(companyId?: string) {
 }
 export function useInventarioRentaMutations(companyId?: string) {
   return useGuardar<ArticuloInventarioRenta>('rentas_inventario', c => [rentasKeys.inventario(c) as unknown as unknown[]], companyId)
+}
+
+/**
+ * Retira fotos del inventario del bucket. Va DESPUÉS de guardar o borrar la
+ * fila: la policy no deja borrar una foto que alguna fila nombra todavía. Sin
+ * esperar ni avisar: si falla queda un archivo huérfano, nunca un artículo roto.
+ */
+export function retirarFotosInventario(rutas: readonly string[]): void {
+  if (rutas.length > 0) void removeMedia(BUCKET_RENTAS_INVENTARIO, [...rutas])
 }
 
 export function useGastosRentaMutations(companyId?: string) {
