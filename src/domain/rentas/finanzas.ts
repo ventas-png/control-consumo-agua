@@ -372,3 +372,78 @@ export function codigoDeConcepto(nombre: string, usados: ReadonlySet<string>): s
   if (!usados.has(base)) return base
   for (let i = 2; ; i++) if (!usados.has(`${base}_${i}`)) return `${base}_${i}`
 }
+
+// ── Tendencia ────────────────────────────────────────────────────────────────
+
+export interface PuntoTendencia {
+  mes: string
+  dias: number
+  nochesOcupadas: number
+  /** 0–100. */
+  ocupacionPct: number
+  estadias: number
+  acreditado: number
+  comision: number
+  /** Gastos a cargo del propietario + los que absorbe la administradora. */
+  gastos: number
+  pagoPropietario: number
+  /** Acreditado por noche ocupada; null si el mes no tuvo noches ocupadas. */
+  ingresoPorNoche: number | null
+}
+
+/**
+ * El desempeño mes a mes de una o varias propiedades: los `meses` meses que
+ * terminan en `mesFin`, del más antiguo al más reciente. Cada punto es el
+ * mismo cálculo de `resumenCarteraMes` (misma moneda, sin tipo de cambio).
+ */
+export function tendenciaMeses(
+  propiedades: PropiedadRenta[], mesFin: string, meses: number, reservas: ReservaUnificada[], contratos: ContratoRenta[],
+  gastos: GastoRenta[], conceptos: ConceptoRenta[], liquidaciones: Map<string, LiquidacionRenta>, moneda: string = MONEDA_DEFECTO,
+): PuntoTendencia[] {
+  const ids = new Set(propiedades.map(p => p.id))
+  const suyas = reservas.filter(r => ids.has(r.propiedad_id))
+  const puntos: PuntoTendencia[] = []
+  for (let i = meses - 1; i >= 0; i--) {
+    const mes = mesDesplazado(mesFin, -i)
+    const { total: t } = resumenCarteraMes(propiedades, mes, suyas, contratos, gastos, conceptos, liquidaciones, moneda)
+    puntos.push({
+      mes, dias: t.dias, nochesOcupadas: t.nochesOcupadas, ocupacionPct: t.ocupacionPct, estadias: t.estadias,
+      acreditado: t.acreditado, comision: t.comision, gastos: r2(t.gastosPropietario + t.gastosAdministradora),
+      pagoPropietario: t.pagoPropietario,
+      ingresoPorNoche: t.nochesOcupadas > 0 ? r2(t.acreditado / t.nochesOcupadas) : null,
+    })
+  }
+  return puntos
+}
+
+export interface ResumenTendencia {
+  acreditado: number
+  gastos: number
+  pagoPropietario: number
+  nochesOcupadas: number
+  dias: number
+  /** Ocupación de todo el periodo (noches ocupadas / noches disponibles), 0–100. */
+  ocupacionPct: number
+  estadias: number
+  ingresoPorNoche: number | null
+  /** Mes con más acreditado; null si ninguno tuvo ingresos. */
+  mejorMes: PuntoTendencia | null
+}
+
+export function resumenTendencia(puntos: PuntoTendencia[]): ResumenTendencia {
+  const suma = (f: (p: PuntoTendencia) => number) => r2(puntos.reduce((a, p) => a + f(p), 0))
+  const acreditado = suma(p => p.acreditado), noches = suma(p => p.nochesOcupadas), dias = suma(p => p.dias)
+  const mejor = puntos.reduce<PuntoTendencia | null>((m, p) => (p.acreditado > (m?.acreditado ?? 0) ? p : m), null)
+  return {
+    acreditado, gastos: suma(p => p.gastos), pagoPropietario: suma(p => p.pagoPropietario),
+    nochesOcupadas: noches, dias, ocupacionPct: dias > 0 ? Math.round((noches / dias) * 100) : 0,
+    estadias: suma(p => p.estadias), ingresoPorNoche: noches > 0 ? r2(acreditado / noches) : null, mejorMes: mejor,
+  }
+}
+
+const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+/** `2026-02` → «feb 26». */
+export function mesCorto(mes: string): string {
+  const [a, m] = mes.split('-').map(Number)
+  return `${MESES_CORTOS[m - 1] ?? mes} ${String(a).slice(2)}`
+}

@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import type { ConceptoRenta, ContratoRenta, GastoRenta, LiquidacionRenta, PropiedadRenta, ReservaUnificada } from '../../../types'
 import {
   calendarioMes, codigoDeConcepto, contratoCubreMes, diasDelMes, importesDeFormulario, liquidacionesPorReserva,
-  mesDesplazado, monedaDeReserva, MONEDAS_RENTA, nochesEnMes, nombreMes, resumenCarteraMes, resumenMes, tieneDesglose, totalesDesglose,
+  mesCorto, mesDesplazado, monedaDeReserva, resumenTendencia, tendenciaMeses, MONEDAS_RENTA, nochesEnMes, nombreMes, resumenCarteraMes, resumenMes, tieneDesglose, totalesDesglose,
 } from '../finanzas'
 
 const concepto = (bloque: 'huesped' | 'anfitrion', codigo: string, signo: 1 | -1, orden: number, extra: Partial<ConceptoRenta> = {}): ConceptoRenta => ({
@@ -216,5 +216,26 @@ describe('moneda', () => {
     const sinMonto = reserva('VACIA', '2026-02-10', '2026-02-11', 1)
     const m = liquidacionesPorReserva([...LIQUIDACIONES, { id: 'lv', company_id: 'c1', propiedad_id: 'p1', reserva_id: 'VACIA', reserva_str_id: null, importes: {}, moneda: 'MXN', created_at: '', updated_at: '' }])
     expect(mes({ reservas: [...RESERVAS, sinMonto], liquidaciones: m }).otrasMonedas).toEqual([])
+  })
+})
+
+describe('tendencia', () => {
+  const liq = liquidacionesPorReserva(LIQUIDACIONES)
+  const puntos = tendenciaMeses([propiedad({ comision_pct: 20 })], '2026-03', 3, RESERVAS, [], [gasto('2026-02-03', 100)], CONCEPTOS, liq)
+  it('un punto por mes, del más antiguo al más reciente, con el mismo cálculo del mes', () => {
+    expect(puntos.map(p => p.mes)).toEqual(['2026-01', '2026-02', '2026-03'])
+    expect(puntos[1]).toMatchObject({ dias: 28, nochesOcupadas: 23, ocupacionPct: 82, estadias: 5, acreditado: 1396.01, gastos: 100, pagoPropietario: 1016.81, ingresoPorNoche: 60.7 })
+    expect(puntos[0]).toMatchObject({ acreditado: 0, nochesOcupadas: 0, ingresoPorNoche: null })
+  })
+  it('sólo cuentan las reservas de las propiedades pedidas', () => {
+    const otra = tendenciaMeses([propiedad({ id: 'p9' })], '2026-02', 1, RESERVAS, [], [], CONCEPTOS, liq)
+    expect(otra[0]).toMatchObject({ acreditado: 0, estadias: 0 })
+  })
+  it('resumen del periodo: totales, ocupación sobre todas las noches y el mejor mes', () => {
+    const r = resumenTendencia(puntos)
+    expect(r).toMatchObject({ acreditado: 1396.01, nochesOcupadas: 23, dias: 90, ocupacionPct: 26, estadias: 5, ingresoPorNoche: 60.7 })
+    expect(r.mejorMes?.mes).toBe('2026-02')
+    expect(resumenTendencia([puntos[0]]).mejorMes).toBeNull()
+    expect(mesCorto('2026-02')).toBe('feb 26')
   })
 })

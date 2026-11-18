@@ -4,7 +4,7 @@ import type {
 } from '../../../types'
 import {
   BLOQUE_TOTAL_LABEL, MONEDA_DEFECTO, POLITICA_CANCELACION_LABEL, calendarioMes, claveReserva, conceptosDeBloque, esMes, mesDesplazado,
-  monedaDeReserva, nombreMes, resumenCarteraMes, resumenMes, tieneDesglose, totalesDesglose,
+  monedaDeReserva, nombreMes, resumenCarteraMes, resumenMes, tendenciaMeses, tieneDesglose, totalesDesglose,
 } from '../../../domain/rentas/finanzas'
 import { TIPO_RENTA_ICONO } from '../../../domain/rentas/logica'
 import { formatCurrency } from '../../../lib/format'
@@ -18,6 +18,8 @@ import { GastosPanel } from '../finanzas/GastosPanel'
 import { IngresosMes, OcupacionMes } from '../finanzas/Graficas'
 import { ImportarReservasModal } from '../finanzas/ImportarReservasModal'
 import { SelectMoneda } from '../finanzas/SelectMoneda'
+import { Tendencia } from '../finanzas/Tendencia'
+import { FilterChips } from '../../shared/FilterChips'
 import { barraFiltros, campo, encabezadoTab, fila, rejillaTiles, td, tenue, th, thead } from '../ui'
 
 interface Props {
@@ -54,6 +56,8 @@ export default function FinanzasTab({
   const [moneda, setMoneda] = useState(MONEDA_DEFECTO)
   const [columnas, setColumnas] = useState(false)
   const [modal, setModal] = useState<'conceptos' | 'importar' | null>(null)
+  const [vista, setVista] = useState<'mes' | 'tendencia'>('mes')
+  const [rango, setRango] = useState(12)
   const [generando, setGenerando] = useState(false)
 
   const nombreProyecto = useMemo(() => new Map(proyectos.map(p => [p.id, p.nombre])), [proyectos])
@@ -83,6 +87,12 @@ export default function FinanzasTab({
       }),
     }
   }, [propiedad, mes, reservas, contratos, gastos, conceptos, liquidaciones, moneda])
+
+  const tendencia = useMemo(
+    () => (vista === 'tendencia'
+      ? tendenciaMeses(propiedad ? [propiedad] : propiedades, mes, rango, reservas, contratos, gastos, conceptos, liquidaciones, moneda)
+      : []),
+    [vista, propiedad, propiedades, mes, rango, reservas, contratos, gastos, conceptos, liquidaciones, moneda])
 
   const delHuesped = useMemo(() => conceptosDeBloque(conceptos, 'huesped'), [conceptos])
   const delAnfitrion = useMemo(() => conceptosDeBloque(conceptos, 'anfitrion'), [conceptos])
@@ -124,6 +134,17 @@ export default function FinanzasTab({
         </div>
       </div>
 
+      <div style={{ ...barraFiltros, marginBottom: '0.75rem' }}>
+        <FilterChips<'mes' | 'tendencia'> ariaLabel="Vista" value={vista} onChange={setVista}
+          options={[{ value: 'mes', label: 'El mes' }, { value: 'tendencia', label: 'Tendencia' }]} />
+        {vista === 'tendencia' && (
+          <select aria-label="Periodo" value={rango} onChange={e => setRango(Number(e.target.value))} style={{ ...campo, width: 'auto' }}>
+            <option value={6}>Últimos 6 meses</option>
+            <option value={12}>Últimos 12 meses</option>
+            <option value={24}>Últimos 24 meses</option>
+          </select>
+        )}
+      </div>
       <div style={barraFiltros}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
           <Button size="sm" variant="secondary" onClick={() => setMes(m => mesDesplazado(m, -1))} aria-label="Mes anterior">‹</Button>
@@ -136,15 +157,17 @@ export default function FinanzasTab({
           {propiedades.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
         </select>
         <SelectMoneda id="rf-moneda" ariaLabel="Moneda de los montos" value={moneda} onChange={setMoneda} extra={monedasUsadas} />
-        <span style={{ ...tenue, fontSize: '13px' }}>{nombreMes(mes)}</span>
+        <span style={{ ...tenue, fontSize: '13px' }}>{vista === 'tendencia' ? `hasta ${nombreMes(mes)}` : nombreMes(mes)}</span>
       </div>
-      {(detalle?.resumen.otrasMonedas ?? cartera.otrasMonedas).length > 0 && (
+      {vista === 'mes' && (detalle?.resumen.otrasMonedas ?? cartera.otrasMonedas).length > 0 && (
         <p role="status" style={{ margin: '0 0 1rem', padding: '0.5rem 0.75rem', borderRadius: '6px', background: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', fontSize: '13px' }}>
           Este mes también hay montos en {(detalle?.resumen.otrasMonedas ?? cartera.otrasMonedas).join(', ')}. Aquí sólo se suman los de {moneda}: cambia la moneda arriba para verlos.
         </p>
       )}
 
-      {!propiedad || !detalle ? (
+      {vista === 'tendencia' ? (
+        <Tendencia puntos={tendencia} moneda={moneda} onVerMes={m => { setMes(m); setVista('mes') }} />
+      ) : !propiedad || !detalle ? (
         <>
           <div style={rejillaTiles}>
             <StatTile label="Ocupación del mes" value={`${cartera.total.ocupacionPct}%`} icon="🔑"

@@ -116,6 +116,14 @@ Lleva dentro de la aplicación la hoja de Excel que las administradoras mantiene
 - **Carga masiva** desde la pestaña Reservas: la misma plantilla de Finanzas con las columnas `Propiedad` (nombre o
   código; se omite si hay una propiedad filtrada) y `Moneda`. Código de reserva repetido en la misma propiedad = actualización.
 
+## Tendencia
+
+**Finanzas › Tendencia** muestra el desempeño mes a mes de una propiedad o de toda la cartera en los últimos 6, 12 o
+24 meses (hasta el mes elegido): acreditado y ocupación por mes en dos gráficas —una medida cada una—, los totales
+del periodo (acreditado, ocupación, ingreso por noche ocupada, mejor mes, a pagar a propietarios) y la tabla, desde
+la que se salta al detalle de un mes. Es el mismo cálculo de `resumenCarteraMes` repetido por mes (`tendenciaMeses`,
+puro), en la moneda elegida. Se alimenta del historial cargado con «Carga masiva».
+
 ## Archivos
 
 | Qué | Dónde |
