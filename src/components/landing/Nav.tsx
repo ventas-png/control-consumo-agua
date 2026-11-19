@@ -71,9 +71,12 @@ interface LoginModalProps {
   // usuario volvió del redirect sin sesión). Cualquier acción posterior del
   // usuario lo reemplaza por el resultado de esa acción.
   initialError?: string
+  // false = pantalla de login fija (app nativa): sin ✕, sin cerrar con Escape
+  // ni tocando fuera, porque detrás no hay landing a la que volver.
+  dismissable?: boolean
 }
 
-export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onLoginWithApple, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialError }: LoginModalProps) {
+export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onLoginWithApple, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialError, dismissable = true }: LoginModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -93,14 +96,14 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onLog
 
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && dismissable && onClose()
     document.addEventListener('keydown', onKey)
     document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKey)
       document.body.style.overflow = ''
     }
-  }, [open, onClose])
+  }, [open, onClose, dismissable])
 
   if (!open) return null
 
@@ -157,9 +160,9 @@ export function LoginModal({ open, onClose, t, onLogin, onLoginWithGoogle, onLog
   }
 
   return (
-    <div className="modal-veil" onClick={onClose} role="dialog" aria-modal="true" aria-label={t.login.title}>
+    <div className="modal-veil" onClick={dismissable ? onClose : undefined} role="dialog" aria-modal="true" aria-label={t.login.title}>
       <div className="modal-card" ref={dialogRef} onClick={(e) => e.stopPropagation()}>
-        <button className="modal-x" onClick={onClose} aria-label="Close">✕</button>
+        {dismissable && <button className="modal-x" onClick={onClose} aria-label="Close">✕</button>}
         <div className="login-split">
           <div className="login-side">
             <div className="login-side-mark">

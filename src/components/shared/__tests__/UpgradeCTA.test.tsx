@@ -17,6 +17,10 @@ vi.mock('../../../lib/featureFlags', () => ({
   useFeatureFlags: () => ({ planName: 'Solo Agua', flags: new Set(), has: () => false, loading: false, planCode: 'agua_only', refresh: mockRefresh }),
 }))
 
+// Venta del plan permitida por defecto (web); los tests de la app nativa la apagan.
+const venta = vi.hoisted(() => ({ mostrarVentaDePlanes: vi.fn(() => true) }))
+vi.mock('../../../lib/ventaDePlanes', () => venta)
+
 import { UpgradeCTA } from '../UpgradeCTA'
 import { notify } from '../Dialog'
 
@@ -25,6 +29,7 @@ beforeEach(() => {
   mockInvoke.mockReset()
   mockRefresh.mockReset()
   vi.mocked(notify).mockReset()
+  venta.mostrarVentaDePlanes.mockReturnValue(true)
 })
 
 describe('UpgradeCTA — render', () => {
@@ -130,5 +135,21 @@ describe('UpgradeCTA — cambio de plan in-place (swapped)', () => {
     fireEvent.click(btn)
     await waitFor(() => expect(mockRefresh).toHaveBeenCalled())
     await waitFor(() => expect(screen.getByRole('button', { name: /Actualizar plan/i })).toBeDefined())
+  })
+})
+
+// App Store 3.1.1 / política de pagos de Google Play: en la app nativa el banner
+// solo informa — ni botón de compra ni "requiere el plan X" (lib/ventaDePlanes).
+describe('UpgradeCTA — app nativa', () => {
+  beforeEach(() => venta.mostrarVentaDePlanes.mockReturnValue(false))
+
+  it('no ofrece comprar ni dice qué plan comprar', () => {
+    render(<UpgradeCTA feature="Asambleas digitales" description="Vota online" requiredPlan="Bundle" />)
+    expect(screen.getByText(/Asambleas digitales no incluido/)).toBeDefined()
+    expect(screen.getByText('Vota online')).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Actualizar plan/ })).toBeNull()
+    expect(screen.queryByText(/Requiere/)).toBeNull()
+    expect(screen.getByText('Consulta con el administrador de tu cuenta.')).toBeDefined()
+    expect(mockInvoke).not.toHaveBeenCalled()
   })
 })
