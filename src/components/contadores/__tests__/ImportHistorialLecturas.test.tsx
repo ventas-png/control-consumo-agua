@@ -111,6 +111,36 @@ describe('ContadoresSection — Importar historial', () => {
     expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', title: 'Historial importado' }))
   })
 
+  it('en varios lotes, el aviso cuenta cada contador una sola vez', async () => {
+    // 501 filas del mismo contador: dos lotes (500 + 1), y la base informa
+    // «1 contador» en cada uno.
+    h.importarHistorialLecturas
+      .mockResolvedValueOnce({ data: { ...resumen(), filas: 500, insertadas: 500, contadores: 1 }, error: null })
+      .mockResolvedValueOnce({ data: { ...resumen(), filas: 1, insertadas: 1, contadores: 1 }, error: null })
+    render(
+      <ContadoresSection
+        contadores={contadores} tarifas={[] as Tarifa[]} unidades={[] as Unidad[]} proyectos={proyectos}
+        onContadorAdded={() => {}} onContadorUpdated={() => {}} onContadorDeleted={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Importar historial' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Importar lecturas históricas desde Excel' })
+    fireEvent.change(within(dialog).getByLabelText('Proyecto *'), { target: { value: 'p2' } })
+
+    const inicio = new Date(Date.UTC(2020, 0, 1))
+    const filas = Array.from({ length: 501 }, (_, i) => {
+      const d = new Date(inicio.getTime() + i * 86_400_000)
+      return `SQ-001,${d.toISOString().slice(0, 10)},${1000 + i},,`
+    })
+    subirCsv(`contador,fecha,lectura,consumo,notas\n${filas.join('\n')}\n`)
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Importar 501 lecturas históricas' }))
+
+    await waitFor(() => expect(h.importarHistorialLecturas).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Historial importado', text: expect.stringContaining('501 filas nuevas de 1 contador.'),
+    })))
+  })
+
   it('sin proyecto elegido marca los contadores que no existen y no deja importar', async () => {
     render(
       <ContadoresSection
