@@ -67,6 +67,7 @@ base() {
   aplicar "$1" "$SYNC"
   aplicar "$1" "$HISTMIG"
   aplicar "$1" "$PADRON"
+  aplicar "$1" "$RAIZ/supabase/migrations/20261206000000_agua_historial_importar_lecturas_por_indice.sql"
   aplicar "$1" "$AQUI/fixture-extra.sql"
   psql -q -d "$1" -c "
     GRANT USAGE ON SCHEMA public, auth TO authenticated, anon;
