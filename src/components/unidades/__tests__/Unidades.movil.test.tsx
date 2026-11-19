@@ -2,7 +2,7 @@
 // toda la pantalla y no se cierran a mitad de un guardado.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-library/react'
-import type { Cliente, Proyecto, Unidad } from '../../../types'
+import type { Cliente, Contador, Proyecto, Unidad } from '../../../types'
 
 const h = vi.hoisted(() => ({
   resolveUnidadProjectCompany: vi.fn(),
@@ -130,6 +130,32 @@ describe('UnidadFormModal — cliente asignado con buscador', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Actualizar' }))
     await waitFor(() => expect(h.updateUnidad).toHaveBeenCalledWith('un-1', expect.objectContaining({ cliente_id: 'cli-3' })))
+  })
+})
+
+describe('UnidadesSection — cambiar la unidad de proyecto', () => {
+  it('sus contadores pasan al proyecto nuevo también en la pantalla, sin recargar', async () => {
+    const otroProyecto = { ...proyecto, id: 'p2', nombre: 'Viñas' } as unknown as Proyecto
+    const contadores = [
+      { id: 'c-1', numero_serie: 'VSC1-1', unidad_id: 'un-1', project_id: 'p1', company_id: 'co1', activo: true },
+      { id: 'c-2', numero_serie: 'OTRA-1', unidad_id: 'un-9', project_id: 'p1', company_id: 'co1', activo: true },
+    ] as unknown as Contador[]
+    const onContadorUpdated = vi.fn()
+    h.updateUnidad.mockResolvedValue({ data: { ...unidad, project_id: 'p2' }, error: null })
+    render(
+      <UnidadesSection
+        unidades={[unidad]} contadores={contadores} clientes={[cliente]} proyectos={[proyecto, otroProyecto]}
+        onUnidadAdded={() => {}} onUnidadUpdated={() => {}} onUnidadDeleted={() => {}} onContadorUpdated={onContadorUpdated}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar Unidad' })
+    fireEvent.change(within(dialog).getByLabelText('Proyecto *'), { target: { value: 'p2' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Actualizar' }))
+
+    await waitFor(() => expect(h.updateUnidad).toHaveBeenCalledWith('un-1', expect.objectContaining({ project_id: 'p2' })))
+    await waitFor(() => expect(onContadorUpdated).toHaveBeenCalledWith('c-1', { project_id: 'p2', company_id: 'co1' }))
+    expect(onContadorUpdated).toHaveBeenCalledTimes(1)
   })
 })
 
