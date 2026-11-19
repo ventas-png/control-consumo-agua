@@ -2,6 +2,7 @@
 // CustomerPortal): KPIs, comparativos 24m, series por contador con línea de
 // tendencia (regresión lineal) y desgloses por tipo de agua y unidad. Antes
 // vivía en un useMemo de ~185 líneas dentro del componente, sin tests.
+import type { ConsumoHistorico } from './historialImportado'
 import { parseFecha } from './format'
 import { proyectarProximoRecibo, type ProyeccionRecibo } from './portalProyeccion'
 
@@ -91,6 +92,13 @@ export const MESES_LABELS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Se
 
 export interface PortalDashboardInputs {
   lecturas: LecturaInfo[]
+  /**
+   * Consumo del historial importado (lo que la empresa llevaba a mano antes de
+   * la plataforma). Sólo alimenta el CONSUMO —mes, promedio, comparaciones y
+   * gráfica en m³—: no tiene importes, no es deuda y no entra en la proyección
+   * del próximo recibo.
+   */
+  historial?: ConsumoHistorico[]
   contadores: ContadorInfo[]
   unidades: UnidadInfo[]
   /** IDs de registros que tienen foto (la foto se baja aparte, bajo demanda). */
@@ -142,13 +150,33 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
       l.contador_id != null && filteredContadorIds.has(l.contador_id)
     )
 
+    // Consumo = lecturas del sistema + historial importado. Para no contar dos
+    // veces un mes, el historial de un contador sólo vale hasta el mes ANTERIOR
+    // a su primera lectura del sistema.
+    const primerMesSistema = new Map<string, number>()
+    for (const l of filteredLecturas) {
+      const d = parseFecha(l.fecha)
+      const ym = d.getFullYear() * 12 + d.getMonth()
+      const previo = primerMesSistema.get(l.contador_id as string)
+      if (previo === undefined || ym < previo) primerMesSistema.set(l.contador_id as string, ym)
+    }
+    const filteredHistorial = (inputs.historial ?? []).filter(h => {
+      if (!filteredContadorIds.has(h.contador_id)) return false
+      const tope = primerMesSistema.get(h.contador_id)
+      if (tope === undefined) return true
+      const d = parseFecha(h.fecha)
+      return d.getFullYear() * 12 + d.getMonth() < tope
+    })
+    interface PuntoConsumo { contador_id: string | null; fecha: string; consumo: number }
+    const consumos: PuntoConsumo[] = [...filteredLecturas, ...filteredHistorial]
+
     const sameYM = (fecha: string, y: number, m: number) => {
       const d = parseFecha(fecha)
       return d.getFullYear() === y && d.getMonth() === m
     }
 
     // KPI 1: consumo mes actual
-    const consumoMesActual = filteredLecturas
+    const consumoMesActual = consumos
       .filter(l => sameYM(l.fecha, curY, curM))
       .reduce((s, l) => s + (l.consumo || 0), 0)
 
@@ -158,7 +186,7 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
       const d = new Date(curY, curM - i, 1)
       monthBuckets[`${d.getFullYear()}-${d.getMonth()}`] = 0
     }
-    filteredLecturas.forEach(l => {
+    consumos.forEach(l => {
       const d = parseFecha(l.fecha)
       const key = `${d.getFullYear()}-${d.getMonth()}`
       if (key in monthBuckets) monthBuckets[key] += (l.consumo || 0)
@@ -181,7 +209,7 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
     for (let i = 23; i >= 0; i--) {
       const d = new Date(curY, curM - i, 1)
       const y = d.getFullYear(); const m = d.getMonth()
-      const sliceLec = filteredLecturas.filter(l => sameYM(l.fecha, y, m))
+      const sliceLec = consumos.filter(l => sameYM(l.fecha, y, m))
       all24Consumo.push(parseFloat(sliceLec.reduce((s, l) => s + (l.consumo || 0), 0).toFixed(2)))
     }
 
@@ -220,8 +248,10 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
       const colorSet = CHART_COLOR_SETS[idx % CHART_COLOR_SETS.length]
       const label = contador.descripcion || contador.numero_serie
       const data = chartMonths.map(({ y, m }) => {
-        const cLec = filteredLecturas.filter(l => l.contador_id === contador.id && sameYM(l.fecha, y, m))
-        const val = cLec.reduce((s, l) => s + (chartMetric === 'm3' ? (l.consumo || 0) : (l.monto_calculado || 0)), 0)
+        // En m³ entra el historial importado; en moneda sólo lo cobrado.
+        const val = chartMetric === 'm3'
+          ? consumos.filter(l => l.contador_id === contador.id && sameYM(l.fecha, y, m)).reduce((s, l) => s + (l.consumo || 0), 0)
+          : filteredLecturas.filter(l => l.contador_id === contador.id && sameYM(l.fecha, y, m)).reduce((s, l) => s + (l.monto_calculado || 0), 0)
         return parseFloat(val.toFixed(2))
       })
       return { label, data, colorSet }
@@ -260,7 +290,7 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
     const comunidadDesc = [...comunidad].sort((a, b) => (a.mes < b.mes ? 1 : a.mes > b.mes ? -1 : 0))
     for (const c of comunidadDesc) {
       const d = parseFecha(c.mes)
-      const tu = filteredLecturas
+      const tu = consumos
         .filter(l => sameYM(l.fecha, d.getFullYear(), d.getMonth()))
         .reduce((s, l) => s + (l.consumo || 0), 0)
       if (tu > 0) {
@@ -296,7 +326,7 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
       if (!tipoAguaMap[c.tipo_agua])
         tipoAguaMap[c.tipo_agua] = { label: TIPO_AGUA_LABELS[c.tipo_agua] ?? c.tipo_agua, count: 0, consumoMes: 0, consumo12m: 0 }
       tipoAguaMap[c.tipo_agua].count++
-      const cLec = filteredLecturas.filter(l => l.contador_id === c.id)
+      const cLec = consumos.filter(l => l.contador_id === c.id)
       tipoAguaMap[c.tipo_agua].consumoMes += cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
       tipoAguaMap[c.tipo_agua].consumo12m += cLec.filter(l => parseFecha(l.fecha) >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
     })
@@ -312,8 +342,11 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
         const cLec = filteredLecturas
           .filter(l => l.contador_id === contador.id)
           .sort((a, b) => parseFecha(b.fecha).getTime() - parseFecha(a.fecha).getTime())
-        const consumoMes = cLec.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
-        const consumo12m = cLec.filter(l => parseFecha(l.fecha) >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
+        // Los consumos suman también el historial importado; `ultimaLectura` y
+        // las fotos son sólo de las lecturas del sistema.
+        const cCons = consumos.filter(l => l.contador_id === contador.id)
+        const consumoMes = cCons.filter(l => sameYM(l.fecha, curY, curM)).reduce((s, l) => s + (l.consumo || 0), 0)
+        const consumo12m = cCons.filter(l => parseFecha(l.fecha) >= twelveMonthsAgo).reduce((s, l) => s + (l.consumo || 0), 0)
         const ultimaLectura = cLec[0] ?? null
         // If current month has no reading yet, show the most recent month with data
         let consumoMesLabel = 'Este mes'
@@ -335,7 +368,8 @@ export function construirDashboardData(inputs: PortalDashboardInputs) {
     })
 
     const lecturasTotal = lecturas.length
-    const filteredLecturasCount = filteredLecturas.length
+    // Cuenta también el historial importado: con él hay gráfica que mostrar.
+    const filteredLecturasCount = consumos.length
 
     return {
       consumoMesActual, consumoPromedio, montoPendiente, contadoresActivos,

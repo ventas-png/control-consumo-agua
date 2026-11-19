@@ -23,6 +23,8 @@ NUESTRA="$RAIZ/supabase/migrations/20261130000000_agua_historial_lecturas.sql"
 # importación. La vigente es la última: va SIEMPRE encima y es la que se muta.
 PADRON0="$RAIZ/supabase/migrations/20261205000000_agua_historial_importar_padron_unico.sql"
 PADRON="$RAIZ/supabase/migrations/20261206000000_agua_historial_importar_lecturas_por_indice.sql"
+# 20261207000000 reemplaza la policy de lectura: agrega al residente (sus contadores).
+RESIDENTE="$RAIZ/supabase/migrations/20261207000000_agua_historial_portal_residente.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -43,7 +45,7 @@ correr() { if [ -n "$COMO" ]; then su postgres -c "PATH=$PATH $*"; else eval "$*
 
 limpiar() {
   correr "pg_ctl -D $DATA stop -m immediate" >/dev/null 2>&1 || true
-  rm -rf "$DATA" "$SOCK" "$MUT"
+  rm -rf "$DATA" "$SOCK" "$MUT" "$MUT".1 "$MUT".2 "$MUT".3
 }
 trap limpiar EXIT
 if [ -n "$COMO" ]; then chown -R postgres "$DATA" "$SOCK"; chmod 644 "$MUT"; fi
@@ -54,7 +56,7 @@ sleep 2
 
 export PGHOST="$SOCK" PGPORT="$PUERTO" PGUSER=postgres
 psql -q -d postgres -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;" >/dev/null
-for db in hist histm1 histm2 histm3 histm4 histm5 histm6 histm7 histm8 histm9; do psql -q -d postgres -c "CREATE DATABASE $db" >/dev/null; done
+for db in hist histm1 histm2 histm3 histm4 histm5 histm6 histm7 histm8 histm9 histm10 histm11 histm12; do psql -q -d postgres -c "CREATE DATABASE $db" >/dev/null; done
 
 aplicar() { PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d "$1" -f "$2" >/dev/null; }
 huella() { psql -q -At -d "$1" -f "$AQUI/huella.sql"; }
@@ -72,16 +74,17 @@ base() {
   " >/dev/null
 }
 # $2 = 20261130 (o su mutante) · $3 = la función vigente (o su mutante)
-preparar() { base "$1"; aplicar "$1" "$2"; aplicar "$1" "$PADRON0"; aplicar "$1" "$3"; }
+# $4 = la policy de lectura vigente (o su mutante)
+preparar() { base "$1"; aplicar "$1" "$2"; aplicar "$1" "$PADRON0"; aplicar "$1" "$3"; aplicar "$1" "$4"; }
 
 echo "── 1/4 · fixture: tenancy, padrón de agua, RLS de registros y contadores ─"
 base hist
 echo "  OK    2 empresas · 3 proyectos · 5 cuentas · 9 contadores · 1 lectura del sistema"
 
 echo "── 2/4 · la migración, DOS veces ───────────────────────────────────────"
-aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON"
+aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE"
 H1=$(huella hist)
-aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON"
+aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE"
 H2=$(huella hist)
 [ "$H1" = "$H2" ] || { echo "❌ re-aplicar la migración cambió el catálogo ($H1 ≠ $H2)"; exit 1; }
 echo "  OK    idempotente: la huella del catálogo no cambia al re-aplicar"
@@ -100,23 +103,23 @@ echo "  OK    $TOTAL comprobaciones"
 
 echo "── 4/4 · mutantes: sin cada compuerta, la suite debe fallar ────────────"
 mutante() {   # $1 = base · $2 = etiqueta · $3 = patrón que se quita · $4 = reemplazo · $5 = «todas» (opcional)
-  # El patrón se busca en la migración que lo contiene: la de la tabla y la RLS
-  # (20261130) o la de la función vigente (20261206). La otra va sin tocar.
-  local origen
-  origen=$(python3 - "$PADRON" "$NUESTRA" "$MUT" "$3" "$4" "${5:-}" <<'PY2'
+  # El patrón se quita de CADA migración que lo contenga: la de la tabla y la
+  # RLS (20261130), la función vigente (20261206) y la policy de lectura vigente
+  # (20261207) — una regla repetida en dos de ellas debe caer en las dos.
+  python3 - "$MUT" "$3" "$4" "${5:-}" "$NUESTRA" "$PADRON" "$RESIDENTE" <<'PY2' || { echo "❌ el mutante «$2» no encuentra su línea en ninguna migración: $3"; exit 1; }
 import sys
-vigente, tabla, dst, pat, rep, todas = sys.argv[1:7]
-for src in (vigente, tabla):
+dst, pat, rep, todas = sys.argv[1:5]
+hallado = False
+for i, src in enumerate(sys.argv[5:], 1):
     s = open(src, encoding='utf-8').read()
     if pat in s:
-        open(dst, 'w', encoding='utf-8').write(s.replace(pat, rep) if todas else s.replace(pat, rep, 1))
-        print(src)
-        break
-else:
-    sys.exit(1)
+        hallado = True
+        s = s.replace(pat, rep) if todas else s.replace(pat, rep, 1)
+    open(f'{dst}.{i}', 'w', encoding='utf-8').write(s)
+sys.exit(0 if hallado else 1)
 PY2
-  ) || { echo "❌ el mutante «$2» no encuentra su línea en ninguna migración: $3"; exit 1; }
-  if [ "$origen" = "$PADRON" ]; then preparar "$1" "$NUESTRA" "$MUT"; else preparar "$1" "$MUT" "$PADRON"; fi
+  chmod 644 "$MUT".1 "$MUT".2 "$MUT".3
+  preparar "$1" "$MUT.1" "$MUT.2" "$MUT.3"
   if psql -q -v ON_ERROR_STOP=1 -d "$1" -f "$AQUI/assert.sql" >/dev/null 2>&1; then
     echo "❌ el mutante «$2» pasó la suite: la regla no está probada"; exit 1
   fi
@@ -137,6 +140,11 @@ mutante histm7 "todo o nada"                     "  IF v_errores IS NOT NULL THE
 mutante histm8 "sólo el proyecto elegido"        "     WHERE c.project_id = p_project_id
      GROUP BY 1" "     GROUP BY 1"
 mutante histm9 "sólo cuentan las lecturas del contador" "         WHERE r.contador_id = c.id AND r.deleted_at IS NULL" "         WHERE r.deleted_at IS NULL"
+mutante histm10 "el residente sólo ve SUS contadores" "         WHERE u.cliente_id = (SELECT public.get_my_cliente_id())" "         WHERE true"
+mutante histm11 "no ve el de un contador dado de baja" "           AND c.activo = true
+" ""
+mutante histm12 "la rama del residente es sólo del residente" "      (SELECT public.current_user_role()) = 'cliente'
+      AND contador_id IN (" "      contador_id IN ("
 
 echo
 echo "✅ historial_lecturas: importa por número de serie en el proyecto, todo o nada, sin cobrar, y la lectura inicial sólo cuando corresponde"

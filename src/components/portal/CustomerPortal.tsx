@@ -16,6 +16,8 @@ import type { UserSession, Registro } from '../../types'
 import { Chart } from '../../lib/chartjs'
 import { resolveChartColor } from '../../lib/chartColors'
 import { PhotoLightbox } from '../shared/PhotoLightbox'
+import { fetchHistorialLecturas } from '../../domain/agua/historialLecturas'
+import { consumosDeHistorial, type ConsumoHistorico } from '../../lib/historialImportado'
 import { construirDashboardData, type ComunidadMensual, type ContadorInfo, type LecturaInfo, type UnidadInfo } from '../../lib/portalDashboard'
 import type { PortalCtx } from './customer/ctx'
 import type { CompanyInfo, ProjectInfo, ClienteContacto } from './customer/ctx'
@@ -76,6 +78,8 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
   const [unidades, setUnidades] = useState<UnidadInfo[]>([])
   const [contadores, setContadores] = useState<ContadorInfo[]>([])
   const [lecturas, setLecturas] = useState<LecturaInfo[]>([])
+  // Historial importado de sus contadores: sólo consumo, para el tablero.
+  const [historialConsumo, setHistorialConsumo] = useState<ConsumoHistorico[]>([])
   const [registros, setRegistros] = useState<Registro[]>([])
   const [fotoRegistroIds, setFotoRegistroIds] = useState<Set<string>>(new Set())
   const [contactoEdit, setContactoEdit] = useState<ClienteContacto>({
@@ -145,11 +149,15 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       //   (safe because RLS, migration 20260420000023, restricts clients to their own data)
       // fotoIds: ids de lecturas con foto (sin bajar el base64; los bytes van bajo demanda)
       const contadorIds = cData.map(c => c.id)
-      const [byContadorData, byProjectData, fotoIds] = await Promise.all([
+      const [byContadorData, byProjectData, fotoIds, historialData] = await Promise.all([
         contadorIds.length > 0 ? fetchRegistrosByContadores(contadorIds) : Promise.resolve(null),
         unidadProjectIds.length > 0 && clienteId ? fetchRegistrosByProjects(unidadProjectIds) : Promise.resolve(null),
         clienteId ? fetchPortalFotoIds(clienteId, contadorIds, unidadProjectIds) : Promise.resolve([] as string[]),
+        // Vacío si falla o si la base aún no deja leerlo: el tablero sigue con
+        // las lecturas del sistema.
+        fetchHistorialLecturas(contadorIds),
       ])
+      setHistorialConsumo(consumosDeHistorial(historialData))
       setFotoRegistroIds(new Set(fotoIds))
 
       const merged = new Map<string, LecturaInfo>()
@@ -228,11 +236,11 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
   // ── Dashboard analytics (useMemo) ────────────────────────
   const dashboardData = useMemo(() => construirDashboardData({
-    lecturas, contadores, unidades, fotoRegistroIds,
+    lecturas, historial: historialConsumo, contadores, unidades, fotoRegistroIds,
     selectedProjectId, selectedUnidadId, selectedTipoAgua,
     chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric,
     comunidad,
-  }), [lecturas, contadores, unidades, fotoRegistroIds, selectedProjectId, selectedUnidadId, selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric, comunidad])
+  }), [lecturas, historialConsumo, contadores, unidades, fotoRegistroIds, selectedProjectId, selectedUnidadId, selectedTipoAgua, chartMonthsBack, chartCustomStart, chartCustomEnd, chartRangeMode, chartMetric, comunidad])
 
   // ── Chart.js bar chart (per-counter, configurable range & metric) ──
   useEffect(() => {

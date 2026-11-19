@@ -21,19 +21,14 @@ export interface DatosHistorico {
 /** Una fila del Historial: lectura del sistema o, con `historico`, importada. */
 export type FilaLectura = Registro & { historico?: DatosHistorico }
 
+interface HistoricoDeducido { h: HistorialLectura; datos: DatosHistorico }
+
 /**
- * Convierte el historial importado en filas del Historial. `lectura anterior`
- * y el consumo que no venga anotado salen de la fila previa del mismo contador
- * (una lectura menor que la previa —medidor cambiado— no da consumo).
+ * Lectura anterior y consumo de cada fila del historial. El consumo que no venga
+ * anotado sale de la fila previa del mismo contador (una lectura menor que la
+ * previa —medidor cambiado— no da consumo).
  */
-export function filasDeHistorial(
-  historial: HistorialLectura[],
-  contadoresById: Map<string, Contador>,
-  unidades: Unidad[],
-  clientes: Cliente[],
-): FilaLectura[] {
-  const unidadesById = new Map(unidades.map(u => [u.id, u]))
-  const clientesById = new Map(clientes.map(c => [c.id, c]))
+function deducirHistorial(historial: HistorialLectura[]): HistoricoDeducido[] {
   const ordenado = [...historial].sort((a, b) =>
     a.contador_id === b.contador_id ? a.fecha.localeCompare(b.fecha) : a.contador_id.localeCompare(b.contador_id))
   const previa = new Map<string, number>()
@@ -42,6 +37,24 @@ export function filasDeHistorial(
     if (h.lectura !== null) previa.set(h.contador_id, h.lectura)
     const consumo = h.consumo
       ?? (h.lectura !== null && anterior !== null && h.lectura >= anterior ? h.lectura - anterior : null)
+    return { h, datos: { lectura: h.lectura, anterior, consumo } }
+  })
+}
+
+// Mediodía local: una fecha sola se leería como medianoche UTC y los filtros
+// por día o por mes (límites locales) la correrían un día.
+const fechaLocal = (fecha: string): string => `${fecha}T12:00:00`
+
+/** Convierte el historial importado en filas del Historial de Lecturas. */
+export function filasDeHistorial(
+  historial: HistorialLectura[],
+  contadoresById: Map<string, Contador>,
+  unidades: Unidad[],
+  clientes: Cliente[],
+): FilaLectura[] {
+  const unidadesById = new Map(unidades.map(u => [u.id, u]))
+  const clientesById = new Map(clientes.map(c => [c.id, c]))
+  return deducirHistorial(historial).map(({ h, datos }) => {
     const unidad = unidadesById.get(contadoresById.get(h.contador_id)?.unidad_id ?? '')
     const cliente = clientesById.get(unidad?.cliente_id ?? '')
     return {
@@ -50,19 +63,35 @@ export function filasDeHistorial(
       cliente_nombre: cliente?.nombre ?? unidad?.nombre ?? '—',
       contador_id: h.contador_id,
       project_id: h.project_id,
-      // Mediodía local: una fecha sola se leería como medianoche UTC y los
-      // filtros «Desde/Hasta» (límites locales) la correrían un día.
-      fecha: `${h.fecha}T12:00:00`,
-      lectura_anterior: anterior ?? 0,
+      fecha: fechaLocal(h.fecha),
+      lectura_anterior: datos.anterior ?? 0,
       lectura_actual: h.lectura ?? 0,
-      consumo: consumo ?? 0,
+      consumo: datos.consumo ?? 0,
       tarifa_aplicada: 0,
       canon_aplicado: 0,
       monto_calculado: 0,
       tipo_cobro: '',
       estado: ESTADO_HISTORICO as Registro['estado'],
       notas: h.notas ?? undefined,
-      historico: { lectura: h.lectura, anterior, consumo },
+      historico: datos,
     }
   })
+}
+
+/** Consumo de un contador en una fecha del historial importado. */
+export interface ConsumoHistorico {
+  contador_id: string
+  /** Fecha local (mediodía) de la lectura. */
+  fecha: string
+  consumo: number
+}
+
+/**
+ * El historial importado como serie de consumo (portal del residente): sólo las
+ * filas de las que se conoce el consumo. Sin importes: el historial no se cobra.
+ */
+export function consumosDeHistorial(historial: HistorialLectura[]): ConsumoHistorico[] {
+  return deducirHistorial(historial)
+    .filter(({ datos }) => datos.consumo !== null)
+    .map(({ h, datos }) => ({ contador_id: h.contador_id, fecha: fechaLocal(h.fecha), consumo: datos.consumo as number }))
 }

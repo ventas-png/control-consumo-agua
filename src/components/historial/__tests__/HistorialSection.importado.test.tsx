@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, within, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Registro, Contador, Proyecto, Unidad, Cliente } from '../../../types'
-import { filasDeHistorial } from '../../../lib/historialImportado'
+import { filasDeHistorial, consumosDeHistorial } from '../../../lib/historialImportado'
 
 const h = vi.hoisted(() => ({ fetchHistorialLecturasProyecto: vi.fn() }))
 
@@ -75,6 +75,15 @@ describe('filasDeHistorial', () => {
     expect(filas[1].historico).toEqual({ lectura: 5, anterior: 130, consumo: null })
     // Sin unidad ni cliente, el nombre queda vacío en vez de inventarse.
     expect(filas[1].cliente_nombre).toBe('—')
+  })
+})
+
+describe('consumosDeHistorial', () => {
+  it('da la serie de consumo (anotado o deducido) y deja fuera las filas sin consumo', () => {
+    expect(consumosDeHistorial(historial)).toEqual([
+      { contador_id: 'cont-1', fecha: '2026-09-30T12:00:00', consumo: 30 },
+      { contador_id: 'cont-1', fecha: '2026-10-31T12:00:00', consumo: 12 },
+    ])
   })
 })
 
