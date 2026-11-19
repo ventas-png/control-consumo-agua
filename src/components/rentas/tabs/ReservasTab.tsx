@@ -21,6 +21,7 @@ import { EmptyState } from '../../shared/EmptyState'
 import { FilterChips } from '../../shared/FilterChips'
 import { StatusBadge } from '../../shared/StatusBadge'
 import { ImageUploader } from '../../shared/ImageUploader'
+import { HoraSelect } from '../../shared/HoraSelect'
 import { MediaScopeProvider } from '../../shared/MediaScopeContext'
 import { GrupoHuespedes } from '../GrupoHuespedes'
 import type { PermisosModulo } from '../RentasSection'
@@ -394,11 +395,11 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
             <div style={rejilla(200)}>
               <div>
                 <label htmlFor="rr-llegada" style={etiqueta}>Hora estimada de llegada</label>
-                <input id="rr-llegada" type="time" value={form.hora_llegada} onChange={e => set('hora_llegada', e.target.value)} style={campo} />
+                <HoraSelect id="rr-llegada" label="Hora estimada de llegada" value={form.hora_llegada} onChange={v => set('hora_llegada', v)} style={campo} />
               </div>
               <div>
                 <label htmlFor="rr-hsalida" style={etiqueta}>Hora estimada de salida</label>
-                <input id="rr-hsalida" type="time" value={form.hora_salida} onChange={e => set('hora_salida', e.target.value)} style={campo} />
+                <HoraSelect id="rr-hsalida" label="Hora estimada de salida" value={form.hora_salida} onChange={v => set('hora_salida', v)} style={campo} />
               </div>
             </div>
             <div style={rejilla(110)}>

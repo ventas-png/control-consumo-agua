@@ -139,6 +139,16 @@ El formulario de reserva de Rentas captura lo mismo que el de la pestaña STR de
   aparte y la reserva queda.
 - La carga masiva no trae estos campos y no los pisa al actualizar una reserva existente.
 
+## STR es operativo; el dinero vive en Rentas
+
+La pestaña STR de Condominios ya no pide ni muestra montos: sin «Tarifa/noche» ni «Total» en el formulario, sin el
+indicador «Ingreso del mes» y sin el monto en la tarjeta de la reserva. Al guardar desde STR los montos no viajan,
+así que los que la reserva ya tenga (capturados en Rentas o por carga masiva) se conservan. La tarifa, el total, la
+moneda y el desglose se llevan en Manejo de Rentas › Reservas y Finanzas.
+
+Las horas estimadas de llegada y salida se eligen con `HoraSelect` (hora, minutos cada 15, a. m. / p. m.) en los dos
+formularios, sin teclado.
+
 ## Archivos
 
 | Qué | Dónde |
