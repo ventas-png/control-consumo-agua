@@ -95,7 +95,7 @@ describe('LandingPage', () => {
   it('en la app de iOS el modal no ofrece Google ni el separador, y el correo sigue funcionando', async () => {
     simularPlataforma('ios')
     const { onLogin, onLoginWithGoogle, container } = setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    // En nativo el login aparece directo (sin landing): no hay que abrirlo.
     expect(screen.getByText('Bienvenido de vuelta')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Continuar con Google' })).toBeNull()
     expect(screen.queryByText('o con tu correo')).toBeNull()
@@ -112,10 +112,46 @@ describe('LandingPage', () => {
   it('en la app de Android el modal sigue ofreciendo Google', async () => {
     simularPlataforma('android')
     const { onLoginWithGoogle } = setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
     expect(screen.getByText('o con tu correo')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Continuar con Google' }))
     await waitFor(() => expect(onLoginWithGoogle).toHaveBeenCalledTimes(1))
+  })
+
+  // App Store 3.1.1 / política de pagos de Google Play: la landing es la página
+  // de venta del plan (precios, "Empezar gratis"), así que la app nativa abre
+  // directo en un login fijo (ver lib/ventaDePlanes).
+  describe('en la app nativa', () => {
+    it.each(['ios', 'android'] as const)('%s: abre directo el login, sin landing comercial ni precios', (plataforma) => {
+      simularPlataforma(plataforma)
+      const { container } = setup()
+      expect(screen.getByText('Bienvenido de vuelta')).toBeTruthy()
+      expect(screen.queryByText('Administra agua,')).toBeNull()
+      expect(container.querySelector('#pricing')).toBeNull()
+    })
+
+    it('el login es fijo: sin botón de cerrar y Escape no lo cierra', () => {
+      simularPlataforma('android')
+      setup()
+      expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      expect(screen.getByText('Bienvenido de vuelta')).toBeTruthy()
+    })
+
+    it('mantiene el registro de empresa y el de residentes (crear cuenta no es vender)', () => {
+      simularPlataforma('ios')
+      const { onSignupCompany, onRegister } = setup()
+      fireEvent.click(screen.getByRole('button', { name: /Crear cuenta gratis/ }))
+      expect(onSignupCompany).toHaveBeenCalledTimes(1)
+      fireEvent.click(screen.getByRole('button', { name: /Portal residente/ }))
+      expect(onRegister).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('en la web el login sí se puede cerrar', () => {
+    setup()
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByText('Bienvenido de vuelta')).toBeNull()
   })
 
   describe('Sign in with Apple (VITE_APPLE_SIGN_IN=true)', () => {

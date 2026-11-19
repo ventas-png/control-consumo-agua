@@ -24,6 +24,7 @@ import {
   fetchMonthlyTotalBreakdown,
 } from '../../domain/facturacion/billing'
 import { logSecurityEvent } from '../../lib/security'
+import { mostrarVentaDePlanes } from '../../lib/ventaDePlanes'
 import { isPasswordPwned, PWNED_PASSWORD_MESSAGE } from '../../lib/validation'
 import { getDisplayRoleLabel, getDisplayRoleColor } from '../../lib/permissions'
 import { PreferenciasRegionales } from './PreferenciasRegionales'
@@ -770,8 +771,10 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
           </form>
         </Card>
 
-        {/* Card — Plan & Suscripción (read-only en F2.11; F2.12 agrega Stripe portal) */}
-        {currentUser.company_id && (
+        {/* Card — Plan & Suscripción (read-only en F2.11; F2.12 agrega Stripe portal).
+            No se muestra en la app nativa (precios, cambio de plan y portal de
+            Stripe): ver lib/ventaDePlanes. */}
+        {currentUser.company_id && mostrarVentaDePlanes() && (
           <Card title="Mi plan" id="billing-section">
             {subLoading ? (
               <div style={{ color: 'var(--at-ink-3)', fontSize: '13px' }}>Cargando…</div>

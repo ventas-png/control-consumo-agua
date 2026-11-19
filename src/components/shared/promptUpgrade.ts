@@ -1,4 +1,5 @@
-import { confirm } from './Dialog'
+import { confirm, notify } from './Dialog'
+import { mostrarVentaDePlanes } from '../../lib/ventaDePlanes'
 
 // ============================================================================
 // promptUpgrade — F4.1.2: Plan upgrade CTA cuando se alcanza el limite.
@@ -72,6 +73,15 @@ export function openBillingSection(): void {
  */
 export async function promptUpgrade(opts: UpgradePromptOptions): Promise<boolean> {
   const labels = RESOURCE_LABELS[opts.resource]
+  // App nativa: se informa el límite, sin ofrecer ampliarlo (ver lib/ventaDePlanes).
+  if (!mostrarVentaDePlanes()) {
+    notify({
+      variant: 'warning',
+      title: 'Límite del plan alcanzado',
+      text: `Tu plan permite hasta ${opts.limit} ${labels.plural} y ya tienes ${opts.current}.`,
+    })
+    return false
+  }
   const result = await confirm({
     icon: 'warning',
     title: 'Límite del plan alcanzado',

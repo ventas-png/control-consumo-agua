@@ -11,6 +11,7 @@ import { BrandingApplier } from './components/branding/BrandingApplier'
 import { Toaster } from 'sonner'
 import type { AppSection, Ruta } from './types'
 import { sectionToPath, pathToSection, RUTA_PUBLICA_ELIMINAR_CUENTA } from './lib/routes'
+import { mostrarVentaDePlanes } from './lib/ventaDePlanes'
 import type { LegalDocType } from './components/legal/content'
 import { sectionForPath, type SectionKey } from './components/condominios/sections'
 import { fetchOpenConversationsCount } from './domain/comunicacion/conversations'
@@ -597,9 +598,11 @@ function AppShell() {
         {/* T6/agua:B11 — breadcrumbs de navegación (Sección › Subsección), bajo el topbar. */}
         <Breadcrumbs activeSection={activeSection} onNavigate={navigateSection} />
         <PresenceBar activeSection={activeSection} />
-        <TrialExpirationBanner companyId={currentUser.company_id ?? null} />
+        {/* Prueba por vencer y pago fallido conducen a pagar el plan: no se
+            montan en la app nativa (ver lib/ventaDePlanes). */}
+        {mostrarVentaDePlanes() && <TrialExpirationBanner companyId={currentUser.company_id ?? null} />}
         {/* P0 #2: dunning — aviso de pago fallido + cuenta atrás a solo-lectura. */}
-        <PastDueBanner companyId={currentUser.company_id ?? null} />
+        {mostrarVentaDePlanes() && <PastDueBanner companyId={currentUser.company_id ?? null} />}
         {/* Ciclo de vida: aviso de empresa suspendida para sesiones ya abiertas. */}
         <CompanySuspendedBanner companyId={currentUser.company_id ?? null} />
         {/* plat:P20 — aplica el color de marca de la empresa a toda la app (efecto, no UI). */}
