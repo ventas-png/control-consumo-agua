@@ -989,6 +989,17 @@ jobs:
           PGPORT_TEST: 55594
         run: supabase/tests/historial_lecturas/run.sh
 
+      # 20261204000000: mover una unidad de proyecto arrastra sus contadores, y el
+      # contador arrastra su historial importado (antes se quedaban en el proyecto
+      # viejo y la carga masiva del historial no los reconocía en el nuevo). Corrige
+      # lo ya desfasado; `registros` no se toca. Ejercido como quien mueve la unidad
+      # SIN poder editar contadores. CONTROL NEGATIVO: cinco mutantes.
+      - name: Agua — la unidad arrastra sus contadores al cambiar de proyecto
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55596
+        run: supabase/tests/unidad_arrastra_contadores/run.sh
+
       # 20261202000000: fotos del inventario de Rentas. `rentas_inventario.fotos`
       # (hasta 6, todas en la carpeta <empresa>/<propiedad> de la fila: CHECK) y el
       # bucket privado `rentas-inventario`, con la misma regla que la RLS de la tabla
