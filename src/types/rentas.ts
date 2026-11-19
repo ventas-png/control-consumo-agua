@@ -66,6 +66,9 @@ export interface ReservaRenta {
   hora_salida_estimada: string | null
   num_ninos: number
   num_bebes: number
+  /** Rutas en el bucket privado `rentas-huespedes`. */
+  foto_url: string | null
+  foto_documento_url: string | null
   created_at: string
   updated_at: string
 }
@@ -102,7 +105,7 @@ export interface ReservaUnificada {
   num_adultos: number
   num_ninos: number
   num_bebes: number
-  /** Rutas en el bucket de Condominios; sólo las reservas de propiedades enlazadas llevan fotos. */
+  /** Rutas: en `condominios-media` si la propiedad está enlazada, en `rentas-huespedes` si es independiente. */
   foto_url: string | null
   foto_documento_url: string | null
 }

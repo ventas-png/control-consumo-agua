@@ -93,7 +93,7 @@ export function unificarReservas(
       hora_llegada_estimada: r.hora_llegada_estimada ?? null, hora_salida_estimada: r.hora_salida_estimada ?? null,
       num_adultos: Math.max(1, r.num_huespedes - (r.num_ninos ?? 0) - (r.num_bebes ?? 0)),
       num_ninos: r.num_ninos ?? 0, num_bebes: r.num_bebes ?? 0,
-      foto_url: null, foto_documento_url: null,
+      foto_url: r.foto_url ?? null, foto_documento_url: r.foto_documento_url ?? null,
     }))
 
   const enlazadas: ReservaUnificada[] = []

@@ -79,3 +79,13 @@ export const BUCKET_RRHH_LLAMADAS = 'rrhh-llamadas-atencion'
  * una foto que ninguna fila nombra (se guarda la fila primero, se borra después).
  */
 export const BUCKET_RENTAS_INVENTARIO = 'rentas-inventario'
+
+/**
+ * Fotos del huésped, de su documento y de las personas del grupo en reservas
+ * de propiedades INDEPENDIENTES de Rentas (20261207000000). Bucket PRIVADO:
+ * son documentos de identidad. Ruta `<company_id>/<propiedad_id>/<archivo>.jpg`;
+ * la policy aplica la regla de `rentas_reservas` y sólo deja borrar una foto
+ * que ninguna reserva ni persona nombra. Las de propiedades enlazadas siguen en
+ * `condominios-media` (carpeta `str_guests`), con las de la pestaña STR.
+ */
+export const BUCKET_RENTAS_HUESPEDES = 'rentas-huespedes'

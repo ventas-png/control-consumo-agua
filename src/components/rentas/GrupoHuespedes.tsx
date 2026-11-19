@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { personaVacia, type PersonaGrupo } from '../../domain/rentas/grupo'
 import { notify } from '../shared/Dialog'
 import { Button } from '../shared/Button'
-import { ImageUploader } from '../shared/ImageUploader'
+import { FotoHuesped, type DestinoFotos } from './FotoHuesped'
 import { campo, etiqueta, rejilla, tenue } from './ui'
 
 interface Props {
@@ -13,15 +13,17 @@ interface Props {
   principal: string
   /** Cuántas adicionales caben: adultos + niños − 1. */
   maximo: number
+  /** Dónde se suben las fotos de cada persona. */
+  destino: DestinoFotos
   onSubiendo?: (subiendo: boolean) => void
 }
 
 /**
- * Personas del grupo de una reserva, como en la pestaña STR de Condominios:
+ * Personas del grupo de una reserva (enlazada o independiente), como en la pestaña STR de Condominios:
  * el huésped principal y los adicionales pre-registrados, cada uno con su
  * documento y fotos opcionales. Quien ya registró su ingreso no se quita.
  */
-export function GrupoHuespedes({ personas, onChange, principal, maximo, onSubiendo }: Props) {
+export function GrupoHuespedes({ personas, onChange, principal, maximo, destino, onSubiendo }: Props) {
   const [nueva, setNueva] = useState<PersonaGrupo | null>(null)
 
   const agregar = () => {
@@ -95,8 +97,8 @@ export function GrupoHuespedes({ personas, onChange, principal, maximo, onSubien
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 200px))', gap: '0.75rem' }}>
-            <ImageUploader value={nueva.foto_url} onChange={v => setNueva({ ...nueva, foto_url: v })} folder="str_guests" label="Foto" capture onSubiendo={onSubiendo} />
-            <ImageUploader value={nueva.foto_documento_url} onChange={v => setNueva({ ...nueva, foto_documento_url: v })} folder="str_guests" label="Documento" capture onSubiendo={onSubiendo} />
+            <FotoHuesped value={nueva.foto_url} onChange={v => setNueva({ ...nueva, foto_url: v })} label="Foto" destino={destino} onSubiendo={onSubiendo} />
+            <FotoHuesped value={nueva.foto_documento_url} onChange={v => setNueva({ ...nueva, foto_documento_url: v })} label="Documento" destino={destino} onSubiendo={onSubiendo} />
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
             <Button size="sm" variant="secondary" onClick={() => setNueva(null)}>Cancelar</Button>
