@@ -153,7 +153,7 @@ export function ImportHistorialLecturasModal({ proyectos, contadores, proyectoIn
       ) : null}
       <p style={{ margin: 0, fontSize: '12px', color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
         El historial sirve para <strong>comparar</strong> las lecturas nuevas (promedio y mismo mes del año anterior):
-        no genera cobros ni aparece en el Historial de Lecturas. Cada fila lleva el <strong>número del contador</strong> como
+        no genera cobros. En el Historial de Lecturas aparece marcado como «histórico», fuera de los totales. Cada fila lleva el <strong>número del contador</strong> como
         aparece en Contadores, la <strong>fecha</strong> (AAAA-MM-DD, DD/MM/AAAA o sólo el mes, AAAA-MM) y la{' '}
         <strong>lectura</strong> y/o el <strong>consumo</strong>. Si una fecha ya estaba cargada, se reemplaza.
         Elija el proyecto antes de subir el archivo.
