@@ -19,9 +19,10 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 LECT="$RAIZ/supabase/tests/registrar_lectura"
 NUESTRA="$RAIZ/supabase/migrations/20261130000000_agua_historial_lecturas.sql"
-# 20261205000000 reemplaza la función de importación (el padrón se lee una vez
-# por lote). Va SIEMPRE encima: la suite ejerce la versión vigente.
-PADRON="$RAIZ/supabase/migrations/20261205000000_agua_historial_importar_padron_unico.sql"
+# 20261205000000 y 20261206000000 reemplazan, en ese orden, la función de
+# importación. La vigente es la última: va SIEMPRE encima y es la que se muta.
+PADRON0="$RAIZ/supabase/migrations/20261205000000_agua_historial_importar_padron_unico.sql"
+PADRON="$RAIZ/supabase/migrations/20261206000000_agua_historial_importar_lecturas_por_indice.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -53,7 +54,7 @@ sleep 2
 
 export PGHOST="$SOCK" PGPORT="$PUERTO" PGUSER=postgres
 psql -q -d postgres -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;" >/dev/null
-for db in hist histm1 histm2 histm3 histm4 histm5 histm6 histm7 histm8; do psql -q -d postgres -c "CREATE DATABASE $db" >/dev/null; done
+for db in hist histm1 histm2 histm3 histm4 histm5 histm6 histm7 histm8 histm9; do psql -q -d postgres -c "CREATE DATABASE $db" >/dev/null; done
 
 aplicar() { PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d "$1" -f "$2" >/dev/null; }
 huella() { psql -q -At -d "$1" -f "$AQUI/huella.sql"; }
@@ -70,17 +71,17 @@ base() {
                     public.user_project_assignments, public.test_permisos TO authenticated;
   " >/dev/null
 }
-# $2 = 20261130 (o su mutante) · $3 = 20261205 (o su mutante)
-preparar() { base "$1"; aplicar "$1" "$2"; aplicar "$1" "$3"; }
+# $2 = 20261130 (o su mutante) · $3 = la función vigente (o su mutante)
+preparar() { base "$1"; aplicar "$1" "$2"; aplicar "$1" "$PADRON0"; aplicar "$1" "$3"; }
 
 echo "── 1/4 · fixture: tenancy, padrón de agua, RLS de registros y contadores ─"
 base hist
 echo "  OK    2 empresas · 3 proyectos · 5 cuentas · 9 contadores · 1 lectura del sistema"
 
 echo "── 2/4 · la migración, DOS veces ───────────────────────────────────────"
-aplicar hist "$NUESTRA"; aplicar hist "$PADRON"
+aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON"
 H1=$(huella hist)
-aplicar hist "$NUESTRA"; aplicar hist "$PADRON"
+aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON"
 H2=$(huella hist)
 [ "$H1" = "$H2" ] || { echo "❌ re-aplicar la migración cambió el catálogo ($H1 ≠ $H2)"; exit 1; }
 echo "  OK    idempotente: la huella del catálogo no cambia al re-aplicar"
@@ -100,7 +101,7 @@ echo "  OK    $TOTAL comprobaciones"
 echo "── 4/4 · mutantes: sin cada compuerta, la suite debe fallar ────────────"
 mutante() {   # $1 = base · $2 = etiqueta · $3 = patrón que se quita · $4 = reemplazo · $5 = «todas» (opcional)
   # El patrón se busca en la migración que lo contiene: la de la tabla y la RLS
-  # (20261130) o la de la función vigente (20261205). La otra va sin tocar.
+  # (20261130) o la de la función vigente (20261206). La otra va sin tocar.
   local origen
   origen=$(python3 - "$PADRON" "$NUESTRA" "$MUT" "$3" "$4" "${5:-}" <<'PY2'
 import sys
@@ -135,6 +136,7 @@ mutante histm6 "no hereda de antes de instalar"  "       AND (b.instalacion IS N
 mutante histm7 "todo o nada"                     "  IF v_errores IS NOT NULL THEN" "  IF false THEN"
 mutante histm8 "sólo el proyecto elegido"        "     WHERE c.project_id = p_project_id
      GROUP BY 1" "     GROUP BY 1"
+mutante histm9 "sólo cuentan las lecturas del contador" "         WHERE r.contador_id = c.id AND r.deleted_at IS NULL" "         WHERE r.deleted_at IS NULL"
 
 echo
 echo "✅ historial_lecturas: importa por número de serie en el proyecto, todo o nada, sin cobrar, y la lectura inicial sólo cuando corresponde"
