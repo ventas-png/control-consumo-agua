@@ -22,6 +22,7 @@ LECT="$RAIZ/supabase/tests/registrar_lectura"
 HIST="$RAIZ/supabase/tests/historial_lecturas"
 SYNC="$RAIZ/supabase/migrations/20260522000001_sync_contador_project_from_unidad.sql"
 HISTMIG="$RAIZ/supabase/migrations/20261130000000_agua_historial_lecturas.sql"
+PADRON="$RAIZ/supabase/migrations/20261205000000_agua_historial_importar_padron_unico.sql"
 NUESTRA="$RAIZ/supabase/migrations/20261204000000_unidad_proyecto_arrastra_contadores.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
@@ -65,6 +66,7 @@ base() {
   aplicar "$1" "$HIST/fixture-extra.sql"
   aplicar "$1" "$SYNC"
   aplicar "$1" "$HISTMIG"
+  aplicar "$1" "$PADRON"
   aplicar "$1" "$AQUI/fixture-extra.sql"
   psql -q -d "$1" -c "
     GRANT USAGE ON SCHEMA public, auth TO authenticated, anon;
