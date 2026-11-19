@@ -14,6 +14,7 @@ import { ImageUploader } from '../../shared/ImageUploader'
 import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import { ModalPortal } from '../../shared/ModalPortal'
+import { HoraSelect } from '../../shared/HoraSelect'
 import { ImportarReservasSTRModal } from './ImportarReservasSTRModal'
 
 interface HuespedSTRForm {
@@ -66,7 +67,7 @@ const blank = (): Partial<ReservaSTR> => ({
   fecha_entrada: '', fecha_salida: '',
   hora_llegada_estimada: '', hora_salida_estimada: '',
   num_adultos: 1, num_ninos: 0, num_bebes: 0,
-  plataforma: 'directo', monto_noche: undefined, monto_total: undefined,
+  plataforma: 'directo',
   estado: 'confirmada', politica_cancelacion: 'na', mascotas: false, notas: '',
 })
 
@@ -119,9 +120,6 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
 
   const enCurso   = reservasSTR.filter(r => r.estado === 'en_curso').length
   const proximas  = reservasSTR.filter(r => r.estado === 'confirmada' && r.fecha_entrada >= today).length
-  const ingresoMes = reservasSTR
-    .filter(r => r.estado !== 'cancelada' && r.fecha_entrada?.slice(0, 7) === today.slice(0, 7))
-    .reduce((s, r) => s + (r.monto_total ?? 0), 0)
 
   function startEdit(r: ReservaSTR) {
     setForm({
@@ -133,8 +131,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       hora_llegada_estimada: (r.hora_llegada_estimada ?? '').slice(0, 5),
       hora_salida_estimada: (r.hora_salida_estimada ?? '').slice(0, 5),
       num_adultos: r.num_adultos, num_ninos: r.num_ninos, num_bebes: r.num_bebes ?? 0,
-      plataforma: r.plataforma, monto_noche: r.monto_noche ?? undefined,
-      monto_total: r.monto_total ?? undefined, estado: r.estado,
+      plataforma: r.plataforma, estado: r.estado,
       politica_cancelacion: r.politica_cancelacion ?? 'na', mascotas: r.mascotas ?? false,
       notas: r.notas ?? '',
     })
@@ -161,11 +158,6 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
     setHuespedes([]); setShowHuespedForm(false); setHuespedForm(defaultHuesped())
   }
 
-  function recalcTotal(f: Partial<ReservaSTR>) {
-    const noches = calcNoches(f.fecha_entrada ?? '', f.fecha_salida ?? '')
-    if (f.monto_noche && noches > 0) return { ...f, monto_total: f.monto_noche * noches }
-    return f
-  }
 
   function agregarHuesped() {
     if (!huespedForm.nombre.trim()) {
@@ -241,8 +233,8 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       num_adultos: form.num_adultos ?? 1, num_ninos: form.num_ninos ?? 0,
       num_bebes: form.num_bebes ?? 0,
       plataforma: form.plataforma ?? 'directo',
-      monto_noche: form.monto_noche ?? null,
-      monto_total: form.monto_total ?? null,
+      // Los montos NO viajan: esta pestaña es operativa y la tarifa y el total se
+      // llevan en Manejo de Rentas. Al editar, los que ya tenga la reserva se conservan.
       estado: form.estado ?? 'confirmada',
       politica_cancelacion: form.politica_cancelacion || null,
       mascotas: form.mascotas ?? false,
@@ -295,7 +287,6 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
           { label: 'Total reservas',  value: String(reservasSTR.length),    icon: '🏨', color: 'var(--at-primary)' },
           { label: 'En curso',        value: String(enCurso),               icon: '🔑', color: 'var(--at-accent)' },
           { label: 'Próximas',        value: String(proximas),              icon: '📅', color: 'var(--at-warning)' },
-          { label: 'Ingreso del mes', value: ingresoMes > 0 ? `${moneda} ${ingresoMes.toFixed(0)}` : '—', icon: '💰', color: 'var(--at-success)' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--at-surface)', border: '1.5px solid var(--at-line)', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', marginBottom: '4px' }}>{k.icon}</div>
@@ -362,19 +353,19 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
             </div>
             <div>
               <label style={labelStyle}>Entrada *</label>
-              <input style={inputStyle} type="date" value={form.fecha_entrada ?? ''} onChange={e => setForm(f => recalcTotal({ ...f, fecha_entrada: e.target.value }))} />
+              <input style={inputStyle} type="date" value={form.fecha_entrada ?? ''} onChange={e => setForm(f => ({ ...f, fecha_entrada: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Salida *</label>
-              <input style={inputStyle} type="date" value={form.fecha_salida ?? ''} onChange={e => setForm(f => recalcTotal({ ...f, fecha_salida: e.target.value }))} />
+              <input style={inputStyle} type="date" value={form.fecha_salida ?? ''} onChange={e => setForm(f => ({ ...f, fecha_salida: e.target.value }))} />
             </div>
             <div>
               <label style={labelStyle}>Hora estimada de llegada</label>
-              <input style={inputStyle} type="time" value={form.hora_llegada_estimada ?? ''} onChange={e => setForm(f => ({ ...f, hora_llegada_estimada: e.target.value }))} />
+              <HoraSelect label="Hora estimada de llegada" style={inputStyle} value={form.hora_llegada_estimada ?? ''} onChange={v => setForm(f => ({ ...f, hora_llegada_estimada: v }))} />
             </div>
             <div>
               <label style={labelStyle}>Hora estimada de salida</label>
-              <input style={inputStyle} type="time" value={form.hora_salida_estimada ?? ''} onChange={e => setForm(f => ({ ...f, hora_salida_estimada: e.target.value }))} />
+              <HoraSelect label="Hora estimada de salida" style={inputStyle} value={form.hora_salida_estimada ?? ''} onChange={v => setForm(f => ({ ...f, hora_salida_estimada: v }))} />
             </div>
             <div>
               <label style={labelStyle}>Adultos</label>
@@ -397,14 +388,6 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                 <option value="directo">Directo</option>
                 <option value="otro">Otro</option>
               </select>
-            </div>
-            <div>
-              <label style={labelStyle}>Tarifa/noche ({moneda})</label>
-              <input style={inputStyle} type="number" min="0" step="0.01" value={form.monto_noche ?? ''} onChange={e => setForm(f => recalcTotal({ ...f, monto_noche: e.target.value ? Number(e.target.value) : undefined }))} placeholder="0.00" />
-            </div>
-            <div>
-              <label style={labelStyle}>Total ({moneda})</label>
-              <input style={inputStyle} type="number" min="0" step="0.01" value={form.monto_total ?? ''} onChange={e => setForm(f => ({ ...f, monto_total: e.target.value ? Number(e.target.value) : undefined }))} placeholder="0.00" />
             </div>
             <div>
               <label style={labelStyle}>Estado</label>
@@ -615,7 +598,6 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                     <div>🕒 {r.hora_llegada_estimada ? `Llegada ${r.hora_llegada_estimada.slice(0, 5)}` : ''}{r.hora_llegada_estimada && r.hora_salida_estimada ? ' · ' : ''}{r.hora_salida_estimada ? `Salida ${r.hora_salida_estimada.slice(0, 5)}` : ''}</div>
                   )}
                   <div>👥 {r.num_adultos} adultos{r.num_ninos > 0 ? ` · ${r.num_ninos} niños` : ''}{r.num_bebes > 0 ? ` · ${r.num_bebes} bebés` : ''}{r.mascotas ? ' · 🐾 mascotas' : ''}</div>
-                  {r.monto_total && <div style={{ fontWeight: 700, color: 'var(--at-ink)' }}>💰 {moneda} {r.monto_total.toFixed(2)}</div>}
                   {r.huesped_telefono && <div>📞 {r.huesped_telefono}</div>}
                   {r.codigo_confirmacion && <div>🔖 {r.codigo_confirmacion}</div>}
                   {r.politica_cancelacion && r.politica_cancelacion !== 'na' && <div>📋 {POLITICA_LABEL[r.politica_cancelacion]}</div>}
