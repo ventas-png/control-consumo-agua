@@ -251,3 +251,64 @@ BEGIN
 END $$;
 
 RESET ROLE;
+
+-- ── E · el residente en su portal (20261207000000) ──────────────────────────
+-- Pepa es la Familia Pérez (Casa 1: M-1, M-3, M-4 y el inactivo M-0);
+-- Lola, la Familia López (Casa 2: M-2).
+RESET ROLE;
+INSERT INTO public.agua_historial_lecturas (contador_id, fecha, lectura)
+VALUES ('c0000000-0000-0000-0000-000000000000', '2025-08-31', 40);
+SET ROLE authenticated;
+
+SELECT set_config('app.uid', 'e0000000-0000-0000-0000-0000000000c1', false) \g /dev/null
+DO $$
+DECLARE
+  M0 constant uuid := 'c0000000-0000-0000-0000-000000000000';
+  M1 constant uuid := 'c0000000-0000-0000-0000-000000000001';
+  M2 constant uuid := 'c0000000-0000-0000-0000-000000000002';
+  M3 constant uuid := 'c0000000-0000-0000-0000-000000000003';
+  M4 constant uuid := 'c0000000-0000-0000-0000-000000000004';
+  e  text;
+  n  integer;
+BEGIN
+  PERFORM ht.ok('E1 el residente ve el historial de los contadores de su casa, completo',
+    ht.filas(M1) > 0
+    AND (SELECT count(*) FROM public.agua_historial_lecturas) = ht.filas(M1) + ht.filas(M3) + ht.filas(M4));
+  PERFORM ht.ok('E2 no ve el de la casa vecina',
+    ht.filas(M2) > 0 AND (SELECT count(*) = 0 FROM public.agua_historial_lecturas WHERE contador_id = M2));
+  PERFORM ht.ok('E3 ni el de un contador dado de baja, aunque sea de su casa',
+    ht.filas(M0) = 1 AND (SELECT count(*) = 0 FROM public.agua_historial_lecturas WHERE contador_id = M0));
+
+  e := ht.error(format($q$INSERT INTO public.agua_historial_lecturas (contador_id, fecha, lectura) VALUES (%L, '2025-07-31', 1)$q$, M1));
+  PERFORM ht.ok('E4 no escribe en el historial', e LIKE '42501:%' AND ht.fila(M1, '2025-07-31') IS NULL);
+  UPDATE public.agua_historial_lecturas SET lectura = 1 WHERE contador_id = M1;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  PERFORM ht.ok('E5 ni lo modifica', n = 0);
+  DELETE FROM public.agua_historial_lecturas WHERE contador_id = M1;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  PERFORM ht.ok('E6 ni lo borra', n = 0 AND ht.filas(M1) > 0);
+  e := ht.error($q$SELECT public.agua_historial_lecturas_importar('11111111-0000-0000-0000-000000000001',
+    '[{"contador":"M-1","fecha":"2025-07-31","lectura":1}]'::jsonb)$q$);
+  PERFORM ht.ok('E7 ni importa', e <> 'sin error' AND ht.fila(M1, '2025-07-31') IS NULL);
+END $$;
+
+SELECT set_config('app.uid', 'e0000000-0000-0000-0000-0000000000c2', false) \g /dev/null
+DO $$
+DECLARE
+  M2 constant uuid := 'c0000000-0000-0000-0000-000000000002';
+BEGIN
+  PERFORM ht.ok('E8 la vecina ve sólo lo suyo',
+    (SELECT count(*) FROM public.agua_historial_lecturas) = ht.filas(M2) AND ht.filas(M2) > 0);
+END $$;
+
+-- Curro (de ACME, sin permisos) sigue sin ver nada: la rama nueva es del rol
+-- `cliente`. Aunque su perfil apunte a un cliente con casa, no le abre.
+RESET ROLE;
+UPDATE public.app_users SET cliente_id = 'c1000000-0000-0000-0000-000000000002'
+ WHERE id = 'e0000000-0000-0000-0000-000000000004';
+SET ROLE authenticated;
+SELECT set_config('app.uid', 'e0000000-0000-0000-0000-000000000004', false) \g /dev/null
+DO $$
+BEGIN
+  PERFORM ht.ok('E9 quien no es residente ni tiene permisos sigue sin verlo', (SELECT count(*) = 0 FROM public.agua_historial_lecturas));
+END $$;
