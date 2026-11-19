@@ -7,17 +7,34 @@
 //     cuando se crea una notificación in-app. Ver MOBILE.md.
 //
 // Este módulo registra el dispositivo y guarda su token en la tabla device_tokens
-// (RLS por usuario). Es 100% defensivo: cualquier fallo se ignora para no afectar
-// el arranque ni el login. No-op en web.
+// (RLS por usuario). No-op en web.
+//
+// SOLO SE ACTIVA CON VITE_PUSH_ENABLED=true, y esa variable solo debe ponerse
+// cuando Firebase y APNs ya están configurados (MOBILE.md, paso 6). No es una
+// precaución de estilo: sin `google-services.json`, en Android `register()`
+// llama a `FirebaseMessaging.getInstance()`, que lanza "Default FirebaseApp is
+// not initialized". El puente de Capacitor atrapa esa excepción en el hilo del
+// plugin y la RELANZA (`throw new RuntimeException(ex)` en Bridge.callPluginMethod),
+// así que Android mata la app — el try/catch de abajo no puede evitarlo, porque
+// el fallo ocurre en código nativo, no en esta promesa. Y como el registro corre
+// en cada login y en cada arranque con sesión, la app se cerraría al abrirse.
+// En iOS no se cae (el fallo llega como evento `registrationError`), pero pediría
+// permiso de notificaciones para algo que todavía no funciona.
 import { isNative, getPlatform } from './platform'
 import { supabase } from './supabase'
+
+/** `true` cuando el build lleva VITE_PUSH_ENABLED=true (o 1): Firebase y APNs listos. */
+export function pushHabilitado(): boolean {
+  const valor = String(import.meta.env.VITE_PUSH_ENABLED ?? '').trim().toLowerCase()
+  return valor === 'true' || valor === '1'
+}
 
 /**
  * Pide permiso de notificaciones, registra el dispositivo y persiste el token en
  * `device_tokens`. Llamar tras autenticar (con el user_id de la sesión activa).
  */
 export async function initPushNotifications(userId: string): Promise<void> {
-  if (!isNative() || !userId) return
+  if (!isNative() || !userId || !pushHabilitado()) return
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications')
 
@@ -42,6 +59,7 @@ export async function initPushNotifications(userId: string): Promise<void> {
 
     await PushNotifications.register()
   } catch {
-    // push-notifications no disponible o sin configurar: se ignora
+    // Fallos del lado JS (plugin ausente, permiso rechazado). Los fallos nativos de
+    // Firebase no llegan aquí: por eso la guarda de pushHabilitado() de arriba.
   }
 }

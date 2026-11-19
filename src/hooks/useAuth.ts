@@ -28,7 +28,8 @@ export function useAuth() {
     useCredentialsLogin(setCurrentUser)
 
   // Push nativas: registrar el dispositivo cuando hay sesión activa. No-op en web
-  // y si FCM/APNs todavía no están configurados (ver src/lib/push.ts).
+  // y mientras el build no lleve VITE_PUSH_ENABLED=true (ver src/lib/push.ts:
+  // sin Firebase configurado, registrar haría caer la app en Android).
   const pushUserId = currentUser?.user_id
   useEffect(() => {
     if (!pushUserId || !isNative()) return
