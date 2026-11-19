@@ -2,6 +2,7 @@ import { dateLocalISO } from './format'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Registro, Empresa, RegistroCalidad } from '../types'
+import type { FilaLectura } from './historialImportado'
 import { TIPOLOGIAS_CALIDAD } from '../components/calidad/constants'
 
 export function generarReciboPDFBase64(registro: Registro, empresa: Empresa): string {
@@ -58,7 +59,7 @@ export function generarReciboPDFBase64(registro: Registro, empresa: Empresa): st
 }
 
 export function exportarPDFGlobal(
-  registros: Registro[],
+  registros: FilaLectura[],
   numeroContadorById?: Map<string, string>,
 ): void {
   const doc = new jsPDF()
@@ -68,16 +69,21 @@ export function exportarPDFGlobal(
   autoTable(doc, {
     startY: 30,
     head: [['Fecha', 'Cliente', '# Contador', 'Lect. Ant.', 'Lect. Act.', 'Consumo', 'Total (Q)', 'Estado']],
-    body: registros.map(r => [
-      new Date(r.fecha).toLocaleDateString(),
-      r.cliente_nombre,
-      numeroContadorDe(r),
-      String(r.lectura_anterior),
-      String(r.lectura_actual),
-      r.consumo.toFixed(2),
-      `Q${r.monto_calculado.toFixed(2)}`,
-      r.estado,
-    ]),
+    body: registros.map(r => {
+      // Lectura importada del historial: sin monto ni estado de pago, y con
+      // «—» donde el historial no trae el dato.
+      const h = r.historico
+      return [
+        new Date(r.fecha).toLocaleDateString(),
+        r.cliente_nombre,
+        numeroContadorDe(r),
+        h && h.anterior === null ? '—' : String(r.lectura_anterior),
+        h && h.lectura === null ? '—' : String(r.lectura_actual),
+        h && h.consumo === null ? '—' : r.consumo.toFixed(2),
+        h ? '—' : `Q${r.monto_calculado.toFixed(2)}`,
+        h ? 'histórico' : r.estado,
+      ]
+    }),
     theme: 'striped',
     styles: { fontSize: 9 },
     headStyles: { fillColor: [14, 165, 233] },

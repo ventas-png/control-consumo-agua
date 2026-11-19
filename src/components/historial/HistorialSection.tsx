@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, Suspense, type CSSProperties, type ReactNode } from 'react'
+import { useState, useMemo, useCallback, useEffect, Suspense, type CSSProperties, type ReactNode } from 'react'
 import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { confirm, notify } from '../shared/Dialog'
 import type { Registro, Cliente, UserRole, Unidad, Proyecto, Contador, Tarifa } from '../../types'
@@ -17,6 +17,8 @@ import {
   type HistorialFiltros,
 } from '../../lib/historialFiltros'
 import { tint } from '../shared/statusTone'
+import { fetchHistorialLecturasProyecto, type HistorialLectura } from '../../domain/agua/historialLecturas'
+import { filasDeHistorial, ESTADO_HISTORICO, type FilaLectura } from '../../lib/historialImportado'
 
 const CargaMasivaLecturasModal = lazy(() => import('../lecturas/CargaMasivaLecturasModal').then(m => ({ default: m.CargaMasivaLecturasModal })))
 const ImportHistorialLecturasModal = lazy(() => import('../contadores/ImportHistorialLecturasModal').then(m => ({ default: m.ImportHistorialLecturasModal })))
@@ -48,11 +50,19 @@ const ESTADO_PILL: Record<string, { bg: string; color: string; icon: string }> =
   pendiente: { bg: 'var(--at-warning-tint)', color: 'var(--at-warning-strong)', icon: '⏳' },
   pagado:    { bg: 'var(--at-success-tint)', color: 'var(--at-success-strong)', icon: '✓' },
   mora:      { bg: 'var(--at-danger-tint)', color: 'var(--at-danger-strong)', icon: '⚠️' },
+  // Lectura importada del historial que la empresa llevaba a mano: no es un cobro.
+  [ESTADO_HISTORICO]: { bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '🗂️' },
 }
 
 function pillDeEstado(estado: string) {
   return ESTADO_PILL[estado] ?? { bg: 'var(--at-chip)', color: 'var(--at-ink-2)', icon: '' }
 }
+
+function etiquetaEstado(estado: string): string {
+  return estado === ESTADO_HISTORICO ? 'histórico' : estado
+}
+
+const SIN_DATO = <span style={{ color: 'var(--at-ink-3)' }}>—</span>
 
 const TIPO_AGUA_LABELS: Record<string, string> = {
   potable: 'Agua Potable', rehuso: 'Agua de Rehúso', piscina: 'Piscina',
@@ -114,16 +124,38 @@ export function HistorialSection({
     [contadores]
   )
 
+  // Historial importado (lo que la empresa llevaba a mano). Se trae por
+  // proyecto —pueden ser decenas de miles de filas—: el del filtro, o el único
+  // que haya. Se mezcla en la tabla marcado «histórico» y fuera de los totales.
+  const proyectoHistorial = filtroProyecto || (proyectos.length === 1 ? proyectos[0].id : '')
+  const [historial, setHistorial] = useState<{ proyecto: string; filas: HistorialLectura[] } | null>(null)
+  const [recargaHistorial, setRecargaHistorial] = useState(0)
+  useEffect(() => {
+    if (!proyectoHistorial) return
+    let vigente = true
+    void fetchHistorialLecturasProyecto(proyectoHistorial).then(filas => {
+      if (vigente) setHistorial({ proyecto: proyectoHistorial, filas })
+    })
+    return () => { vigente = false }
+  }, [proyectoHistorial, recargaHistorial])
+  const historialDelProyecto = proyectoHistorial && historial?.proyecto === proyectoHistorial ? historial.filas : null
+  const cargandoHistorial = !!proyectoHistorial && historialDelProyecto === null
+
+  const filas: FilaLectura[] = useMemo(() => {
+    if (!historialDelProyecto?.length) return registros
+    return [...registros, ...filasDeHistorial(historialDelProyecto, contadoresById, unidades, clientes)]
+  }, [registros, historialDelProyecto, contadoresById, unidades, clientes])
+
   const filtrados = useMemo(() => {
     const filtros: HistorialFiltros = {
       texto: filtroTexto, estado: filtroEstado, proyecto: filtroProyecto,
       unidad: filtroUnidad, tipoAgua: filtroTipoAgua,
       fechaInicio: filtroFechaInicio, fechaFin: filtroFechaFin,
     }
-    return registros
+    return filas
       .filter(r => registroCoincide(r, filtros, contadoresById))
       .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
-  }, [registros, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, filtroTipoAgua, contadoresById])
+  }, [filas, filtroTexto, filtroEstado, filtroFechaInicio, filtroFechaFin, filtroProyecto, filtroUnidad, filtroTipoAgua, contadoresById])
 
   // Unidades del dropdown limitadas al proyecto seleccionado (si hay uno), para
   // que el filtro de unidad no liste unidades de otros proyectos.
@@ -144,8 +176,10 @@ export function HistorialSection({
 
   const stats = useMemo(() => {
     let totalMonto = 0, totalConsumo = 0, pagado = 0, pendiente = 0, mora = 0
-    let countPendiente = 0, countMora = 0
+    let countPendiente = 0, countMora = 0, historicas = 0
     for (const r of filtrados) {
+      // El historial importado es referencia: ni cuenta ni suma en los totales.
+      if (r.historico) { historicas++; continue }
       const t = getTotal(r)
       totalMonto += t
       totalConsumo += r.consumo || 0
@@ -154,8 +188,8 @@ export function HistorialSection({
       else if (r.estado === 'mora') { mora += t; countMora++ }
     }
     return {
-      totalRegistros: filtrados.length,
-      totalMonto, totalConsumo, pagado, pendiente, mora, countPendiente, countMora,
+      totalRegistros: filtrados.length - historicas,
+      totalMonto, totalConsumo, pagado, pendiente, mora, countPendiente, countMora, historicas,
     }
   }, [filtrados])
 
@@ -242,7 +276,7 @@ export function HistorialSection({
   // En el teléfono (≤480px) cada fila es una tarjeta con fecha, cliente,
   // consumo, total y estado; el resto (`hideOnMobile`) vive en la ventana de
   // detalle, incluidas las acciones.
-  const columns: DataTableColumn<Registro>[] = useMemo(() => [
+  const columns: DataTableColumn<FilaLectura>[] = useMemo(() => [
     {
       key: 'fecha', header: 'Fecha', sortable: true,
       accessor: r => r.fecha,
@@ -278,22 +312,31 @@ export function HistorialSection({
     {
       key: 'lectAnt', header: 'Lect. Ant.', numeric: true, hideOnMobile: true,
       accessor: r => r.lectura_anterior,
-      render: r => <span style={{ color: 'var(--at-ink-3)' }}>{r.lectura_anterior}</span>,
+      render: r => r.historico && r.historico.anterior === null
+        ? SIN_DATO
+        : <span style={{ color: 'var(--at-ink-3)' }}>{r.lectura_anterior}</span>,
     },
     {
       key: 'lectAct', header: 'Lect. Act.', numeric: true, hideOnMobile: true,
       accessor: r => r.lectura_actual,
-      render: r => <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}>{r.lectura_actual}</span>,
+      render: r => r.historico && r.historico.lectura === null
+        ? SIN_DATO
+        : <span style={{ color: 'var(--at-primary)', fontWeight: 600 }}>{r.lectura_actual}</span>,
     },
     {
       key: 'consumo', header: 'Consumo (m³)', sortable: true, numeric: true,
       accessor: r => r.consumo,
-      render: r => <span style={{ fontWeight: 600 }}>{formatNumber(r.consumo)}</span>,
+      render: r => r.historico && r.historico.consumo === null
+        ? SIN_DATO
+        : <span style={{ fontWeight: 600 }}>{formatNumber(r.consumo)}</span>,
     },
     {
       key: 'total', header: `Total (${moneda})`, sortable: true, numeric: true,
-      accessor: r => getTotal(r),
-      render: r => <span style={{ fontWeight: 700, color: 'var(--at-primary)', whiteSpace: 'nowrap' }}>{formatCurrency(getTotal(r), moneda)}</span>,
+      accessor: r => (r.historico ? 0 : getTotal(r)),
+      // Una lectura importada no se cobra: no tiene total.
+      render: r => r.historico
+        ? SIN_DATO
+        : <span style={{ fontWeight: 700, color: 'var(--at-primary)', whiteSpace: 'nowrap' }}>{formatCurrency(getTotal(r), moneda)}</span>,
     },
     {
       key: 'estado', header: 'Estado', sortable: true,
@@ -302,7 +345,7 @@ export function HistorialSection({
         const p = pillDeEstado(r.estado)
         return (
           <span style={pillStyle(p)}>
-            {p.icon} {r.estado}
+            {p.icon} {etiquetaEstado(r.estado)}
           </span>
         )
       },
@@ -313,11 +356,12 @@ export function HistorialSection({
       // las muestra como "—" en vez de atribuirlas al "Sistema".
       key: 'capturo', header: 'Capturó', hideOnMobile: true,
       accessor: r => r.creado_por ?? '',
-      render: r => <UsuarioChip userId={r.creado_por} historico />,
+      render: r => (r.historico ? SIN_DATO : <UsuarioChip userId={r.creado_por} historico />),
     },
     {
       key: 'acciones', header: 'Acciones', hideOnMobile: true,
-      render: r => (
+      // Una lectura importada no tiene estado de pago, foto ni recibo que enviar.
+      render: r => r.historico ? SIN_DATO : (
         // La fila entera abre el detalle; estos botones hacen otra cosa.
         <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
           {canEdit && (
@@ -350,7 +394,7 @@ export function HistorialSection({
     },
   ], [moneda, canEdit, canDelete, onRegistroDeleted, contadoresById, enviarWhatsApp, eliminarRegistro])
 
-  const detalle = detalleId ? registros.find(r => r.id === detalleId) ?? null : null
+  const detalle = detalleId ? filas.find(r => r.id === detalleId) ?? null : null
   const registroEnEdicion = editModal ? registros.find(r => r.id === editModal.registroId) ?? null : null
 
   return (
@@ -417,6 +461,17 @@ export function HistorialSection({
         <StatCard label={`En Mora (${stats.countMora})`} value={stats.mora} color="var(--at-danger)" icon={<Icon name="alert" size={14} />} moneda={moneda} />
       </div>
 
+      {/* El historial importado se ve en la tabla pero no entra en los totales. */}
+      {(stats.historicas > 0 || cargandoHistorial || (proyectos.length > 1 && !filtroProyecto)) && (
+        <p role="status" style={{ margin: '-8px 0 20px', fontSize: 13, color: 'var(--at-ink-2)' }}>
+          {cargandoHistorial
+            ? '🗂️ Cargando el historial importado…'
+            : stats.historicas > 0
+              ? `🗂️ ${formatNumber(stats.historicas, 0)} ${stats.historicas === 1 ? 'lectura histórica importada' : 'lecturas históricas importadas'} en la lista. Son de referencia: no generan cobro y no suman en los totales de arriba.`
+              : '🗂️ Elija un proyecto en Filtros para ver también su historial importado.'}
+        </p>
+      )}
+
       {/* Filters Panel */}
       {showFilters && (
         <div style={{ background: 'var(--at-surface-2)', padding: 16, marginBottom: 20, borderRadius: 12, border: '1px solid var(--at-line)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
@@ -432,6 +487,7 @@ export function HistorialSection({
             <option value="pendiente">⏳ Pendiente</option>
             <option value="pagado">✓ Pagado</option>
             <option value="mora">⚠️ Mora</option>
+            <option value={ESTADO_HISTORICO}>🗂️ Histórico (importado)</option>
           </select>
           {proyectos.length > 1 && (
             <select value={filtroProyecto} onChange={e => { setFiltroProyecto(e.target.value); setFiltroUnidad(''); setCurrentPage(1) }} style={filterFieldStyle}>
@@ -472,7 +528,7 @@ export function HistorialSection({
       {/* View Mode: Table (vía DataTable, sin paginación interna) */}
       {viewMode === 'table' && (
         <div style={{ marginBottom: 20 }}>
-          <DataTable<Registro>
+          <DataTable<FilaLectura>
             data={paginados}
             columns={columns}
             rowKey="id"
@@ -491,6 +547,7 @@ export function HistorialSection({
           {paginados.map(r => {
             const total = getTotal(r)
             const p = pillDeEstado(r.estado)
+            const h = r.historico
             return (
               <div
                 key={r.id}
@@ -516,14 +573,14 @@ export function HistorialSection({
                   </div>
                 </div>
                 <div style={{ background: 'var(--at-surface-2)', padding: 12, borderRadius: 8, marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 12 }}>
-                  <div><span style={{ color: 'var(--at-ink-3)' }}>Anterior</span><div style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{r.lectura_anterior}</div></div>
-                  <div><span style={{ color: 'var(--at-ink-3)' }}>Actual</span><div style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{r.lectura_actual}</div></div>
-                  <div><span style={{ color: 'var(--at-ink-3)' }}>Consumo</span><div style={{ fontWeight: 600, color: 'var(--at-accent)' }}>💧 {formatNumber(r.consumo)} m³</div></div>
-                  <div><span style={{ color: 'var(--at-ink-3)' }}>Total</span><div style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{formatCurrency(total, moneda)}</div></div>
+                  <div><span style={{ color: 'var(--at-ink-3)' }}>Anterior</span><div style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{h && h.anterior === null ? '—' : r.lectura_anterior}</div></div>
+                  <div><span style={{ color: 'var(--at-ink-3)' }}>Actual</span><div style={{ fontWeight: 600, color: 'var(--at-primary)' }}>{h && h.lectura === null ? '—' : r.lectura_actual}</div></div>
+                  <div><span style={{ color: 'var(--at-ink-3)' }}>Consumo</span><div style={{ fontWeight: 600, color: 'var(--at-accent)' }}>{h && h.consumo === null ? '—' : `💧 ${formatNumber(r.consumo)} m³`}</div></div>
+                  <div><span style={{ color: 'var(--at-ink-3)' }}>Total</span><div style={{ fontWeight: 700, color: 'var(--at-primary)' }}>{h ? '—' : formatCurrency(total, moneda)}</div></div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                  <span style={pillStyle(p)}>{p.icon} {r.estado}</span>
-                  <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+                  <span style={pillStyle(p)}>{p.icon} {etiquetaEstado(r.estado)}</span>
+                  {!h && <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
                     {canEdit && (
                       <button onClick={() => setEditModal({ registroId: r.id, estado: r.estado === 'mora' ? 'mora' : 'pendiente' })} aria-label="Editar estado" style={{ padding: '6px 10px', background: 'var(--at-warning)', color: 'var(--at-on-status)', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>✏️</button>
                     )}
@@ -532,7 +589,7 @@ export function HistorialSection({
                     {canDelete && onRegistroDeleted && (
                       <button onClick={() => eliminarRegistro(r)} aria-label="Eliminar lectura" style={{ padding: '6px 10px', background: 'var(--at-danger)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>🗑️</button>
                     )}
-                  </div>
+                  </div>}
                 </div>
                 <button
                   type="button"
@@ -576,7 +633,7 @@ export function HistorialSection({
             subtitle={
               <span style={{ display: 'inline-flex', gap: '4px 8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <span>🔢 {numero ? `Contador ${numero}` : 'Sin contador'}</span>
-                <span style={{ ...pillStyle(p), padding: '2px 10px' }}>{p.icon} {detalle.estado}</span>
+                <span style={{ ...pillStyle(p), padding: '2px 10px' }}>{p.icon} {etiquetaEstado(detalle.estado)}</span>
               </span>
             }
             maxWidth="720px"
@@ -589,7 +646,8 @@ export function HistorialSection({
             // Las mismas acciones y permisos que la fila: en el teléfono la
             // columna de acciones se oculta y este es su único sitio.
             // Envueltas para que bajen de línea en pantallas angostas.
-            footer={
+            // Una lectura importada no tiene acciones: sólo se consulta.
+            footer={detalle.historico ? undefined : (
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, width: '100%' }}>
                 {canDelete && onRegistroDeleted && (
                   <Button variant="outline-danger" onClick={() => eliminarRegistro(detalle)} aria-label="Eliminar lectura" style={{ marginRight: 'auto' }}>🗑️</Button>
@@ -604,14 +662,18 @@ export function HistorialSection({
                   >✏️ Editar estado</Button>
                 )}
               </div>
-            }
+            )}
           >
-            <RegistroDetalle
-              registro={detalle}
-              moneda={moneda}
-              total={getTotal(detalle)}
-              numeroContador={numero}
-            />
+            {detalle.historico ? (
+              <HistoricoDetalle fila={detalle} numeroContador={numero} />
+            ) : (
+              <RegistroDetalle
+                registro={detalle}
+                moneda={moneda}
+                total={getTotal(detalle)}
+                numeroContador={numero}
+              />
+            )}
           </EditModal>
         )
       })()}
@@ -685,7 +747,8 @@ export function HistorialSection({
             proyectos={proyectos}
             contadores={contadores}
             proyectoInicial={filtroProyecto}
-            onClose={() => setImportar(null)}
+            // Al cerrar se vuelve a leer: lo recién importado aparece en la tabla.
+            onClose={() => { setImportar(null); setRecargaHistorial(n => n + 1) }}
             onLecturaInicialActualizada={cambios => {
               cambios.forEach(c => onContadorUpdated(c.id, { lectura_inicial: Number(c.lectura_inicial) }))
             }}
@@ -763,6 +826,32 @@ function RegistroDetalle({ registro: r, moneda, total, numeroContador }: {
       )}
 
       <div style={{ fontSize: 11, color: 'var(--at-ink-3)', overflowWrap: 'anywhere' }}>ID de lectura: {r.id}</div>
+    </div>
+  )
+}
+
+// Detalle de una lectura importada: sólo lo que el historial trae.
+function HistoricoDetalle({ fila, numeroContador }: { fila: FilaLectura; numeroContador: string | null }) {
+  const h = fila.historico
+  if (!h) return null
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--at-ink-2)' }}>
+        Lectura importada del historial que se llevaba fuera de la plataforma. Es de referencia: no genera cobro.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+        <DetailField label="Fecha" value={formatDate(fila.fecha)} />
+        {numeroContador && <DetailField label="# Contador" value={numeroContador} />}
+        <DetailField label="Lectura anterior" value={h.anterior === null ? '—' : formatNumber(h.anterior, 0)} />
+        <DetailField label="Lectura" value={h.lectura === null ? '—' : formatNumber(h.lectura, 0)} accent="var(--at-primary)" />
+        <DetailField label="Consumo" value={h.consumo === null ? '—' : `${formatNumber(h.consumo)} m³`} accent="var(--at-accent)" />
+      </div>
+      {fila.notas && (
+        <div style={{ background: 'var(--at-surface-2)', borderRadius: 8, padding: '10px 12px' }}>
+          <div style={detailLabelStyle}>📝 Notas</div>
+          <div style={{ fontSize: 13.5, color: 'var(--at-ink)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{fila.notas}</div>
+        </div>
+      )}
     </div>
   )
 }
