@@ -81,8 +81,9 @@ Identidad fija de la app (no cambiarla una vez publicada):
    compilar con `VITE_APPLE_SIGN_IN=true`. Mientras no esté, el binario cumple
    igual: sin la variable la app de iOS no muestra ningún login social (ni
    Google). Android no tiene esta regla y no muestra Apple.
-3. **Iconos y splash de marca.** Los actuales son los del template de
-   Capacitor (sección 3). Apple rechaza iconos placeholder.
+3. ~~**Iconos y splash de marca.**~~ **Resuelto**: salen del logo de la web
+   (`public/favicon.svg`) con `scripts/generar-iconos-nativos.mjs` (sección 3).
+   Queda verlos en un teléfono de cada plataforma (sección 7, punto 1).
 
 **Falta y es opcional para la v1**
 
@@ -160,32 +161,37 @@ Pasos 2 y 4 de `MOBILE.md`, resumidos:
 
 ## 3. Iconos y splash de marca
 
-Hoy `ios/App/App/Assets.xcassets/AppIcon.appiconset` y los `mipmap-*` de
-Android llevan el icono azul de Capacitor. La fuente de la marca ya está en el
-repo: `public/favicon.svg` (cuadrícula sobre verde `#1B3B36`) y
-`public/pwa-512x512.png`.
+**Hechos.** El ícono, el splash y los gráficos de la ficha de Play salen del
+logo de la web y de la PWA: la cuadrícula de `public/favicon.svg` sobre verde
+`#1B3B36`. Los dibuja `scripts/generar-iconos-nativos.mjs` y escribe cada PNG
+al tamaño exacto de cada plataforma:
 
-1. Exportar desde el SVG (o desde el diseño original) a una carpeta `resources/`
-   en la raíz:
-   - `resources/icon-only.png` — 1024×1024, **sin transparencia y sin esquinas
-     redondeadas** (Apple aplica su propia máscara; un PNG con alfa se rechaza).
-   - `resources/icon-foreground.png` — 1024×1024, solo la cuadrícula, fondo
-     transparente (capa frontal del icono adaptativo de Android).
-   - `resources/icon-background.png` — 1024×1024, verde `#1B3B36` plano.
-   - `resources/splash.png` — 2732×2732, fondo `#1B3B36` con el logo centrado
-     en el tercio central (se recorta en cada pantalla).
-2. Generar todos los tamaños:
+| Archivo | Para qué |
+| --- | --- |
+| `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png` | Ícono de iOS, 1024×1024 **sin canal alfa** (App Store rechaza el ícono con alfa). iOS redondea las esquinas. App Store Connect toma el ícono de aquí: no se sube aparte. |
+| `ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732*.png` | Splash de iOS: cuadrícula centrada sobre el verde. |
+| `android/app/src/main/res/mipmap-*/ic_launcher_foreground.png` | Capa frontal del ícono adaptativo de Android, dentro de la zona segura. El fondo es el color `ic_launcher_background` (`values/ic_launcher_background.xml`). |
+| `android/app/src/main/res/mipmap-*/ic_launcher.png` y `ic_launcher_round.png` | Ícono para Android 7, que no tiene ícono adaptativo. |
+| `android/app/src/main/res/drawable*/splash.png` | Splash de Android hasta la versión 11. Desde Android 12 el sistema muestra el ícono sobre `windowSplashScreenBackground` (`values/styles.xml`), también en el verde de la marca. |
+| `docs/tiendas/play-icono-512.png` | Ícono de alta resolución para la ficha de Play: 512×512, PNG de 32 bits. |
+| `docs/tiendas/play-grafico-funciones-1024x500.png` | Gráfico de funciones de la ficha de Play (obligatorio): logo, nombre y lema de la web. Se puede cambiar por uno propio del mismo tamaño. |
 
-   ```bash
-   npm i -D @capacitor/assets
-   npx capacitor-assets generate --iconBackgroundColor '#1B3B36' --splashBackgroundColor '#1B3B36'
-   ```
+Para cambiar el logo o el color, editar el script (colores y proporciones van
+al principio) y volver a correrlo:
 
-   Esto reescribe los `.appiconset`, los `mipmap-*` y los `drawable-*/splash.png`.
-3. Abrir la app en un simulador y en un emulador y comprobar el icono en la
-   pantalla de inicio y el splash al arrancar.
-4. Para la ficha de la tienda, además: icono **512×512** (Play) y la captura de
-   **1024×1024** (App Store la toma del binario; Play la pide aparte).
+```bash
+npx playwright install chromium   # solo la primera vez
+node scripts/generar-iconos-nativos.mjs
+```
+
+Si cambia el color de fondo, cambiarlo también en
+`android/app/src/main/res/values/ic_launcher_background.xml`. Después,
+compilar como siempre (`npm run mobile:build` y Xcode o Android Studio) y
+probar en el teléfono.
+
+No usar `@capacitor/assets` para esto: genera la capa frontal del ícono de
+Android a 48 dp y la estira a 72 dp, así que el ícono queda borroso; además
+reformatea `AndroidManifest.xml` y deja PNG sin usar en el `Splash.imageset`.
 
 ---
 
@@ -292,7 +298,8 @@ adb install -r app/build/outputs/apk/release/app-release.apk
      conservan, que es lo que la política pide declarar.
 3. **Ficha de Play Store** (*Presencia en la tienda → Ficha principal*):
    - Nombre (30 caracteres), descripción breve (80), descripción completa (4000).
-   - Icono 512×512 PNG, **gráfico de funciones** 1024×500 (obligatorio).
+   - Icono 512×512 PNG, **gráfico de funciones** 1024×500 (obligatorio): los
+     dos están en `docs/tiendas/` (sección 3).
    - Capturas de **teléfono**: mínimo 2, recomendable 4–8, relación 16:9 o 9:16,
      lado mayor entre 320 y 3840 px. Tomarlas de un teléfono real o del
      emulador Pixel.
@@ -431,7 +438,9 @@ En App Store Connect → la app → versión `2.0.0`:
 
 ## 7. Prueba de humo antes de cada envío (en dispositivo real, build release)
 
-1. La app abre con splash de marca y entra a login (no pantalla blanca).
+1. El ícono en la pantalla de inicio es el de la marca (cuadrícula sobre
+   verde, no la X azul de Capacitor) y la app abre con el splash verde y entra
+   al login (no pantalla blanca).
 2. Login con correo y contraseña; cerrar la app del todo y reabrir: sigue la
    sesión.
 3. Deep link en los dos arranques (app abierta y app cerrada del todo): en

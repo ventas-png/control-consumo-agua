@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Verde de la marca: fondo del ícono adaptativo y del splash de arranque
+         (styles.xml). Los PNG salen de scripts/generar-iconos-nativos.mjs. -->
+    <color name="ic_launcher_background">#1B3B36</color>
 </resources>

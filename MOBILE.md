@@ -113,12 +113,10 @@ abren el navegador del sistema y vuelven a la app con sesión; en Android,
 Google. La recuperación de contraseña desde la app usa el mismo deep link.
 
 ### Paso 5 — Iconos y splash
-Hoy son los del template de Capacitor. Con tu marca:
-```bash
-npm i -D @capacitor/assets
-# resources/icon.png (1024x1024) y resources/splash.png (2732x2732)
-npx capacitor-assets generate
-```
+Hechos: salen del logo de la web (`public/favicon.svg`) con
+`scripts/generar-iconos-nativos.mjs`, que también deja en `docs/tiendas/` el
+ícono de 512 y el gráfico de funciones de la ficha de Play. Para cambiar el
+logo, ver `docs/PUBLICACION_TIENDAS.md`, sección 3.
 
 ### Paso 6 — Notificaciones push
 Cliente (`src/lib/push.ts`), tabla (`supabase/migrations/20260730000000_create_device_tokens.sql`)
@@ -164,8 +162,8 @@ TestFlight, fichas, declaración de datos y problemas frecuentes) está en
   mi cuenta* y `/eliminar-cuenta`), Apple 4.8 (login social sin *Sign in with
   Apple*: la app de iOS no muestra el botón de Google, paso 4 y sección 5) y
   Apple 3.1.1 / pagos de Play (la app nativa no vende ni amplía el plan:
-  `src/lib/ventaDePlanes.ts`). Lo
-  que queda es externo: iconos de marca y las declaraciones en las consolas.
+  `src/lib/ventaDePlanes.ts`). Los iconos y el splash de marca también están
+  (paso 5). Lo que queda es externo: las declaraciones en las consolas.
   Detalle en la guía.
 
 ---
