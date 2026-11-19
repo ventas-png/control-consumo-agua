@@ -135,7 +135,11 @@ y despachador (`supabase/functions/send-push`) ya están. Falta lo externo:
    ```bash
    supabase secrets set FCM_SERVICE_ACCOUNT="$(cat firebase-service-account.json)"
    ```
-4. **Disparo**: llama a `send-push` con `{ user_id, title, body }` desde donde ya
+4. **Activar en el build**: compilar con **`VITE_PUSH_ENABLED=true`** en el
+   `.env`, solo cuando 1–3 estén hechos. Sin ella la app no pide permiso ni
+   registra el dispositivo; con ella y sin `google-services.json`, **la app se
+   cierra en Android** al iniciar sesión (ver el comentario de `src/lib/push.ts`).
+5. **Disparo**: llama a `send-push` con `{ user_id, title, body }` desde donde ya
    insertas en `user_notifications` (p. ej. `notifications-dispatcher`).
 
 Sin `FCM_SERVICE_ACCOUNT`, `send-push` responde `{ status: 'not_configured' }` y
@@ -157,8 +161,10 @@ TestFlight, fichas, declaración de datos y problemas frecuentes) está en
   (`LegalPage`, ya pre-renderizada).
 - **Bloqueantes de revisión ya cubiertos en el código**: eliminación de cuenta
   desde la app (Apple 5.1.1 v / Play *Account deletion*: *Mi perfil → Eliminar
-  mi cuenta* y `/eliminar-cuenta`) y Apple 4.8 (login social sin *Sign in with
-  Apple*: la app de iOS no muestra el botón de Google, paso 4 y sección 5). Lo
+  mi cuenta* y `/eliminar-cuenta`), Apple 4.8 (login social sin *Sign in with
+  Apple*: la app de iOS no muestra el botón de Google, paso 4 y sección 5) y
+  Apple 3.1.1 / pagos de Play (la app nativa no vende ni amplía el plan:
+  `src/lib/ventaDePlanes.ts`). Lo
   que queda es externo: iconos de marca y las declaraciones en las consolas.
   Detalle en la guía.
 

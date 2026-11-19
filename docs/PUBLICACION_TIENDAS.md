@@ -21,8 +21,12 @@ Identidad fija de la app (no cambiarla una vez publicada):
 
 **Ya está hecho en el repo**
 
-- Proyectos nativos generados, con permisos (cámara, galería, GPS, push) y sus
-  textos de justificación en `Info.plist` y `AndroidManifest.xml`.
+- Proyectos nativos generados, con permisos (cámara, GPS, push) y sus textos de
+  justificación en `Info.plist` y `AndroidManifest.xml`. La galería **no pide
+  permiso** en Android: `@capacitor/camera` usa el *Photo Picker* del sistema.
+  No declarar `READ_MEDIA_IMAGES`: Play obliga a justificarlo (política de
+  permisos de fotos y videos) y rechaza las apps que no necesitan la galería
+  entera.
 - Deep link de login con Google registrado en los dos sistemas.
 - Página de privacidad y términos públicas y pre-renderizadas (sirven para los
   enlaces obligatorios de las dos tiendas).
@@ -36,6 +40,26 @@ Identidad fija de la app (no cambiarla una vez publicada):
   `delete-own-account`; y la URL pública para pedirlo sin la app,
   `https://administratodo.com/eliminar-cuenta` (pre-renderizada, ES/EN). Reglas,
   retención y procedimiento de soporte en `docs/ELIMINACION_CUENTA.md`.
+- **Sin venta del plan dentro de la app** (Apple 3.1.1, política de pagos de
+  Google Play): el plan es una suscripción digital y las tiendas rechazan
+  venderla fuera de su sistema de cobro. En la app nativa no aparecen la
+  landing comercial (abre directo en el login), precios, «Actualizar plan»,
+  la tarjeta *Mi plan* (cambio de plan y portal de Stripe), la ampliación de
+  límites ni los avisos de prueba vencida o pago fallido. Sí se mantienen el
+  registro de empresa y de residentes (crear cuenta no es vender) y los pagos
+  de cuotas y agua de los residentes, que son servicios del mundo real (Apple
+  3.1.5(a)). La empresa contrata en la web y usa lo contratado en la app
+  (3.1.3(c), servicios empresariales). La regla vive en un solo sitio,
+  `src/lib/ventaDePlanes.ts`: **toda pantalla nueva que venda o amplíe el plan
+  debe pasar por `mostrarVentaDePlanes()`**, y antes de cada envío basta un
+  `grep -rn "createCheckoutSession\|createBillingPortalSession\|openBillingSection" src/components`
+  para comprobar que no apareció otra.
+- `ITSAppUsesNonExemptEncryption = NO` en `Info.plist` (solo HTTPS estándar):
+  App Store Connect ya no pregunta por cifrado en cada subida.
+- Ningún plugin usa APIs de «razón obligatoria» sin declarar (`ITMS-91053`):
+  se quitó `@capacitor/preferences`, que usaba `UserDefaults` sin manifiesto de
+  privacidad y ya no se usaba. Si vuelve a hacer falta un plugin así, ver la
+  sección 10.
 
 **Falta y es bloqueante para la revisión** (decidir antes de subir nada):
 
@@ -62,7 +86,13 @@ Identidad fija de la app (no cambiarla una vez publicada):
 
 **Falta y es opcional para la v1**
 
-- Push (Firebase + APNs). El código es defensivo: sin configurar, no rompe nada.
+- Push (Firebase + APNs). **Solo se activa compilando con
+  `VITE_PUSH_ENABLED=true`, y esa variable va únicamente cuando Firebase y APNs
+  ya están configurados** (`MOBILE.md`, paso 6). No es opcional dejarla puesta
+  sin Firebase: en Android, registrar el dispositivo sin `google-services.json`
+  **cierra la app** (Capacitor relanza la excepción de Firebase en el hilo
+  nativo y en cada arranque con sesión), lo que el *pre-launch report* de Play
+  detecta como crash. Sin la variable no se pide permiso ni se registra nada.
   Si no se activa en la v1, dejar la capability de *Push Notifications* sin
   añadir en Xcode para que la revisión no pregunte por ella.
 
@@ -409,15 +439,25 @@ En App Store Connect → la app → versión `2.0.0`:
    lleva `VITE_APPLE_SIGN_IN=true` (bloqueante #2), o recuperación de
    contraseña desde la app abriendo el enlace del correo en el mismo iPhone si
    no la lleva.
-4. Registrar una lectura con foto de cámara y con foto de galería: aparecen
-   los diálogos de permiso con los textos en español.
+4. Registrar una lectura con foto de cámara y con foto de galería: la cámara
+   pide permiso con el texto en español; en Android la galería abre el
+   selector de fotos del sistema **sin** pedir permiso.
 5. Una lectura con GPS: aparece el permiso de ubicación «mientras se usa».
 6. Una acción que pase por una edge function (invitar usuario, enviar correo):
    si responde 403, falta el origen en `ALLOWED_ORIGINS` (sección 2.2).
 7. Recuperar contraseña desde la app y abrir el correo **en el mismo teléfono**.
 8. Girar el teléfono, abrir un modal, hacer scroll: nada queda bajo la barra de
-   estado ni se arrastra de lado (`MOBILE.md` §4).
-9. En Sentry aparece el `release` del build (comprobar que llegan eventos).
+   estado ni se arrastra de lado (`MOBILE.md` §4). En Android 15 o superior
+   revisar también la **barra de navegación inferior**: con `targetSdk 36` el
+   sistema impone *edge-to-edge* (Capacitor lo gestiona con
+   `SystemBars.insetsHandling`, por defecto `css`), y es lo primero que salta en
+   las capturas del *pre-launch report*.
+9. Recorrer la app nativa buscando venta del plan: no debe haber precios,
+   «Actualizar plan», «Mi plan», «Ampliar plan» ni avisos de prueba o pago
+   (sección 0). Al primer arranque debe verse el login, no la landing.
+10. Sin `VITE_PUSH_ENABLED`, al iniciar sesión **no** aparece el permiso de
+    notificaciones; en Android, la app no se cierra tras el login.
+11. En Sentry aparece el `release` del build (comprobar que llegan eventos).
 
 ---
 
@@ -487,4 +527,9 @@ tracking** (Apple: *Data not used for tracking*; no hay ATT que pedir).
 | Rechazo Apple 4.8 *Login services* | No debería ocurrir: con `VITE_APPLE_SIGN_IN=true` la app ofrece *Sign in with Apple* junto a Google, y sin la variable no muestra login social (bloqueante #2 de la sección 0). Si aparece, comprobar en el binario qué botones salen (`src/lib/loginProviders.ts`) y que nadie añadió otro login social sin Apple al lado. |
 | «Continuar con Apple» vuelve con error de callback y Google funciona | El *Secret Key* del proveedor Apple en Supabase caducó (Apple lo limita a 6 meses). Renovarlo: `docs/RUNBOOK_GOOGLE_OAUTH_LOGIN.md`. |
 | Rechazo Apple 2.1 *App completeness*: «no pudimos iniciar sesión» | Credenciales de prueba caducadas o con 2FA. Mantener la cuenta demo viva y sin SSO/2FA. |
+| App Store Connect: «ITMS-91053: Missing API declaration» | Una dependencia nativa usa una API de «razón obligatoria» (`UserDefaults`, fechas de archivos, espacio en disco…) sin manifiesto de privacidad. El correo nombra la categoría. Solución: actualizar el plugin a una versión que traiga su `PrivacyInfo.xcprivacy` o, si no existe, añadir uno al target *App* en Xcode (*File → New → App Privacy*) declarando esa categoría y su motivo. Candidatos a vigilar: `IONCameraLib` e `IONGeolocationLib`, que bajan por Swift Package Manager al compilar. |
+| Rechazo Apple 3.1.1 *In-App Purchase* o Play *Payments policy* | No debería ocurrir: la app nativa no vende ni amplía el plan (sección 0). Si aparece, alguien añadió una pantalla de venta sin pasar por `mostrarVentaDePlanes()` (`src/lib/ventaDePlanes.ts`): localizarla con el `grep` de la sección 0. Los pagos de cuotas y agua de residentes están permitidos (Apple 3.1.5(a)); indicarlo en las notas de revisión si preguntan. |
+| Play: crash al iniciar sesión en el *pre-launch report* | Se compiló con `VITE_PUSH_ENABLED=true` sin `google-services.json`. Quitar la variable o configurar Firebase (`MOBILE.md`, paso 6). |
+| Play: declaración de «permisos de fotos y videos» | Alguien añadió `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO` al `AndroidManifest.xml`. Quitarlo: la galería funciona con el *Photo Picker* sin permiso (sección 0). |
+| Play: aviso de compatibilidad con páginas de memoria de **16 KB** | Lo exige Play para apps que apuntan a Android 15+. Revisarlo en *Explorador de app bundle*; si una biblioteca nativa no está alineada, actualizar Capacitor, el plugin afectado o el Android Gradle Plugin. |
 | Rechazo Apple 4.2 *Minimum functionality*: «es solo un sitio web empaquetado» | Resaltar en las notas de revisión las capacidades nativas: cámara para medidores, GPS, sesión persistente, (push). Las capturas deben mostrar esas pantallas. |
