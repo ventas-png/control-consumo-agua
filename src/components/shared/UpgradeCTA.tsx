@@ -2,6 +2,9 @@
  * UpgradeCTA — banner mostrado cuando un usuario intenta acceder a una
  * funcionalidad bloqueada por su plan actual. Click "Actualizar" abre
  * Stripe Checkout directamente (plat:P36d) o invoca `onUpgrade` custom.
+ *
+ * En la app nativa el banner es solo informativo: sin botón ni plan requerido
+ * (ver lib/ventaDePlanes: las tiendas rechazan vender el plan fuera de su cobro).
  */
 
 import { useState, type ReactNode } from 'react'
@@ -10,6 +13,7 @@ import { useFeatureFlags } from '../../lib/featureFlags'
 import { createCheckoutSession } from '../../domain/shared/mutations'
 import { trackFunnel, FUNNEL } from '../../lib/analytics'
 import { notify } from './Dialog'
+import { mostrarVentaDePlanes } from '../../lib/ventaDePlanes'
 
 interface Props {
   /** Nombre legible de la feature ('Asambleas digitales', 'Cobranza judicial'). */
@@ -109,18 +113,26 @@ export function UpgradeCTA({
           {description}
         </p>
       )}
-      <p style={{ margin: '0 0 20px', fontSize: 12, color: 'var(--at-ink-3)' }}>
-        Tu plan actual: <strong>{planName ?? '—'}</strong> · Requiere: <strong>{requiredPlan}</strong>
-      </p>
-      <Button
-        variant="gradient-primary"
-        onClick={handleClick}
-        loading={loading}
-        loadingText="Abriendo checkout…"
-        iconLeft={!loading ? '✨' : undefined}
-      >
-        Actualizar plan
-      </Button>
+      {!mostrarVentaDePlanes() ? (
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--at-ink-3)' }}>
+          Consulta con el administrador de tu cuenta.
+        </p>
+      ) : (
+        <>
+          <p style={{ margin: '0 0 20px', fontSize: 12, color: 'var(--at-ink-3)' }}>
+            Tu plan actual: <strong>{planName ?? '—'}</strong> · Requiere: <strong>{requiredPlan}</strong>
+          </p>
+          <Button
+            variant="gradient-primary"
+            onClick={handleClick}
+            loading={loading}
+            loadingText="Abriendo checkout…"
+            iconLeft={!loading ? '✨' : undefined}
+          >
+            Actualizar plan
+          </Button>
+        </>
+      )}
     </div>
   )
 }

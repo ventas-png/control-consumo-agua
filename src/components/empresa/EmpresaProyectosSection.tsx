@@ -11,6 +11,7 @@ import type { Proyecto } from '../../types'
 import { MONEDAS } from '../../types'
 import { SecureImage } from '../shared/SecureImage'
 import { OPEN_AMPLIAR_FLAG } from '../shared/promptUpgrade'
+import { mostrarVentaDePlanes } from '../../lib/ventaDePlanes'
 import { PlanUsageCard } from './PlanUsageCard'
 import { AmpliarPlanModal } from './AmpliarPlanModal'
 import type { EmpresaInfo } from '../../domain/empresa/queries'
@@ -248,7 +249,12 @@ export function EmpresaProyectosSection({
     if (!empresa || !puedeCrear) return
     if (proyectos.length >= effectiveMaxProjects) {
       // Límite alcanzado: ya estamos en la sección Empresa, así que se abre el
-      // modal de ampliación self-service directamente (sin navegación).
+      // modal de ampliación self-service directamente (sin navegación). En la
+      // app nativa solo se informa: ampliar es vender el plan (lib/ventaDePlanes).
+      if (!mostrarVentaDePlanes()) {
+        notify({ variant: 'warning', title: 'Límite del plan alcanzado', text: `Tu plan permite hasta ${effectiveMaxProjects} proyecto(s).` })
+        return
+      }
       setShowAmpliar(true)
       return
     }
@@ -286,7 +292,7 @@ export function EmpresaProyectosSection({
         <PlanUsageCard key={usageKey} companyId={companyId ?? null} onAmpliar={() => setShowAmpliar(true)} />
       </div>
 
-      {showAmpliar && companyId && (
+      {showAmpliar && companyId && mostrarVentaDePlanes() && (
         <AmpliarPlanModal
           companyId={companyId}
           onClose={() => setShowAmpliar(false)}

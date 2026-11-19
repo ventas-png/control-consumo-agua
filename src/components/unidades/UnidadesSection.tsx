@@ -145,15 +145,32 @@ export function UnidadesSection({
     setSelectedContadorIds([])
   }
 
-  async function batchUpdateContadores(savedUnitId: string) {
+  /**
+   * `unidad` es la fila ya guardada: la base deja a sus contadores en el mismo
+   * proyecto y empresa (triggers), y aquí se refleja en la copia de la pantalla
+   * para que no haga falta recargar (p. ej. la carga masiva del historial busca
+   * el contador en el proyecto elegido).
+   */
+  async function batchUpdateContadores(unidad: Pick<Unidad, 'id' | 'project_id' | 'company_id'>) {
+    const savedUnitId = unidad.id
+    const destino: Partial<Contador> = {
+      ...(unidad.project_id && { project_id: unidad.project_id }),
+      ...(unidad.company_id && { company_id: unidad.company_id }),
+    }
     const previouslyAssigned = contadores
       .filter(c => c.unidad_id === savedUnitId)
       .map(c => c.id)
+    // Los que siguen en la unidad la acompañan si cambió de proyecto.
+    if (unidad.project_id) {
+      contadores
+        .filter(c => c.unidad_id === savedUnitId && selectedContadorIds.includes(c.id) && c.project_id !== unidad.project_id)
+        .forEach(c => onContadorUpdated(c.id, destino))
+    }
     const toAdd = selectedContadorIds.filter(id => !previouslyAssigned.includes(id))
     const toRemove = previouslyAssigned.filter(id => !selectedContadorIds.includes(id))
     if (toAdd.length > 0) {
       const { error } = await assignContadoresToUnidad(savedUnitId, toAdd)
-      if (!error) toAdd.forEach(id => onContadorUpdated(id, { unidad_id: savedUnitId }))
+      if (!error) toAdd.forEach(id => onContadorUpdated(id, { unidad_id: savedUnitId, ...destino }))
     }
     if (toRemove.length > 0) {
       const { error } = await unlinkContadores(toRemove)
@@ -232,7 +249,7 @@ export function UnidadesSection({
 
       if (!error && data) {
         onUnidadUpdated(editingId, data as Unidad)
-        await batchUpdateContadores(editingId)
+        await batchUpdateContadores(data as Unidad)
         cancelForm()
         notify({ variant: 'success', title: 'Unidad actualizada', duration: 1800 })
       } else {
@@ -271,7 +288,7 @@ export function UnidadesSection({
       if (!error && data) {
         const newUnit = data as Unidad
         onUnidadAdded(newUnit)
-        await batchUpdateContadores(newUnit.id)
+        await batchUpdateContadores(newUnit)
         cancelForm()
         notify({ variant: 'success', title: 'Unidad creada', duration: 1800 })
       } else {

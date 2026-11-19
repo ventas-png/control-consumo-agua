@@ -18,5 +18,9 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- En Android 12+ el sistema siempre muestra su propio splash al abrir la
+             app: el ícono sobre este color. Sin definirlo, el fondo es el del tema
+             del sistema (blanco o negro), no el verde de la marca. -->
+        <item name="windowSplashScreenBackground">@color/ic_launcher_background</item>
     </style>
 </resources>

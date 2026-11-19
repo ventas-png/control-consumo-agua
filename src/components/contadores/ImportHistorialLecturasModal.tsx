@@ -169,7 +169,8 @@ export function ImportHistorialLecturasModal({ proyectos, contadores, proyectoIn
       templateFilename="plantilla_historial_lecturas"
       columns={COLUMNS}
       validateRow={(row, n) => validarFilaHistorial(row, n, contadores, destinoRef.current)}
-      batchSize={1000}
+      // Cada lote es UNA sentencia en la base, con 8 s de tope (statement_timeout).
+      batchSize={500}
       optionsPanel={panel}
       importDisabled={!destinoId}
       importDisabledReason="Elija el proyecto."
