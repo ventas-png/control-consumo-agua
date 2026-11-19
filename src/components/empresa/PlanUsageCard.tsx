@@ -1,6 +1,7 @@
 import { type CSSProperties } from 'react'
 import { usePlanLimits } from '../../hooks/usePlanLimits'
 import { promptUpgrade, type UpgradeResource } from '../shared/promptUpgrade'
+import { mostrarVentaDePlanes } from '../../lib/ventaDePlanes'
 
 // ============================================================================
 // PlanUsageCard — F4.2.2: Visibilidad operacional del uso del plan.
@@ -128,7 +129,7 @@ function UsageBar({ label, current, max, resource, onAmpliar }: UsageBarProps) {
           }}
         />
       </div>
-      {reachedLimit && (
+      {reachedLimit && mostrarVentaDePlanes() && (
         <button
           type="button"
           onClick={() => {

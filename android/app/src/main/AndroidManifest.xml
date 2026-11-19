@@ -51,11 +51,12 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Cámara: foto del medidor en lecturas (@capacitor/camera) -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Galería: adjuntar imágenes existentes. READ_MEDIA_IMAGES aplica en
-         Android 13+ (API 33); los permisos legacy quedan acotados a =32. -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Galería: SIN permisos a propósito. @capacitor/camera elige fotos existentes
+         con el Photo Picker del sistema, que no requiere permiso, y los de
+         almacenamiento solo hacen falta con saveToGallery (no se usa). Declarar
+         READ_MEDIA_IMAGES obliga a justificarlo en Play Console (política de
+         permisos de fotos y videos) y Play rechaza las apps que no necesitan acceso
+         amplio a la galería: no lo añadas sin una función que lo exija. -->
     <!-- Ubicación GPS de la lectura (@capacitor/geolocation) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />

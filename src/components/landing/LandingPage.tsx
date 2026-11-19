@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { mostrarVentaDePlanes } from '../../lib/ventaDePlanes'
 import { COPY, type Lang } from './i18n'
 import { warmUpSupabase } from '../../lib/supabase'
 import { Nav, LoginModal } from './Nav'
@@ -69,6 +70,32 @@ export function LandingPage({ onLogin, onLoginWithGoogle, onLoginWithApple, onFo
     setLoginOpen(true)
   }
 
+  // App nativa: sin landing comercial, login directo y fijo. La landing es la
+  // página de venta del plan (precios, "Empezar gratis") y la app no puede
+  // venderlo (ver lib/ventaDePlanes); además, quien abre la app ya viene a entrar.
+  const soloLogin = !mostrarVentaDePlanes()
+
+  const loginModal = (
+    <LoginModal
+      open={soloLogin || loginOpen}
+      dismissable={!soloLogin}
+      onClose={() => setLoginOpen(false)}
+      t={t}
+      onLogin={onLogin}
+      onLoginWithGoogle={onLoginWithGoogle}
+      onLoginWithApple={onLoginWithApple}
+      onForgotPassword={onForgotPassword}
+      onRegister={onRegister}
+      onSignupCompany={onSignupCompany}
+      mfaChallenge={mfaChallenge}
+      onVerifyMfa={onVerifyMfa}
+      onCancelMfa={onCancelMfa}
+      initialError={initialAuthError ?? undefined}
+    />
+  )
+
+  if (soloLogin) return <div className="at-root">{loginModal}</div>
+
   return (
     <div className="at-root">
       <Nav t={t} lang={lang} onToggleLang={setLang} onLogin={openLogin} onSignup={goPricing} />
@@ -85,21 +112,7 @@ export function LandingPage({ onLogin, onLoginWithGoogle, onLoginWithApple, onFo
       </main>
       <Footer t={t} />
 
-      <LoginModal
-        open={loginOpen}
-        onClose={() => setLoginOpen(false)}
-        t={t}
-        onLogin={onLogin}
-        onLoginWithGoogle={onLoginWithGoogle}
-        onLoginWithApple={onLoginWithApple}
-        onForgotPassword={onForgotPassword}
-        onRegister={onRegister}
-        onSignupCompany={onSignupCompany}
-        mfaChallenge={mfaChallenge}
-        onVerifyMfa={onVerifyMfa}
-        onCancelMfa={onCancelMfa}
-        initialError={initialAuthError ?? undefined}
-      />
+      {loginModal}
     </div>
   )
 }
