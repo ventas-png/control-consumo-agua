@@ -68,6 +68,10 @@ INSERT INTO public.contadores (id, project_id, company_id, unidad_id, tarifa_id,
   ('c0000000-0000-0000-0000-00000000000a', '11111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', NULL, NULL, 'DUP-7', 0, NULL, true),
   ('c0000000-0000-0000-0000-00000000000b', '11111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', NULL, NULL, 'dup-7 ', 0, NULL, true);
 
+-- ESP-1 · guardado con tres espacios en medio, como los de producción («VSC3-1   70304021»).
+INSERT INTO public.contadores (id, project_id, company_id, unidad_id, tarifa_id, numero_serie, lectura_inicial, fecha_instalacion, activo) VALUES
+  ('c0000000-0000-0000-0000-00000000000e', '11111111-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-00000000000a', NULL, NULL, 'ESP-1   77', 0, NULL, true);
+
 -- M-3 ya tiene una lectura del sistema: su base es esa lectura, no lectura_inicial.
 INSERT INTO public.registros (id, contador_id, project_id, fecha, lectura_anterior, lectura_actual, consumo, estado) VALUES
   ('a0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000003', '11111111-0000-0000-0000-000000000001',

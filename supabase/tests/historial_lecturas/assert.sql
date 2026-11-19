@@ -252,6 +252,26 @@ END $$;
 
 RESET ROLE;
 
+-- ── B' · los espacios del número (20261208000000), como Ada ─────────────────
+DO $$
+DECLARE
+  P1  constant uuid := '11111111-0000-0000-0000-000000000001';
+  ESP constant uuid := 'c0000000-0000-0000-0000-00000000000e';
+  r   jsonb;
+  e   text;
+BEGIN
+  -- Guardado «ESP-1   77» (tres espacios). El archivo lo trae con uno, con un
+  -- tabulador y con un espacio duro de Excel.
+  r := public.agua_historial_lecturas_importar(P1, jsonb_build_array(
+    jsonb_build_object('contador', 'esp-1 77',               'fecha', '2025-06-30', 'lectura', 1),
+    jsonb_build_object('contador', E'ESP-1\t77',              'fecha', '2025-07-31', 'lectura', 2),
+    jsonb_build_object('contador', 'ESP-1' || chr(160) || '77', 'fecha', '2025-08-31', 'lectura', 3)));
+  PERFORM ht.ok('B15 el número se reconoce aunque el archivo traiga otro espaciado (uno, tabulador o espacio duro)',
+    (r->>'insertadas')::int = 3 AND (r->>'contadores')::int = 1 AND ht.filas(ESP) = 3);
+  e := ht.error(format($q$SELECT public.agua_historial_lecturas_importar(%L, '[{"contador":"ESP-177","fecha":"2025-09-30","lectura":4}]'::jsonb)$q$, P1));
+  PERFORM ht.ok('B16 pero sin el espacio es otro número: no existe', e LIKE '%el contador «ESP-177» no existe en el proyecto%');
+END $$;
+
 -- ── E · el residente en su portal (20261207000000) ──────────────────────────
 -- Pepa es la Familia Pérez (Casa 1: M-1, M-3, M-4 y el inactivo M-0);
 -- Lola, la Familia López (Casa 2: M-2).

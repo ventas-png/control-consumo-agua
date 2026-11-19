@@ -79,6 +79,20 @@ it('el resumen dice qué pasó con la lectura inicial', () => {
     '1 contador conserva su lectura inicial: el historial es anterior a su fecha de instalación.')
 })
 
+describe('validarFilaHistorial — espacios del número de contador', () => {
+  // En la base están como «VSC3-1   70304021» (tres espacios); el Excel suele
+  // traer uno, un tabulador o un espacio duro.
+  const vsc = [{ numero_serie: 'VSC3-1   70304021', project_id: 'p2' }]
+  it.each(['VSC3-1 70304021', 'vsc3-1   70304021', 'VSC3-1\t70304021', 'VSC3-1\u00a070304021', '  VSC3-1  70304021 '])(
+    'reconoce «%s»', (serie) => {
+      expect(validarFilaHistorial({ contador: serie, fecha: '2025-11-30', lectura: 5 }, 2, vsc, 'p2', '2026-11-17').ok).toBe(true)
+    })
+  it('sin el espacio es otro número', () => {
+    const r = validarFilaHistorial({ contador: 'VSC3-170304021', fecha: '2025-11-30', lectura: 5 }, 2, vsc, 'p2', '2026-11-17')
+    expect(r.ok).toBe(false)
+  })
+})
+
 describe('ContadoresSection — Importar historial', () => {
   it('pide el proyecto, manda las filas a ese proyecto y actualiza la lectura inicial en pantalla', async () => {
     h.importarHistorialLecturas.mockResolvedValue({
@@ -109,6 +123,36 @@ describe('ContadoresSection — Importar historial', () => {
     ])
     await waitFor(() => expect(onContadorUpdated).toHaveBeenCalledWith('c-2', { lectura_inicial: 1548 }))
     expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', title: 'Historial importado' }))
+  })
+
+  it('en varios lotes, el aviso cuenta cada contador una sola vez', async () => {
+    // 501 filas del mismo contador: dos lotes (500 + 1), y la base informa
+    // «1 contador» en cada uno.
+    h.importarHistorialLecturas
+      .mockResolvedValueOnce({ data: { ...resumen(), filas: 500, insertadas: 500, contadores: 1 }, error: null })
+      .mockResolvedValueOnce({ data: { ...resumen(), filas: 1, insertadas: 1, contadores: 1 }, error: null })
+    render(
+      <ContadoresSection
+        contadores={contadores} tarifas={[] as Tarifa[]} unidades={[] as Unidad[]} proyectos={proyectos}
+        onContadorAdded={() => {}} onContadorUpdated={() => {}} onContadorDeleted={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Importar historial' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Importar lecturas históricas desde Excel' })
+    fireEvent.change(within(dialog).getByLabelText('Proyecto *'), { target: { value: 'p2' } })
+
+    const inicio = new Date(Date.UTC(2020, 0, 1))
+    const filas = Array.from({ length: 501 }, (_, i) => {
+      const d = new Date(inicio.getTime() + i * 86_400_000)
+      return `SQ-001,${d.toISOString().slice(0, 10)},${1000 + i},,`
+    })
+    subirCsv(`contador,fecha,lectura,consumo,notas\n${filas.join('\n')}\n`)
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Importar 501 lecturas históricas' }))
+
+    await waitFor(() => expect(h.importarHistorialLecturas).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Historial importado', text: expect.stringContaining('501 filas nuevas de 1 contador.'),
+    })))
   })
 
   it('sin proyecto elegido marca los contadores que no existen y no deja importar', async () => {

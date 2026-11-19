@@ -82,9 +82,15 @@ export function leerNumeroHistorial(raw: unknown): number | null {
   return /^-?\d+(\.\d+)?$/.test(normal) ? Number(normal) : NaN
 }
 
-/** Clave para buscar un contador por número de serie: sin mayúsculas ni espacios en los bordes. */
+/**
+ * Clave para buscar un contador por número de serie: sin mayúsculas, sin
+ * espacios en los bordes y con cualquier tirada de espacios de en medio (también
+ * tabuladores y espacios duros de Excel) contada como uno. «VSC3-1 70304021» y
+ * «VSC3-1   70304021» son el mismo contador. La base compara igual
+ * (20261208000000).
+ */
 export function claveSerie(serie: string | null | undefined): string {
-  return (serie ?? '').trim().toLowerCase()
+  return (serie ?? '').replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
 /**
