@@ -19,10 +19,11 @@ AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 LECT="$RAIZ/supabase/tests/registrar_lectura"
 NUESTRA="$RAIZ/supabase/migrations/20261130000000_agua_historial_lecturas.sql"
-# 20261205000000 y 20261206000000 reemplazan, en ese orden, la función de
+# 20261205000000, 20261206000000 y 20261208000000 reemplazan, en ese orden, la función de
 # importación. La vigente es la última: va SIEMPRE encima y es la que se muta.
 PADRON0="$RAIZ/supabase/migrations/20261205000000_agua_historial_importar_padron_unico.sql"
-PADRON="$RAIZ/supabase/migrations/20261206000000_agua_historial_importar_lecturas_por_indice.sql"
+PADRON1="$RAIZ/supabase/migrations/20261206000000_agua_historial_importar_lecturas_por_indice.sql"
+PADRON="$RAIZ/supabase/migrations/20261208000000_agua_historial_importar_espacios.sql"
 # 20261207000000 reemplaza la policy de lectura: agrega al residente (sus contadores).
 RESIDENTE="$RAIZ/supabase/migrations/20261207000000_agua_historial_portal_residente.sql"
 
@@ -56,7 +57,7 @@ sleep 2
 
 export PGHOST="$SOCK" PGPORT="$PUERTO" PGUSER=postgres
 psql -q -d postgres -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;" >/dev/null
-for db in hist histm1 histm2 histm3 histm4 histm5 histm6 histm7 histm8 histm9 histm10 histm11 histm12; do psql -q -d postgres -c "CREATE DATABASE $db" >/dev/null; done
+for db in hist histm1 histm2 histm3 histm4 histm5 histm6 histm7 histm8 histm9 histm10 histm11 histm12 histm13; do psql -q -d postgres -c "CREATE DATABASE $db" >/dev/null; done
 
 aplicar() { PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d "$1" -f "$2" >/dev/null; }
 huella() { psql -q -At -d "$1" -f "$AQUI/huella.sql"; }
@@ -75,16 +76,16 @@ base() {
 }
 # $2 = 20261130 (o su mutante) · $3 = la función vigente (o su mutante)
 # $4 = la policy de lectura vigente (o su mutante)
-preparar() { base "$1"; aplicar "$1" "$2"; aplicar "$1" "$PADRON0"; aplicar "$1" "$3"; aplicar "$1" "$4"; }
+preparar() { base "$1"; aplicar "$1" "$2"; aplicar "$1" "$PADRON0"; aplicar "$1" "$PADRON1"; aplicar "$1" "$3"; aplicar "$1" "$4"; }
 
 echo "── 1/4 · fixture: tenancy, padrón de agua, RLS de registros y contadores ─"
 base hist
 echo "  OK    2 empresas · 3 proyectos · 5 cuentas · 9 contadores · 1 lectura del sistema"
 
 echo "── 2/4 · la migración, DOS veces ───────────────────────────────────────"
-aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE"
+aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON1"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE"
 H1=$(huella hist)
-aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE"
+aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON1"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE"
 H2=$(huella hist)
 [ "$H1" = "$H2" ] || { echo "❌ re-aplicar la migración cambió el catálogo ($H1 ≠ $H2)"; exit 1; }
 echo "  OK    idempotente: la huella del catálogo no cambia al re-aplicar"
@@ -104,7 +105,7 @@ echo "  OK    $TOTAL comprobaciones"
 echo "── 4/4 · mutantes: sin cada compuerta, la suite debe fallar ────────────"
 mutante() {   # $1 = base · $2 = etiqueta · $3 = patrón que se quita · $4 = reemplazo · $5 = «todas» (opcional)
   # El patrón se quita de CADA migración que lo contenga: la de la tabla y la
-  # RLS (20261130), la función vigente (20261206) y la policy de lectura vigente
+  # RLS (20261130), la función vigente (20261208) y la policy de lectura vigente
   # (20261207) — una regla repetida en dos de ellas debe caer en las dos.
   python3 - "$MUT" "$3" "$4" "${5:-}" "$NUESTRA" "$PADRON" "$RESIDENTE" <<'PY2' || { echo "❌ el mutante «$2» no encuentra su línea en ninguna migración: $3"; exit 1; }
 import sys
@@ -145,6 +146,7 @@ mutante histm11 "no ve el de un contador dado de baja" "           AND c.activo 
 " ""
 mutante histm12 "la rama del residente es sólo del residente" "      (SELECT public.current_user_role()) = 'cliente'
       AND contador_id IN (" "      contador_id IN ("
+mutante histm13 "los espacios de en medio no cuentan" "    SELECT lower(btrim(regexp_replace(c.numero_serie, '[\\s\\u00A0]+', ' ', 'g'))) AS clave," "    SELECT lower(btrim(c.numero_serie)) AS clave,"
 
 echo
 echo "✅ historial_lecturas: importa por número de serie en el proyecto, todo o nada, sin cobrar, y la lectura inicial sólo cuando corresponde"

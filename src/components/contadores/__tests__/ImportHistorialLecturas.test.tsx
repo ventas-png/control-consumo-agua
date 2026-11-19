@@ -79,6 +79,20 @@ it('el resumen dice qué pasó con la lectura inicial', () => {
     '1 contador conserva su lectura inicial: el historial es anterior a su fecha de instalación.')
 })
 
+describe('validarFilaHistorial — espacios del número de contador', () => {
+  // En la base están como «VSC3-1   70304021» (tres espacios); el Excel suele
+  // traer uno, un tabulador o un espacio duro.
+  const vsc = [{ numero_serie: 'VSC3-1   70304021', project_id: 'p2' }]
+  it.each(['VSC3-1 70304021', 'vsc3-1   70304021', 'VSC3-1\t70304021', 'VSC3-1\u00a070304021', '  VSC3-1  70304021 '])(
+    'reconoce «%s»', (serie) => {
+      expect(validarFilaHistorial({ contador: serie, fecha: '2025-11-30', lectura: 5 }, 2, vsc, 'p2', '2026-11-17').ok).toBe(true)
+    })
+  it('sin el espacio es otro número', () => {
+    const r = validarFilaHistorial({ contador: 'VSC3-170304021', fecha: '2025-11-30', lectura: 5 }, 2, vsc, 'p2', '2026-11-17')
+    expect(r.ok).toBe(false)
+  })
+})
+
 describe('ContadoresSection — Importar historial', () => {
   it('pide el proyecto, manda las filas a ese proyecto y actualiza la lectura inicial en pantalla', async () => {
     h.importarHistorialLecturas.mockResolvedValue({
