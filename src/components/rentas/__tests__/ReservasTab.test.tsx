@@ -281,7 +281,7 @@ describe('datos de la estancia (como en la pestaña STR)', () => {
     fireEvent.change(within(dialogo).getByLabelText('Niños'), { target: { value: '1' } })
     fireEvent.change(within(dialogo).getByLabelText('Bebés'), { target: { value: '1' } })
     fireEvent.change(within(dialogo).getByLabelText('Fecha de reservación'), { target: { value: '2027-01-15' } })
-    fireEvent.change(within(dialogo).getByLabelText('Hora estimada de llegada'), { target: { value: '15:00' } })
+    fireEvent.change(within(dialogo).getByLabelText('Hora estimada de llegada: hora'), { target: { value: '3' } })
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
     const datos = (h.crear.mock.calls[0][0] as { datos: Record<string, unknown> }).datos
