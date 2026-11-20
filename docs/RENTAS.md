@@ -131,10 +131,15 @@ El formulario de reserva de Rentas captura lo mismo que el de la pestaña STR de
 - **Todas las propiedades**: fecha de reservación, hora estimada de llegada y de salida, y el grupo como adultos /
   niños / bebés (`num_huespedes` sigue siendo el total). Para las independientes son columnas nuevas de
   `rentas_reservas`; para las enlazadas, las de `reservas_str` que ya existían.
-- **Sólo propiedades enlazadas a un condominio**: fotos del huésped principal y de su documento, y las personas del
-  grupo. Son las mismas columnas `foto_url` / `foto_documento_url` y las mismas filas `huespedes_str` de la pestaña
-  STR (bucket `condominios-media`, que autoriza por proyecto), así que lo capturado en un lado se ve en el otro y
-  sirve al control de ingreso. Las independientes no las llevan todavía: necesitan su propio bucket y tabla.
+- **Fotos del huésped y personas del grupo, en todas las propiedades**, con dos destinos detrás del mismo formulario:
+  - *Enlazadas a un condominio*: las columnas `foto_url` / `foto_documento_url` de `reservas_str` y las filas
+    `huespedes_str` de la pestaña STR (bucket `condominios-media`, que autoriza por proyecto). Lo capturado en un
+    lado se ve en el otro y sirve al control de ingreso.
+  - *Independientes* (migración `20261207000000_rentas_huespedes`): `rentas_reservas.foto_url` /
+    `foto_documento_url` y la tabla `rentas_huespedes`, con las fotos en el bucket privado `rentas-huespedes`, bajo
+    `<empresa>/<propiedad>/`. Lo ve quien ve la reserva; sube quien la crea o edita; sólo se borra lo que ninguna
+    reserva ni persona nombra, así que el formulario guarda primero y retira después (`retirarFotosHuespedes`), y
+    al cancelar retira lo subido en esa sesión.
 - Una persona del grupo que ya registró su ingreso no se quita. Si la reserva se guarda y el grupo falla, se avisa
   aparte y la reserva queda.
 - La carga masiva no trae estos campos y no los pisa al actualizar una reserva existente.
