@@ -272,6 +272,33 @@ BEGIN
   PERFORM ht.ok('B16 pero sin el espacio es otro número: no existe', e LIKE '%el contador «ESP-177» no existe en el proyecto%');
 END $$;
 
+-- ── C' · lectura acotada al proyecto (20261209000000) ───────────────────────
+-- M-5 es de Condominio Dos. Lucía captura en Uno y NO está asignada a Dos.
+RESET ROLE;
+INSERT INTO public.agua_historial_lecturas (contador_id, fecha, lectura)
+VALUES ('c0000000-0000-0000-0000-000000000005', '2025-05-31', 9);
+SET ROLE authenticated;
+SELECT set_config('app.uid', 'e0000000-0000-0000-0000-000000000001', false) \g /dev/null
+DO $$
+DECLARE M5 constant uuid := 'c0000000-0000-0000-0000-000000000005';
+BEGIN
+  PERFORM ht.ok('C10 quien lee ve el historial de sus proyectos y no el de un proyecto que no tiene asignado',
+    ht.filas(M5) = 1
+    AND (SELECT count(*) > 0 FROM public.agua_historial_lecturas)
+    AND (SELECT count(*) = 0 FROM public.agua_historial_lecturas WHERE contador_id = M5));
+  -- INSERT pelado (sin RETURNING ni ON CONFLICT): sólo lo frena la policy de
+  -- escritura, sin ayuda de la de lectura.
+  PERFORM ht.ok('C12 ni escribe directo en un proyecto que no tiene asignado',
+    ht.error(format($q$INSERT INTO public.agua_historial_lecturas (contador_id, fecha, lectura) VALUES (%L, '2025-04-30', 1)$q$, M5)) LIKE '42501:%'
+    AND ht.filas(M5) = 1);
+END $$;
+SELECT set_config('app.uid', 'e0000000-0000-0000-0000-00000000000d', false) \g /dev/null
+DO $$
+BEGIN
+  PERFORM ht.ok('C11 la dueña de la empresa lo ve en todos sus proyectos',
+    (SELECT count(*) = 1 FROM public.agua_historial_lecturas WHERE contador_id = 'c0000000-0000-0000-0000-000000000005'));
+END $$;
+
 -- ── E · el residente en su portal (20261207000000) ──────────────────────────
 -- Pepa es la Familia Pérez (Casa 1: M-1, M-3, M-4 y el inactivo M-0);
 -- Lola, la Familia López (Casa 2: M-2).
