@@ -24,8 +24,10 @@ NUESTRA="$RAIZ/supabase/migrations/20261130000000_agua_historial_lecturas.sql"
 PADRON0="$RAIZ/supabase/migrations/20261205000000_agua_historial_importar_padron_unico.sql"
 PADRON1="$RAIZ/supabase/migrations/20261206000000_agua_historial_importar_lecturas_por_indice.sql"
 PADRON="$RAIZ/supabase/migrations/20261208000000_agua_historial_importar_espacios.sql"
-# 20261207000000 reemplaza la policy de lectura: agrega al residente (sus contadores).
-RESIDENTE="$RAIZ/supabase/migrations/20261207000000_agua_historial_portal_residente.sql"
+# 20261207000000 y 20261209000000 reemplazan, en ese orden, la policy de lectura
+# (el residente; el alcance por proyecto calculado una vez). La vigente es la última.
+RESIDENTE0="$RAIZ/supabase/migrations/20261207000000_agua_historial_portal_residente.sql"
+RESIDENTE="$RAIZ/supabase/migrations/20261209000000_agua_historial_lectura_por_proyecto.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH
@@ -57,7 +59,7 @@ sleep 2
 
 export PGHOST="$SOCK" PGPORT="$PUERTO" PGUSER=postgres
 psql -q -d postgres -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;" >/dev/null
-for db in hist histm1 histm2 histm3 histm4 histm5 histm6 histm7 histm8 histm9 histm10 histm11 histm12 histm13; do psql -q -d postgres -c "CREATE DATABASE $db" >/dev/null; done
+for db in hist histm1 histm2 histm3 histm4 histm5 histm6 histm7 histm8 histm9 histm10 histm11 histm12 histm13 histm14; do psql -q -d postgres -c "CREATE DATABASE $db" >/dev/null; done
 
 aplicar() { PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -d "$1" -f "$2" >/dev/null; }
 huella() { psql -q -At -d "$1" -f "$AQUI/huella.sql"; }
@@ -76,16 +78,16 @@ base() {
 }
 # $2 = 20261130 (o su mutante) · $3 = la función vigente (o su mutante)
 # $4 = la policy de lectura vigente (o su mutante)
-preparar() { base "$1"; aplicar "$1" "$2"; aplicar "$1" "$PADRON0"; aplicar "$1" "$PADRON1"; aplicar "$1" "$3"; aplicar "$1" "$4"; }
+preparar() { base "$1"; aplicar "$1" "$2"; aplicar "$1" "$PADRON0"; aplicar "$1" "$PADRON1"; aplicar "$1" "$3"; aplicar "$1" "$RESIDENTE0"; aplicar "$1" "$4"; }
 
 echo "── 1/4 · fixture: tenancy, padrón de agua, RLS de registros y contadores ─"
 base hist
 echo "  OK    2 empresas · 3 proyectos · 5 cuentas · 9 contadores · 1 lectura del sistema"
 
 echo "── 2/4 · la migración, DOS veces ───────────────────────────────────────"
-aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON1"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE"
+aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON1"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE0"; aplicar hist "$RESIDENTE"
 H1=$(huella hist)
-aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON1"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE"
+aplicar hist "$NUESTRA"; aplicar hist "$PADRON0"; aplicar hist "$PADRON1"; aplicar hist "$PADRON"; aplicar hist "$RESIDENTE0"; aplicar hist "$RESIDENTE"
 H2=$(huella hist)
 [ "$H1" = "$H2" ] || { echo "❌ re-aplicar la migración cambió el catálogo ($H1 ≠ $H2)"; exit 1; }
 echo "  OK    idempotente: la huella del catálogo no cambia al re-aplicar"
@@ -147,6 +149,7 @@ mutante histm11 "no ve el de un contador dado de baja" "           AND c.activo 
 mutante histm12 "la rama del residente es sólo del residente" "      (SELECT public.current_user_role()) = 'cliente'
       AND contador_id IN (" "      contador_id IN ("
 mutante histm13 "los espacios de en medio no cuentan" "    SELECT lower(btrim(regexp_replace(c.numero_serie, '[\\s\\u00A0]+', ' ', 'g'))) AS clave," "    SELECT lower(btrim(c.numero_serie)) AS clave,"
+mutante histm14 "lee sólo los proyectos a su alcance" "         WHERE public.can_access_project(p.id)" "         WHERE true"
 
 echo
 echo "✅ historial_lecturas: importa por número de serie en el proyecto, todo o nada, sin cobrar, y la lectura inicial sólo cuando corresponde"

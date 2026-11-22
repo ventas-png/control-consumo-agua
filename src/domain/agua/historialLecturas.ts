@@ -75,13 +75,14 @@ export async function fetchHistorialLecturas(contadorIds: string[]): Promise<His
 }
 
 /**
- * Todo el historial de un proyecto (para la carga masiva, que compara cientos
- * de contadores a la vez: pedirlos por id haría una URL enorme). Pagina para no
- * quedarse en el tope de filas de la API. Vacío si falla: el preview sigue,
- * sólo que sin promedio del historial.
+ * Todo el historial de un proyecto, diciendo si la lectura falló. Pagina para no
+ * quedarse en el tope de filas de la API. Para quien tiene que distinguir «no
+ * hay historial» de «no se pudo leer» (el Historial de Lecturas).
  */
-export async function fetchHistorialLecturasProyecto(projectId: string): Promise<HistorialLectura[]> {
-  if (!projectId) return []
+export async function fetchHistorialLecturasProyectoResultado(
+  projectId: string,
+): Promise<{ filas: HistorialLectura[]; error: boolean }> {
+  if (!projectId) return { filas: [], error: false }
   const { data, error } = await fetchAllRows<HistorialLectura>((from, to) =>
     db
       .from('agua_historial_lecturas')
@@ -91,12 +92,24 @@ export async function fetchHistorialLecturasProyecto(projectId: string): Promise
       .order('id', { ascending: true })
       .range(from, to),
   )
-  if (error) return []
-  return data.map(r => ({
-    ...r,
-    lectura: r.lectura === null ? null : Number(r.lectura),
-    consumo: r.consumo === null ? null : Number(r.consumo),
-  }))
+  if (error) return { filas: [], error: true }
+  return {
+    filas: data.map(r => ({
+      ...r,
+      lectura: r.lectura === null ? null : Number(r.lectura),
+      consumo: r.consumo === null ? null : Number(r.consumo),
+    })),
+    error: false,
+  }
+}
+
+/**
+ * Todo el historial de un proyecto (para la carga masiva, que compara cientos
+ * de contadores a la vez: pedirlos por id haría una URL enorme). Vacío si
+ * falla: el preview sigue, sólo que sin promedio del historial.
+ */
+export async function fetchHistorialLecturasProyecto(projectId: string): Promise<HistorialLectura[]> {
+  return (await fetchHistorialLecturasProyectoResultado(projectId)).filas
 }
 
 /**
