@@ -50,7 +50,7 @@ describe('leerFilaReserva', () => {
     expect(r).toEqual({
       ok: true,
       data: {
-        importes: { a1: 39, h1: 29 }, moneda: 'USD', propiedad: '',
+        importes: { a1: 39, h1: 29 }, moneda: 'USD', propiedad: '', proyecto: '',
         datos: expect.objectContaining({
           huesped_nombre: 'Ana', codigo_confirmacion: 'HM34NRSTRH', fecha_entrada: '2026-02-02', fecha_salida: '2026-02-03',
           num_huespedes: 1, plataforma: 'airbnb', politica_cancelacion: 'no_reembolsable', num_mascotas: 0, estado: 'completada',
@@ -80,7 +80,7 @@ describe('moneda y propiedad de la fila', () => {
   const base = { [COL.huesped]: 'Ana', [COL.entrada]: '2026-02-02', [COL.salida]: '2026-02-03' }
   it('la moneda se normaliza a mayúsculas y por defecto es USD', () => {
     const r = leerFilaReserva({ ...base, moneda: 'gtq', Propiedad: ' Apto 1A ' }, CONCEPTOS, '2026-11-16')
-    expect(r.ok && r.data).toMatchObject({ moneda: 'GTQ', propiedad: 'Apto 1A' })
+    expect(r.ok && r.data).toMatchObject({ moneda: 'GTQ', propiedad: 'Apto 1A', proyecto: '' })
   })
   it('una moneda que no es un código de tres letras se rechaza', () => {
     expect(leerFilaReserva({ ...base, [COL.moneda]: 'dólares' }, CONCEPTOS, '2026-11-16'))

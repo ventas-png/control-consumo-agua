@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type {
   ConceptoRenta, EstadoReservaRenta, LiquidacionRenta, PlataformaRenta, PoliticaCancelacionRenta, PropiedadRenta, Proyecto, ReservaUnificada,
@@ -12,7 +12,7 @@ import {
   tieneDesglose, totalesDesglose,
 } from '../../../domain/rentas/finanzas'
 import { useReservasRentaMutations, type DatosReserva } from '../../../domain/rentas/mutations'
-import { cargarGrupo, guardarGrupo, type PersonaGrupo } from '../../../domain/rentas/grupo'
+import { cargarGrupo, fotosDe, guardarGrupo, retirarFotosHuespedes, type PersonaGrupo } from '../../../domain/rentas/grupo'
 import { formatCurrency, formatFechaCalendario } from '../../../lib/format'
 import { confirm, notify } from '../../shared/Dialog'
 import { EditModal } from '../../shared/EditModal'
@@ -20,10 +20,10 @@ import { Button } from '../../shared/Button'
 import { EmptyState } from '../../shared/EmptyState'
 import { FilterChips } from '../../shared/FilterChips'
 import { StatusBadge } from '../../shared/StatusBadge'
-import { ImageUploader } from '../../shared/ImageUploader'
 import { HoraSelect } from '../../shared/HoraSelect'
 import { MediaScopeProvider } from '../../shared/MediaScopeContext'
 import { GrupoHuespedes } from '../GrupoHuespedes'
+import { FotoHuesped, type DestinoFotos } from '../FotoHuesped'
 import type { PermisosModulo } from '../RentasSection'
 import { DesgloseCampos } from '../finanzas/DesgloseCampos'
 import { ImportarReservasModal } from '../finanzas/ImportarReservasModal'
@@ -87,18 +87,28 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
   const [propiedadFiltro, setPropiedadFiltro] = useState('')
   const [editando, setEditando] = useState<ReservaUnificada | 'nueva' | null>(null)
   const [importando, setImportando] = useState(false)
-  // Personas del grupo (sólo reservas de propiedades enlazadas): como estaban y como quedan.
+  // Personas del grupo: como estaban y como quedan.
   const [grupoInicial, setGrupoInicial] = useState<PersonaGrupo[]>([])
   const [grupo, setGrupo] = useState<PersonaGrupo[]>([])
   const [subiendo, setSubiendo] = useState(false)
-  const idEnEdicion = editando && editando !== 'nueva' && editando.origen === 'condominio' ? editando.id : null
+  const idEnEdicion = editando && editando !== 'nueva' ? editando.id : null
+  const origenEnEdicion = editando && editando !== 'nueva' ? editando.origen : null
   useEffect(() => {
     setGrupo([]); setGrupoInicial([])
-    if (!idEnEdicion) return
+    if (!idEnEdicion || !origenEnEdicion) return
     let vigente = true
-    void cargarGrupo(idEnEdicion).then(g => { if (vigente) { setGrupo(g); setGrupoInicial(g) } }).catch(() => undefined)
+    void cargarGrupo({ id: idEnEdicion, origen: origenEnEdicion })
+      .then(g => {
+        if (!vigente) return
+        setGrupo(g); setGrupoInicial(g)
+        fotosIniciales.current = [...fotosIniciales.current, ...fotosDe({ foto_url: null, foto_documento_url: null }, g)]
+      }).catch(() => undefined)
     return () => { vigente = false }
-  }, [idEnEdicion])
+  }, [idEnEdicion, origenEnEdicion])
+  // Fotos de propiedades INDEPENDIENTES: toda ruta que pasó por el formulario, para
+  // retirar del bucket las que al final no quedaron en ninguna fila.
+  const fotosVistas = useRef(new Set<string>())
+  const fotosIniciales = useRef<string[]>([])
   const [form, setForm] = useState<Form>(formDe())
   const { crear, actualizar, eliminar } = useReservasRentaMutations(companyId)
   const guardando = crear.isPending || actualizar.isPending
@@ -115,9 +125,17 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(prev => ({ ...prev, [k]: v }))
   const abrir = (r: ReservaUnificada | 'nueva') => {
     setForm(r === 'nueva' ? formDe(undefined, propiedadFiltro) : formDe(r, '', liquidaciones.get(claveReserva(r))))
+    fotosIniciales.current = r === 'nueva' ? [] : fotosDe(r, [])
+    fotosVistas.current = new Set(fotosIniciales.current)
     setEditando(r)
   }
-  const cerrar = () => { if (!guardando) setEditando(null) }
+  /** Al cancelar se retiran las fotos subidas en esta sesión; las que ya tenía la reserva se quedan. */
+  const cerrar = () => {
+    if (guardando) return
+    const conservar = new Set(fotosIniciales.current)
+    retirarFotosHuespedes([...fotosVistas.current].filter(r => !conservar.has(r)))
+    setEditando(null)
+  }
 
   const nNoches = noches(form.fecha_entrada, form.fecha_salida)
   const totalSugerido = (() => {
@@ -128,6 +146,16 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
     ? reservasSolapadas(reservas, form.propiedad_id, form.fecha_entrada, form.fecha_salida, editando === 'nueva' ? undefined : editando.id)
     : []
   const propiedadForm = propiedadPorId.get(form.propiedad_id)
+  const destinoFotos: DestinoFotos | null = !propiedadForm ? null
+    : propiedadForm.unidad_id && propiedadForm.project_id ? { tipo: 'condominio' }
+      : { tipo: 'rentas', companyId: propiedadForm.company_id, propiedadId: propiedadForm.id }
+  // Toda ruta que aparece en el formulario queda anotada (ver fotosVistas).
+  useEffect(() => { for (const r of fotosDe(form, grupo)) fotosVistas.current.add(r) }, [form, grupo])
+  /** Cambiar de propiedad cambia la carpeta de las fotos: las ya subidas no sirven para la nueva. */
+  const cambiarPropiedad = (id: string) => {
+    setForm(prev => ({ ...prev, propiedad_id: id, foto_url: null, foto_documento_url: null }))
+    setGrupo([])
+  }
 
   const guardar = async () => {
     if (guardando || !editando) return
@@ -158,28 +186,31 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
       fecha_entrada: form.fecha_entrada, fecha_salida: form.fecha_salida,
       num_huespedes: adultos + ninos + bebes, num_adultos: adultos, num_ninos: ninos, num_bebes: bebes,
       fecha_reservacion: nulo(form.fecha_reservacion), hora_llegada_estimada: nulo(form.hora_llegada), hora_salida_estimada: nulo(form.hora_salida),
-      ...(enlazada ? { foto_url: form.foto_url, foto_documento_url: form.foto_documento_url } : {}),
+      foto_url: form.foto_url, foto_documento_url: form.foto_documento_url,
       plataforma: form.plataforma, codigo_confirmacion: nulo(form.codigo_confirmacion),
       monto_noche: noche, monto_total: recibido ?? total ?? totalSugerido,
       estado: form.estado, notas: nulo(form.notas),
       politica_cancelacion: form.politica_cancelacion === '' ? null : form.politica_cancelacion, num_mascotas: mascotas,
     }
     try {
-      let reservaStrId: string | null = null
-      if (editando === 'nueva') {
-        const ref = await crear.mutateAsync({ propiedad, datos, importes: importesAGuardar, moneda: form.moneda })
-        if (ref?.origen === 'condominio') reservaStrId = ref.id
-      } else {
-        await actualizar.mutateAsync({ reserva: editando, datos, propiedad, importes: importesAGuardar, moneda: form.moneda })
-        if (editando.origen === 'condominio') reservaStrId = editando.id
-      }
+      const ref = editando === 'nueva'
+        ? await crear.mutateAsync({ propiedad, datos, importes: importesAGuardar, moneda: form.moneda })
+        : (await actualizar.mutateAsync({ reserva: editando, datos, propiedad, importes: importesAGuardar, moneda: form.moneda }), editando)
       // La reserva ya quedó guardada: si el grupo falla se avisa aparte, sin perderla.
-      if (reservaStrId && (grupo.length > 0 || grupoInicial.length > 0)) {
+      let grupoGuardado = true
+      if (ref && (grupo.length > 0 || grupoInicial.length > 0)) {
         try {
-          await guardarGrupo(reservaStrId, grupoInicial, grupo)
+          await guardarGrupo(ref, propiedad, grupoInicial, grupo)
         } catch (e) {
+          grupoGuardado = false
           notify({ variant: 'warning', title: 'La reserva se guardó, pero no las personas del grupo', text: mensajeErrorRentas(e, 'Edita la reserva e intenta de nuevo.') })
         }
+      }
+      // Fotos que pasaron por el formulario y ya no nombra ninguna fila (sólo independientes;
+      // si el grupo no se guardó no se retira nada: sus fotos siguen haciendo falta).
+      if (!enlazada && grupoGuardado) {
+        const quedan = new Set(fotosDe(form, grupo))
+        retirarFotosHuespedes([...fotosVistas.current].filter(r => !quedan.has(r)))
       }
       setEditando(null)
       notify({ variant: 'success', title: editando === 'nueva' ? 'Reserva registrada' : 'Reserva actualizada', duration: 1500 })
@@ -335,7 +366,7 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
         <ImportarReservasModal
           propiedades={deCortoPlazo.filter(p => p.estado !== 'inactiva')}
           propiedadFija={propiedadPorId.get(propiedadFiltro)}
-          reservas={reservas} conceptos={conceptos} hoy={hoy} onClose={() => setImportando(false)}
+          reservas={reservas} nombreProyecto={nombreProyecto} conceptos={conceptos} hoy={hoy} onClose={() => setImportando(false)}
         />
       )}
 
@@ -353,7 +384,7 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
             style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
             <div>
               <label htmlFor="rr-propiedad" style={etiqueta}>Propiedad *</label>
-              <select id="rr-propiedad" value={form.propiedad_id} onChange={e => set('propiedad_id', e.target.value)} style={campo}
+              <select id="rr-propiedad" value={form.propiedad_id} onChange={e => cambiarPropiedad(e.target.value)} style={campo}
                 disabled={editando !== 'nueva'}>
                 <option value="">Elige una propiedad…</option>
                 {deCortoPlazo.filter(p => p.estado !== 'inactiva' || p.id === form.propiedad_id).map(p => (
@@ -496,25 +527,21 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
               <label htmlFor="rr-notas" style={etiqueta}>Notas</label>
               <textarea id="rr-notas" value={form.notas} onChange={e => set('notas', e.target.value)} rows={3} style={campo} maxLength={1000} />
             </div>
-            {propiedadForm?.unidad_id && propiedadForm.project_id ? (
-              <MediaScopeProvider projectId={propiedadForm.project_id}>
+            {propiedadForm && destinoFotos && (
+              <MediaScopeProvider projectId={propiedadForm.project_id ?? ''}>
                 <section aria-label="Fotografías del huésped principal" style={{ borderTop: '1px solid var(--at-line)', paddingTop: '0.75rem' }}>
                   <div style={{ fontWeight: 600, fontSize: '14px', marginBottom: '0.5rem' }}>
                     Fotografías del huésped principal <span style={{ ...tenue, fontWeight: 400 }}>(opcional — se pueden completar al ingreso)</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 200px))', gap: '0.75rem' }}>
-                    <ImageUploader value={form.foto_url} onChange={v => set('foto_url', v)} folder="str_guests" label="Foto del huésped" capture onSubiendo={setSubiendo} />
-                    <ImageUploader value={form.foto_documento_url} onChange={v => set('foto_documento_url', v)} folder="str_guests" label="DPI / Documento" capture onSubiendo={setSubiendo} />
+                    <FotoHuesped value={form.foto_url} onChange={v => set('foto_url', v)} label="Foto del huésped" destino={destinoFotos} onSubiendo={setSubiendo} />
+                    <FotoHuesped value={form.foto_documento_url} onChange={v => set('foto_documento_url', v)} label="DPI / Documento" destino={destinoFotos} onSubiendo={setSubiendo} />
                   </div>
                 </section>
                 <GrupoHuespedes personas={grupo} onChange={setGrupo} principal={form.huesped_nombre} onSubiendo={setSubiendo}
-                  maximo={(Number(form.num_adultos) || 0) + (Number(form.num_ninos) || 0) - 1} />
+                  destino={destinoFotos} maximo={(Number(form.num_adultos) || 0) + (Number(form.num_ninos) || 0) - 1} />
               </MediaScopeProvider>
-            ) : propiedadForm ? (
-              <p style={{ ...tenue, margin: 0 }}>
-                Las fotos del huésped y las personas del grupo se registran en las propiedades enlazadas a un condominio.
-              </p>
-            ) : null}
+            )}
           </form>
         </EditModal>
       )}

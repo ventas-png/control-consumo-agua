@@ -10,6 +10,8 @@ export const COL = {
   plataforma: 'Plataforma', politica: 'Política de cancelación', mascotas: 'Mascotas', moneda: 'Moneda',
   /** Sólo en la carga de varias propiedades a la vez: nombre o código de la propiedad. */
   propiedad: 'Propiedad',
+  /** Opcional, junto a «Propiedad»: el condominio al que pertenece, para distinguir nombres repetidos. */
+  proyecto: 'Proyecto',
 } as const
 
 /** Encabezado de la columna de un concepto: «Cobro huésped · Tarifa de limpieza». */
@@ -62,6 +64,8 @@ export interface FilaReservaImportada {
   moneda: string
   /** Texto de la columna «Propiedad» ('' si no viene). */
   propiedad: string
+  /** Texto de la columna «Proyecto» ('' si no viene). */
+  proyecto: string
 }
 
 const POLITICA_POR_TEXTO = new Map<string, PoliticaCancelacionRenta>(
@@ -117,7 +121,7 @@ export function leerFilaReserva(
   return {
     ok: true,
     data: {
-      importes, moneda, propiedad: texto(COL.propiedad),
+      importes, moneda, propiedad: texto(COL.propiedad), proyecto: texto(COL.proyecto),
       datos: {
         huesped_nombre: huesped || codigo, huesped_email: null, huesped_telefono: null,
         fecha_entrada: entrada, fecha_salida: salida, num_huespedes: huespedes, plataforma,
