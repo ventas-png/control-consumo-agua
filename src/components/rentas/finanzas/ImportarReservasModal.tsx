@@ -93,6 +93,7 @@ export function ImportarReservasModal({ propiedades, propiedadFija, reservas, no
     ]),
     { key: COL.codigo, width: 18, exampleValues: ['HM34NRSTRH'] },
     { key: COL.huesped, width: 24, exampleValues: ['Ana Pérez'] },
+    { key: COL.pais, width: 16, exampleValues: ['Guatemala'] },
     { key: COL.entrada, width: 12, exampleValues: ['2026-02-02'] },
     { key: COL.salida, width: 12, exampleValues: ['2026-02-03'] },
     { key: COL.huespedes, width: 10, exampleValues: [1] },

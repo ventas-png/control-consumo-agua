@@ -1,0 +1,46 @@
+import { describe, it, expect } from 'vitest'
+import { PAISES, banderaPais, buscarPaises, codigoDePais, esCodigoPais, etiquetaPais, nombrePais } from '../paises'
+
+describe('catálogo de países', () => {
+  it('249 códigos únicos de dos letras, con nombre en español y ordenados por nombre', () => {
+    expect(PAISES).toHaveLength(249)
+    expect(new Set(PAISES.map(p => p.codigo)).size).toBe(249)
+    expect(PAISES.every(p => /^[A-Z]{2}$/.test(p.codigo) && p.nombre.length > 1 && p.nombre !== p.codigo)).toBe(true)
+    expect(nombrePais('GT')).toBe('Guatemala')
+    expect(nombrePais('US')).toBe('Estados Unidos')
+    expect(nombrePais('DE')).toBe('Alemania')
+    const nombres = PAISES.map(p => p.nombre)
+    expect(nombres).toEqual([...nombres].sort((a, b) => a.localeCompare(b, 'es')))
+  })
+  it('nombre, bandera y etiqueta toleran vacío y códigos desconocidos', () => {
+    expect(nombrePais(null)).toBe('')
+    expect(nombrePais('ZZ')).toBe('ZZ')
+    expect(banderaPais('GT')).toBe('🇬🇹')
+    expect(banderaPais('gt')).toBe('')
+    expect(etiquetaPais('GT')).toBe('🇬🇹 Guatemala')
+    expect(etiquetaPais(null)).toBe('')
+    expect(esCodigoPais('GT')).toBe(true)
+    expect(esCodigoPais('ZZ')).toBe(false)
+  })
+  it('codigoDePais: código, nombre sin acentos ni mayúsculas, y alias habituales', () => {
+    expect(codigoDePais('gt')).toBe('GT')
+    expect(codigoDePais('MÉXICO')).toBe('MX')
+    expect(codigoDePais('espana')).toBe('ES')
+    expect(codigoDePais('USA')).toBe('US')
+    expect(codigoDePais('Reino Unido')).toBe('GB')
+    expect(codigoDePais('zz')).toBeNull()
+    expect(codigoDePais('Atlántida')).toBeNull()
+    expect(codigoDePais('')).toBeNull()
+  })
+  it('buscarPaises: primero los que empiezan así, luego los que lo contienen; vacío = todos', () => {
+    expect(buscarPaises('')).toHaveLength(249)
+    expect(buscarPaises('guat').map(p => p.codigo)).toEqual(['GT'])
+    const guin = buscarPaises('guin').map(p => p.nombre)
+    expect(guin[0]).toMatch(/^Guinea/)
+    expect(guin).toContain('Papúa Nueva Guinea')
+    expect(guin.indexOf('Papúa Nueva Guinea')).toBeGreaterThan(guin.indexOf('Guinea'))
+    expect(buscarPaises('us')[0].codigo).toBe('US')
+    expect(buscarPaises('eeuu').map(p => p.codigo)).toEqual(['US'])
+    expect(buscarPaises('xyzq')).toEqual([])
+  })
+})

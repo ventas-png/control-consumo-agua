@@ -59,6 +59,8 @@ export interface ReservaRenta {
   notas: string | null
   politica_cancelacion: PoliticaCancelacionRenta | null
   num_mascotas: number
+  /** País de procedencia del huésped: ISO 3166-1 alfa-2 ('GT'). */
+  huesped_pais: string | null
   /** Día en que se hizo la reserva. */
   fecha_reservacion: string | null
   /** `HH:MM[:SS]`. */
@@ -96,6 +98,8 @@ export interface ReservaUnificada {
   notas: string | null
   politica_cancelacion: PoliticaCancelacionRenta | null
   num_mascotas: number
+  /** País de procedencia del huésped: ISO 3166-1 alfa-2 ('GT'). */
+  huesped_pais: string | null
   /** Día en que se hizo la reserva. */
   fecha_reservacion: string | null
   /** `HH:MM[:SS]`. */

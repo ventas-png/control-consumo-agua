@@ -16,6 +16,8 @@ export interface ReservaSTR {
   huesped_email?: string | null
   huesped_telefono?: string | null
   codigo_confirmacion?: string | null
+  /** País de procedencia: ISO 3166-1 alfa-2. Lo captura Manejo de Rentas. */
+  huesped_pais?: string | null
   fecha_reservacion?: string | null
   fecha_entrada: string
   fecha_salida: string

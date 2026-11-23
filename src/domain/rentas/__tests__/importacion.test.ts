@@ -76,6 +76,27 @@ describe('leerFilaReserva', () => {
   })
 })
 
+describe('país de procedencia en la fila', () => {
+  const base = { [COL.huesped]: 'Ana', [COL.entrada]: '2026-02-02', [COL.salida]: '2026-02-03' }
+  it('por nombre, alias o código; vacío no manda el campo (no pisa lo guardado)', () => {
+    const pais = (v?: string) => {
+      const r = leerFilaReserva(v === undefined ? base : { ...base, [COL.pais]: v }, [], '2026-11-16')
+      return r.ok ? r.data.datos.huesped_pais : 'ERROR'
+    }
+    expect(pais('Guatemala')).toBe('GT')
+    expect(pais(' estados unidos ')).toBe('US')
+    expect(pais('EEUU')).toBe('US')
+    expect(pais('mx')).toBe('MX')
+    expect(pais('')).toBeUndefined()
+    expect(pais()).toBeUndefined()
+  })
+  it('un país que no se reconoce rechaza la fila con su motivo', () => {
+    const r = leerFilaReserva({ ...base, pais: 'Atlántida' }, [], '2026-11-16')
+    expect(r.ok).toBe(false)
+    expect(!r.ok && r.errors.join(' ')).toMatch(/País «Atlántida»: no se reconoce/)
+  })
+})
+
 describe('moneda y propiedad de la fila', () => {
   const base = { [COL.huesped]: 'Ana', [COL.entrada]: '2026-02-02', [COL.salida]: '2026-02-03' }
   it('la moneda se normaliza a mayúsculas y por defecto es USD', () => {
