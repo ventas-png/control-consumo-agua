@@ -203,16 +203,20 @@ está en el valor inicial.
 | Plataforma | Campo | Archivo | Regla |
 | --- | --- | --- | --- |
 | Android | `versionCode` | `android/app/build.gradle` | Entero. **Sube en cada AAB** que se suba a Play, aunque sea de pruebas. Nunca se puede repetir. |
-| Android | `versionName` | `android/app/build.gradle` | Texto que ve el usuario (`"2.0.0"`). |
+| Android | `versionName` | `android/app/build.gradle` | Texto que ve el usuario (`"1.0"`). |
 | iOS | `CURRENT_PROJECT_VERSION` (Build) | Xcode → target App → General | Entero. **Sube en cada archivo** subido a App Store Connect. |
-| iOS | `MARKETING_VERSION` (Version) | Xcode → target App → General | Lo que ve el usuario (`2.0.0`). Sube en cada versión publicada. |
+| iOS | `MARKETING_VERSION` (Version) | Xcode → target App → General | Lo que ve el usuario (`1.0`). Sube en cada versión publicada. |
 
-Convención sugerida: `versionName` = `MARKETING_VERSION` = la `"version"` de
-`package.json`; `versionCode` y `CURRENT_PROJECT_VERSION` = contador que
-empieza en 1 y sube de uno en uno con cada build.
+Convención sugerida: `versionName` = `MARKETING_VERSION`, la misma en las dos
+tiendas: `1.0` la primera, luego `1.0.1` para correcciones y `1.1` para
+novedades. `versionCode` y `CURRENT_PROJECT_VERSION` = contador que empieza en
+1 y sube de uno en uno con cada build. (La `"version"` de `package.json` es la
+de la web y no tiene que coincidir.)
 
-Para la primera publicación: `versionCode 1` / `versionName "2.0.0"` y
-Version `2.0.0` / Build `1`.
+Para la primera publicación: `versionCode 1` / `versionName "1.0"` y
+Version `1.0` / Build `1`. Son los valores que ya tiene el proyecto, y `1.0` es
+la versión que App Store Connect crea por defecto al dar de alta la app, así que
+no hay que cambiar nada.
 
 ---
 
@@ -351,7 +355,7 @@ En Xcode, con el target **App** seleccionado:
   **Team** de la empresa. Xcode crea el certificado de distribución y el
   perfil. Si aparece «no profiles found», revisar que el Bundle ID coincida con
   el App ID creado en 6.1.
-- *General → Identity*: Version `2.0.0`, Build `1` (sección 4).
+- *General → Identity*: Version `1.0`, Build `1` (sección 4); ya vienen así.
 - *General → Deployment Info*: la app soporta iPhone **y iPad** (`TARGETED_DEVICE_FAMILY
   = 1,2`). Esto obliga a subir **capturas de iPad** y a que la revisión pruebe
   en iPad. Si no se quiere dar soporte a iPad en la v1, dejar solo *iPhone*
@@ -404,7 +408,7 @@ deep link (ver `MOBILE.md` §3).
 
 ### 6.6 Ficha de la App Store y envío a revisión
 
-En App Store Connect → la app → versión `2.0.0`:
+En App Store Connect → la app → versión `1.0`:
 
 - **Capturas**: obligatorias para iPhone 6.9" (1320×2868 o 1290×2796); se
   reutilizan para el resto de tamaños. Si se mantiene iPad: iPad 13"
