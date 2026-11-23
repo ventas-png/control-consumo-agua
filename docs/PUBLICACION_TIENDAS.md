@@ -48,7 +48,7 @@ Identidad fija de la app (no cambiarla una vez publicada):
   límites ni los avisos de prueba vencida o pago fallido. Sí se mantienen el
   registro de empresa y de residentes (crear cuenta no es vender) y los pagos
   de cuotas y agua de los residentes, que son servicios del mundo real (Apple
-  3.1.5(a)). La empresa contrata en la web y usa lo contratado en la app
+  3.1.3(e)). La empresa contrata en la web y usa lo contratado en la app
   (3.1.3(c), servicios empresariales). La regla vive en un solo sitio,
   `src/lib/ventaDePlanes.ts`: **toda pantalla nueva que venda o amplíe el plan
   debe pasar por `mostrarVentaDePlanes()`**, y antes de cada envío basta un
@@ -376,19 +376,15 @@ En Xcode:
 1. Seleccionar como destino **Any iOS Device (arm64)** (no un simulador; con un
    simulador seleccionado *Archive* está deshabilitado).
 2. *Product → Archive*. Al terminar se abre *Organizer*.
-3. *Distribute App → App Store Connect → Upload*. Dejar marcadas las opciones
-   de subir símbolos (*Upload your app's symbols*) y **desmarcar** *Manage
-   Version and Build Number* (la versión se controla a mano). Aceptar la firma
-   automática.
-4. Si aparece **«Missing Compliance»** o la pregunta de cifrado de exportación:
-   la app solo usa HTTPS/TLS estándar y los `SHA-256` del navegador, que entran
-   en la exención; responder **No** a «¿usa cifrado no exento?». Para no
-   responderlo en cada build, añadir a `ios/App/App/Info.plist`:
-
-   ```xml
-   <key>ITSAppUsesNonExemptEncryption</key>
-   <false/>
-   ```
+3. *Distribute App* → **App Store Connect** (en las versiones recientes de
+   Xcode aparece como *TestFlight & App Store*) → *Distribute*. Xcode firma con
+   el equipo elegido y sube el build con sus símbolos. Si en vez de eso aparece
+   la lista de opciones (*Custom*): *Upload*, dejar marcado *Upload your app's
+   symbols* y aceptar la firma automática.
+4. La pregunta de cifrado de exportación (*Missing Compliance*) no debería
+   aparecer: `Info.plist` ya declara `ITSAppUsesNonExemptEncryption = false`
+   (la app solo usa HTTPS estándar, que está exento). Si aun así la pide,
+   responder **No** a «¿usa cifrado no exento?».
 
 5. En 10–30 minutos el build aparece en App Store Connect → *TestFlight*.
 
@@ -422,11 +418,16 @@ En App Store Connect → la app → versión `2.0.0`:
 - **Privacidad de la app** (*App Privacy*): declarar lo de la sección 8.
 - **Información de revisión**: marcar *Se requiere inicio de sesión* y dar
   **usuario y contraseña de la cuenta de prueba** (la misma que en Play).
-  Notas para el revisor, en inglés: qué hace la app, que la cámara se usa para
-  fotografiar medidores de agua y el GPS para geolocalizar la lectura, y cómo
-  llegar a una pantalla que use cada permiso. Indicar también dónde está la
-  eliminación de cuenta (*Profile → Delete my account*) y la URL pública
-  `https://administratodo.com/eliminar-cuenta`. Un teléfono de contacto.
+  Notas para el revisor, en inglés: qué hace la app; que es un servicio para
+  empresas administradoras que se contrata fuera de la app, sin compras dentro
+  de ella (3.1.3(c)), y que los pagos de residentes son cuotas y servicios del
+  inmueble, servicios del mundo real (3.1.3(e)); para qué se usan la cámara
+  (medidor, portería, asistencia, adjuntos) y el GPS (lecturas y marcaje de
+  turno), y cómo llegar a una pantalla que use cada permiso. Indicar también
+  dónde está la eliminación de cuenta (*Profile → Delete my account*) y la URL
+  pública `https://administratodo.com/eliminar-cuenta`, con una **segunda
+  cuenta** para probar el borrado (si borran la cuenta principal, la empresa de
+  prueba queda suspendida). Un teléfono de contacto.
 - *Versión*: seleccionar el build subido desde TestFlight.
 - *Lanzamiento*: «Manual» para controlar el día, o «Automático».
 - **Enviar para revisión**. Primera revisión: 1–3 días laborables; las
@@ -531,13 +532,14 @@ tracking** (Apple: *Data not used for tracking*; no hay ATT que pedir).
 | Play: «El paquete debe estar firmado con la llave de subida» | Se firmó con otro `.jks`. Usar la llave registrada o pedir reset de upload key en Play Console → *Integridad de la app*. |
 | Xcode: «No signing certificate» / «No profiles for com.administratodo.app» | Team sin seleccionar o App ID no creado. Sección 6.1 y 6.2. |
 | App Store Connect: «ITMS-90xxx Missing Purpose String» | Falta una clave `NS*UsageDescription` para un permiso que un plugin declara. Las cuatro actuales cubren cámara, galería (lectura y escritura) y ubicación. |
+| Rechazo Apple 5.1.1(ii): el texto del permiso no explica el uso | Los textos de `Info.plist` tienen que cubrir todo lo que la app hace con la cámara y la ubicación, no solo un caso. Hoy: cámara para el medidor, portería (visitantes, documentos, paquetes), asistencia (foto al marcar el turno) y adjuntos; ubicación para lecturas y marcaje de turno. Si una función nueva usa la cámara o el GPS para otra cosa, actualizar el texto antes de subir el build. |
 | App Store Connect: «Invalid App Icon: transparency / alpha channel» | El `icon-only.png` de `resources/` tiene alfa. Exportar en RGB sin transparencia y regenerar. |
 | Rechazo Apple 5.1.1(v) *Account deletion* | Ya existe (*Mi perfil → Eliminar mi cuenta* y `/eliminar-cuenta`). Si lo rechazan, comprobar que la cuenta de prueba llega a *Mi perfil* y que `delete-own-account` está desplegada (`deploy-functions.yml`) y en `ALLOWED_ORIGINS` el origen de la app. |
 | Rechazo Apple 4.8 *Login services* | No debería ocurrir: con `VITE_APPLE_SIGN_IN=true` la app ofrece *Sign in with Apple* junto a Google, y sin la variable no muestra login social (bloqueante #2 de la sección 0). Si aparece, comprobar en el binario qué botones salen (`src/lib/loginProviders.ts`) y que nadie añadió otro login social sin Apple al lado. |
 | «Continuar con Apple» vuelve con error de callback y Google funciona | El *Secret Key* del proveedor Apple en Supabase caducó (Apple lo limita a 6 meses). Renovarlo: `docs/RUNBOOK_GOOGLE_OAUTH_LOGIN.md`. |
 | Rechazo Apple 2.1 *App completeness*: «no pudimos iniciar sesión» | Credenciales de prueba caducadas o con 2FA. Mantener la cuenta demo viva y sin SSO/2FA. |
 | App Store Connect: «ITMS-91053: Missing API declaration» | Una dependencia nativa usa una API de «razón obligatoria» (`UserDefaults`, fechas de archivos, espacio en disco…) sin manifiesto de privacidad. El correo nombra la categoría. Solución: actualizar el plugin a una versión que traiga su `PrivacyInfo.xcprivacy` o, si no existe, añadir uno al target *App* en Xcode (*File → New → App Privacy*) declarando esa categoría y su motivo. Candidatos a vigilar: `IONCameraLib` e `IONGeolocationLib`, que bajan por Swift Package Manager al compilar. |
-| Rechazo Apple 3.1.1 *In-App Purchase* o Play *Payments policy* | No debería ocurrir: la app nativa no vende ni amplía el plan (sección 0). Si aparece, alguien añadió una pantalla de venta sin pasar por `mostrarVentaDePlanes()` (`src/lib/ventaDePlanes.ts`): localizarla con el `grep` de la sección 0. Los pagos de cuotas y agua de residentes están permitidos (Apple 3.1.5(a)); indicarlo en las notas de revisión si preguntan. |
+| Rechazo Apple 3.1.1 *In-App Purchase* o Play *Payments policy* | No debería ocurrir: la app nativa no vende ni amplía el plan (sección 0). Si aparece, alguien añadió una pantalla de venta sin pasar por `mostrarVentaDePlanes()` (`src/lib/ventaDePlanes.ts`): localizarla con el `grep` de la sección 0. Los pagos de cuotas y agua de residentes están permitidos (Apple 3.1.3(e)); indicarlo en las notas de revisión si preguntan. |
 | Play: crash al iniciar sesión en el *pre-launch report* | Se compiló con `VITE_PUSH_ENABLED=true` sin `google-services.json`. Quitar la variable o configurar Firebase (`MOBILE.md`, paso 6). |
 | Play: declaración de «permisos de fotos y videos» | Alguien añadió `READ_MEDIA_IMAGES`/`READ_MEDIA_VIDEO` al `AndroidManifest.xml`. Quitarlo: la galería funciona con el *Photo Picker* sin permiso (sección 0). |
 | Play: aviso de compatibilidad con páginas de memoria de **16 KB** | Lo exige Play para apps que apuntan a Android 15+. Revisarlo en *Explorador de app bundle*; si una biblioteca nativa no está alineada, actualizar Capacitor, el plugin afectado o el Android Gradle Plugin. |

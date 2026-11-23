@@ -69,13 +69,13 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Se usa para tomar la foto del medidor al registrar una lectura.</string>
+	<string>Para tomar las fotos que registras en la app, por ejemplo la del medidor en una lectura, la de un visitante o un paquete en portería, o la tuya al marcar la entrada o la salida de tu turno.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Permite adjuntar fotos desde tu galería.</string>
+	<string>Para que elijas fotos de tu galería y las adjuntes, por ejemplo a una lectura, un ticket, un mensaje o un comprobante de pago.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Permite guardar en tu galería las fotos tomadas en la app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Se usa para registrar la ubicación GPS de la lectura del medidor.</string>
+	<string>Para guardar dónde se toma cada lectura de medidor y dónde marcas la entrada o la salida de tu turno. Solo se usa mientras tienes la app abierta.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
