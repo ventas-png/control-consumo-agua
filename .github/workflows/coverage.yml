@@ -1015,6 +1015,20 @@ jobs:
           PGPORT_TEST: 55595
         run: supabase/tests/rentas_inventario_fotos/run.sh
 
+      # 20261210000000: fotos del huésped y personas del grupo en reservas de
+      # propiedades INDEPENDIENTES. rentas_reservas.foto_url / foto_documento_url y
+      # rentas_huespedes (ambas con las rutas atadas a la carpeta de SU propiedad), y
+      # el bucket privado rentas-huespedes (documentos de identidad): ve quien ve la
+      # reserva, sube quien la crea o edita, y sólo se borra lo que ninguna reserva ni
+      # persona nombra. Ejercido como cada persona sobre storage.objects: otra empresa,
+      # proyecto ajeno, solo-ver, sin permisos, plataforma, anon y servicio apagado.
+      # CONTROL NEGATIVO: ocho mutantes.
+      - name: Rentas — fotos y personas del grupo en reservas independientes
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55597
+        run: supabase/tests/rentas_huespedes/run.sh
+
       # 20261127000000: módulos por PROYECTO. Cada proyecto elige en cuáles de los
       # módulos contratados por su empresa opera (projects.modulo_*, encendidos por
       # defecto). Ejercido como cada persona: la dueña y la plataforma mueven los

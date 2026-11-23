@@ -1,5 +1,6 @@
 // Importación de reservas con su desglose de cobro desde una hoja (Excel o CSV)
 // — lógica pura: qué columnas lleva la plantilla y cómo se lee cada fila.
+import { codigoDePais } from '../shared/paises'
 import type { ConceptoRenta, EstadoReservaRenta, ImportesRenta, PlataformaRenta, PoliticaCancelacionRenta } from '../../types'
 import { conceptosDeBloque, esMoneda, MONEDA_DEFECTO, POLITICA_CANCELACION_LABEL, POLITICAS_CANCELACION, r2 } from './finanzas'
 import { PLATAFORMAS } from './logica'
@@ -10,6 +11,10 @@ export const COL = {
   plataforma: 'Plataforma', politica: 'Política de cancelación', mascotas: 'Mascotas', moneda: 'Moneda',
   /** Sólo en la carga de varias propiedades a la vez: nombre o código de la propiedad. */
   propiedad: 'Propiedad',
+  /** Opcional, junto a «Propiedad»: el condominio al que pertenece, para distinguir nombres repetidos. */
+  proyecto: 'Proyecto',
+  /** Opcional: país de procedencia del huésped, por nombre («Guatemala») o código («GT»). */
+  pais: 'País',
 } as const
 
 /** Encabezado de la columna de un concepto: «Cobro huésped · Tarifa de limpieza». */
@@ -62,6 +67,8 @@ export interface FilaReservaImportada {
   moneda: string
   /** Texto de la columna «Propiedad» ('' si no viene). */
   propiedad: string
+  /** Texto de la columna «Proyecto» ('' si no viene). */
+  proyecto: string
 }
 
 const POLITICA_POR_TEXTO = new Map<string, PoliticaCancelacionRenta>(
@@ -102,6 +109,10 @@ export function leerFilaReserva(
   const politicaTxt = normalizar(texto(COL.politica))
   const politica = politicaTxt === '' ? null : POLITICA_POR_TEXTO.get(politicaTxt) ?? 'otra'
 
+  const paisTxt = texto(COL.pais)
+  const pais = paisTxt === '' ? undefined : codigoDePais(paisTxt)
+  if (pais === null) errores.push(`País «${paisTxt}»: no se reconoce; usa el nombre en español o el código de dos letras (GT, US…)`)
+
   const moneda = texto(COL.moneda).toUpperCase() || MONEDA_DEFECTO
   if (!esMoneda(moneda)) errores.push('Moneda: usa el código de tres letras (USD, GTQ, MXN…)')
 
@@ -117,12 +128,13 @@ export function leerFilaReserva(
   return {
     ok: true,
     data: {
-      importes, moneda, propiedad: texto(COL.propiedad),
+      importes, moneda, propiedad: texto(COL.propiedad), proyecto: texto(COL.proyecto),
       datos: {
         huesped_nombre: huesped || codigo, huesped_email: null, huesped_telefono: null,
         fecha_entrada: entrada, fecha_salida: salida, num_huespedes: huespedes, plataforma,
         codigo_confirmacion: codigo || null, monto_noche: null, monto_total: null, estado, notas: null,
         politica_cancelacion: politica, num_mascotas: mascotas,
+        ...(pais ? { huesped_pais: pais } : {}),
       },
     },
   }

@@ -50,7 +50,7 @@ describe('leerFilaReserva', () => {
     expect(r).toEqual({
       ok: true,
       data: {
-        importes: { a1: 39, h1: 29 }, moneda: 'USD', propiedad: '',
+        importes: { a1: 39, h1: 29 }, moneda: 'USD', propiedad: '', proyecto: '',
         datos: expect.objectContaining({
           huesped_nombre: 'Ana', codigo_confirmacion: 'HM34NRSTRH', fecha_entrada: '2026-02-02', fecha_salida: '2026-02-03',
           num_huespedes: 1, plataforma: 'airbnb', politica_cancelacion: 'no_reembolsable', num_mascotas: 0, estado: 'completada',
@@ -76,11 +76,32 @@ describe('leerFilaReserva', () => {
   })
 })
 
+describe('país de procedencia en la fila', () => {
+  const base = { [COL.huesped]: 'Ana', [COL.entrada]: '2026-02-02', [COL.salida]: '2026-02-03' }
+  it('por nombre, alias o código; vacío no manda el campo (no pisa lo guardado)', () => {
+    const pais = (v?: string) => {
+      const r = leerFilaReserva(v === undefined ? base : { ...base, [COL.pais]: v }, [], '2026-11-16')
+      return r.ok ? r.data.datos.huesped_pais : 'ERROR'
+    }
+    expect(pais('Guatemala')).toBe('GT')
+    expect(pais(' estados unidos ')).toBe('US')
+    expect(pais('EEUU')).toBe('US')
+    expect(pais('mx')).toBe('MX')
+    expect(pais('')).toBeUndefined()
+    expect(pais()).toBeUndefined()
+  })
+  it('un país que no se reconoce rechaza la fila con su motivo', () => {
+    const r = leerFilaReserva({ ...base, pais: 'Atlántida' }, [], '2026-11-16')
+    expect(r.ok).toBe(false)
+    expect(!r.ok && r.errors.join(' ')).toMatch(/País «Atlántida»: no se reconoce/)
+  })
+})
+
 describe('moneda y propiedad de la fila', () => {
   const base = { [COL.huesped]: 'Ana', [COL.entrada]: '2026-02-02', [COL.salida]: '2026-02-03' }
   it('la moneda se normaliza a mayúsculas y por defecto es USD', () => {
     const r = leerFilaReserva({ ...base, moneda: 'gtq', Propiedad: ' Apto 1A ' }, CONCEPTOS, '2026-11-16')
-    expect(r.ok && r.data).toMatchObject({ moneda: 'GTQ', propiedad: 'Apto 1A' })
+    expect(r.ok && r.data).toMatchObject({ moneda: 'GTQ', propiedad: 'Apto 1A', proyecto: '' })
   })
   it('una moneda que no es un código de tres letras se rechaza', () => {
     expect(leerFilaReserva({ ...base, [COL.moneda]: 'dólares' }, CONCEPTOS, '2026-11-16'))

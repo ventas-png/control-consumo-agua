@@ -107,6 +107,8 @@ export interface DatosReserva {
   notas: string | null
   politica_cancelacion: PoliticaCancelacionRenta | null
   num_mascotas: number
+  /** País de procedencia (ISO alfa-2). Omitido = no se toca. */
+  huesped_pais?: string | null
   /** Datos de la estancia. Quien no los captura (la carga masiva) los omite y no se tocan. */
   fecha_reservacion?: string | null
   hora_llegada_estimada?: string | null
@@ -114,7 +116,7 @@ export interface DatosReserva {
   num_adultos?: number
   num_ninos?: number
   num_bebes?: number
-  /** Sólo propiedades enlazadas (`reservas_str`). */
+  /** Rutas de las fotos del huésped principal, en el bucket que toca a la propiedad. */
   foto_url?: string | null
   foto_documento_url?: string | null
 }
@@ -137,9 +139,9 @@ function aReservaStr(d: Partial<DatosReserva>, alCrear: boolean) {
   })
 }
 
-/** Columnas de `rentas_reservas`: sin adultos (se derivan del total) ni fotos (no las lleva). */
+/** Columnas de `rentas_reservas`: sin adultos (se derivan del total). */
 function aReservaRentas(d: Partial<DatosReserva>) {
-  const { num_adultos: _a, foto_url: _f, foto_documento_url: _d, ...resto } = d
+  const { num_adultos: _a, ...resto } = d
   return definidos(resto)
 }
 

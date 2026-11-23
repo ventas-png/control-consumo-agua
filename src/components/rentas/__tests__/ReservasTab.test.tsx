@@ -27,10 +27,21 @@ vi.mock('../../shared/ImageUploader', () => ({
   ImageUploader: (p: { label?: string; value: string | null; onChange: (v: string | null) => void }) => (
     <button type="button" onClick={() => p.onChange(`ruta/${p.label}.jpg`)}>{p.value ? `${p.label}: ${p.value}` : `Subir ${p.label}`}</button>
   ),
+  // El de varios (aquí con tope 1) es el de las propiedades independientes: sube a <empresa>/<propiedad>/.
+  MultiImageUploader: (p: { label?: string; values: string[]; onChange: (v: string[]) => void; bucket?: string; alcance?: string; folder: string }) => (
+    <span>
+      <button type="button" onClick={() => p.onChange([`${p.alcance}/${p.folder}/${p.label}.jpg`])}>
+        {p.values[0] ? `${p.label}: ${p.values[0]}` : `Subir ${p.label} (${p.bucket})`}
+      </button>
+      {p.values[0] && <button type="button" onClick={() => p.onChange([])}>Quitar {p.label}</button>}
+    </span>
+  ),
 }))
-const g = vi.hoisted(() => ({ cargar: vi.fn(async (_id: string) => [] as unknown[]), guardar: vi.fn(async (..._a: unknown[]) => undefined) }))
+const g = vi.hoisted(() => ({ cargar: vi.fn(async (_r: unknown) => [] as unknown[]), guardar: vi.fn(async (..._a: unknown[]) => undefined), retirar: vi.fn() }))
 vi.mock('../../../domain/rentas/grupo', () => ({
-  cargarGrupo: g.cargar, guardarGrupo: g.guardar,
+  cargarGrupo: g.cargar, guardarGrupo: g.guardar, retirarFotosHuespedes: g.retirar,
+  fotosDe: (p: { foto_url: string | null; foto_documento_url: string | null }, grupo: { foto_url: string | null; foto_documento_url: string | null }[]) =>
+    [p, ...grupo].flatMap(x => [x.foto_url, x.foto_documento_url]).filter(Boolean),
   personaVacia: () => ({ nombre: '', identificacion: '', es_menor: false, fecha_nacimiento: '', foto_url: null, foto_documento_url: null }),
 }))
 vi.mock('../../shared/Dialog', () => ({ notify: h.notify, confirm: h.confirm }))
@@ -51,7 +62,7 @@ const proyectos = [{ id: 'p1', nombre: '21B+' }] as Proyecto[]
 const r = (id: string, origen: 'rentas' | 'condominio', propiedad_id: string, huesped: string, entrada: string, salida: string): ReservaUnificada => ({
   id, origen, propiedad_id, huesped_nombre: huesped, huesped_email: null, huesped_telefono: null,
   fecha_entrada: entrada, fecha_salida: salida, num_huespedes: 2, plataforma: 'directo', codigo_confirmacion: null,
-  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0, fecha_reservacion: null, hora_llegada_estimada: null, hora_salida_estimada: null, num_adultos: 1, num_ninos: 0, num_bebes: 0, foto_url: null, foto_documento_url: null,
+  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0, huesped_pais: null, fecha_reservacion: null, hora_llegada_estimada: null, hora_salida_estimada: null, num_adultos: 1, num_ninos: 0, num_bebes: 0, foto_url: null, foto_documento_url: null,
 })
 const reservas = [
   r('r1', 'rentas', 'ind', 'Ana Pérez', '2026-12-10', '2026-12-13'),
@@ -142,13 +153,19 @@ describe('nueva reserva', () => {
     expect(h.crear).not.toHaveBeenCalled()
   })
 
-  it('avisa el solape sin impedir guardar, y calcula el total con las noches', async () => {
+  it('avisa el solape sin impedir guardar; no pide montos y guarda el país elegido en el buscador', async () => {
     const dialogo = abrir()
     fireEvent.change(within(dialogo).getByLabelText('Propiedad *'), { target: { value: 'ind' } })
     fireEvent.change(within(dialogo).getByLabelText('Huésped *'), { target: { value: '  Eva Ruiz ' } })
     fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2026-12-12' } })
     fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2026-12-15' } })
-    fireEvent.change(within(dialogo).getByLabelText('Monto por noche (USD)'), { target: { value: '850,50' } })
+    expect(within(dialogo).queryByLabelText(/Monto por noche/)).toBeNull()
+    expect(within(dialogo).queryByLabelText(/^Total \(/)).toBeNull()
+    const pais = within(dialogo).getByLabelText('País de procedencia')
+    fireEvent.focus(pais)
+    fireEvent.change(pais, { target: { value: 'guat' } })
+    fireEvent.mouseDown(within(dialogo).getByRole('option', { name: /Guatemala/ }))
+    expect((pais as HTMLInputElement).value).toMatch(/Guatemala/)
     expect(within(dialogo).getByRole('status').textContent).toMatch(/se cruzan con la reserva de Ana Pérez/)
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
@@ -156,7 +173,7 @@ describe('nueva reserva', () => {
       propiedad: expect.objectContaining({ id: 'ind', unidad_id: null }),
       datos: expect.objectContaining({
         huesped_nombre: 'Eva Ruiz', fecha_entrada: '2026-12-12', fecha_salida: '2026-12-15',
-        num_huespedes: 1, monto_noche: 850.5, monto_total: 2551.5, estado: 'confirmada', plataforma: 'directo',
+        num_huespedes: 1, monto_noche: null, monto_total: null, huesped_pais: 'GT', estado: 'confirmada', plataforma: 'directo',
       }),
       moneda: 'USD',
     })
@@ -212,6 +229,20 @@ describe('desglose de cobro', () => {
     expect(h.crear).not.toHaveBeenCalled()
   })
 
+  it('editar una reserva sin desglose conserva el total que ya tenía y muestra su país', async () => {
+    montar(todos, reservas.map(x => (x.id === 'r1' ? { ...x, monto_noche: 80, monto_total: 240, huesped_pais: 'US' } : x)))
+    expect(fila('Ana Pérez').textContent).toMatch(/Estados Unidos/)
+    fireEvent.click(within(fila('Ana Pérez')).getByRole('button', { name: /Editar/ }))
+    const dialogo = screen.getByRole('dialog')
+    expect((within(dialogo).getByLabelText('País de procedencia') as HTMLInputElement).value).toMatch(/Estados Unidos/)
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Quitar país' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.actualizar).toHaveBeenCalledTimes(1))
+    expect(h.actualizar).toHaveBeenCalledWith(expect.objectContaining({
+      datos: expect.objectContaining({ monto_noche: 80, monto_total: 240, huesped_pais: null }),
+    }))
+  })
+
   it('editar carga el desglose guardado; sin tocarlo, una reserva sin desglose no escribe ninguno', async () => {
     liquidaciones = new Map([['rentas:r1', { id: 'l1', company_id: 'c1', propiedad_id: 'ind', reserva_id: 'r1', reserva_str_id: null, moneda: 'USD', importes: { a1: 120 }, created_at: '', updated_at: '' }]])
     montar()
@@ -242,7 +273,6 @@ describe('moneda de la reserva', () => {
     fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2027-02-02' } })
     fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2027-02-03' } })
     fireEvent.change(within(dialogo).getByLabelText('Moneda'), { target: { value: 'GTQ' } })
-    expect(within(dialogo).getByLabelText('Total (GTQ)')).toBeTruthy()
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
     expect(h.crear).toHaveBeenCalledWith(expect.objectContaining({ moneda: 'GTQ', importes: {} }))
@@ -289,10 +319,6 @@ describe('datos de la estancia (como en la pestaña STR)', () => {
       num_huespedes: 4, num_adultos: 2, num_ninos: 1, num_bebes: 1,
       fecha_reservacion: '2027-01-15', hora_llegada_estimada: '15:00', hora_salida_estimada: null,
     })
-    // Una propiedad independiente no lleva fotos: ni se ofrecen ni viajan.
-    expect(datos).not.toHaveProperty('foto_url')
-    expect(within(dialogo).queryByRole('region', { name: 'Personas del grupo' })).toBeNull()
-    expect(within(dialogo).getByText(/se registran en las propiedades enlazadas/)).toBeTruthy()
   })
 
   it('sin adultos no se guarda', async () => {
@@ -324,27 +350,85 @@ describe('datos de la estancia (como en la pestaña STR)', () => {
     await waitFor(() => expect(g.guardar).toHaveBeenCalledTimes(1))
     expect((h.crear.mock.calls[0][0] as { datos: Record<string, unknown> }).datos)
       .toMatchObject({ foto_url: 'ruta/Foto del huésped.jpg', foto_documento_url: null, num_adultos: 2 })
-    expect(g.guardar).toHaveBeenCalledWith('nueva-str', [], [expect.objectContaining({ nombre: 'Luis' })])
+    expect(g.guardar).toHaveBeenCalledWith({ id: 'nueva-str', origen: 'condominio' }, expect.objectContaining({ id: 'enl' }), [], [expect.objectContaining({ nombre: 'Luis' })])
+    // Las fotos de una propiedad enlazada viven en el bucket de Condominios: aquí no se retira nada.
+    expect(g.retirar).not.toHaveBeenCalled()
   })
 
   it('editar una reserva de condominio carga su grupo; sin grupo no se escribe nada', async () => {
     g.cargar.mockResolvedValueOnce([{ id: 'h1', nombre: 'Marta', identificacion: '', es_menor: false, fecha_nacimiento: '', foto_url: null, foto_documento_url: null }])
     montar()
     fireEvent.click(within(fila('Paola González')).getByRole('button', { name: /Editar/ }))
-    expect(g.cargar).toHaveBeenCalledWith('s1')
+    expect(g.cargar).toHaveBeenCalledWith({ id: 's1', origen: 'condominio' })
     const dialogo = screen.getByRole('dialog')
     expect(await within(dialogo).findByText('Marta')).toBeTruthy()
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Quitar a Marta' }))
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(g.guardar).toHaveBeenCalledTimes(1))
-    expect(g.guardar).toHaveBeenCalledWith('s1', [expect.objectContaining({ id: 'h1' })], [])
+    expect(g.guardar).toHaveBeenCalledWith(expect.objectContaining({ id: 's1', origen: 'condominio' }), expect.objectContaining({ id: 'enl' }), [expect.objectContaining({ id: 'h1' })], [])
 
     cleanup(); vi.clearAllMocks()
     montar()
     fireEvent.click(within(fila('Ana Pérez')).getByRole('button', { name: /Editar/ }))
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.actualizar).toHaveBeenCalledTimes(1))
-    expect(g.cargar).not.toHaveBeenCalled()
+    expect(g.cargar).toHaveBeenCalledWith({ id: 'r1', origen: 'rentas' })
     expect(g.guardar).not.toHaveBeenCalled()
+  })
+})
+
+describe('propiedad independiente: fotos y grupo en el bucket de Rentas', () => {
+  const abrirNueva = () => {
+    montar()
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva reserva' }))
+    const dialogo = screen.getByRole('dialog')
+    fireEvent.change(within(dialogo).getByLabelText('Propiedad *'), { target: { value: 'ind' } })
+    fireEvent.change(within(dialogo).getByLabelText('Huésped *'), { target: { value: 'Eva' } })
+    fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2027-02-02' } })
+    fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2027-02-05' } })
+    fireEvent.change(within(dialogo).getByLabelText('Adultos'), { target: { value: '2' } })
+    return dialogo
+  }
+
+  it('sube a <empresa>/<propiedad>/ del bucket privado y guarda fotos y grupo con la reserva', async () => {
+    h.crear.mockResolvedValueOnce({ id: 'nueva', origen: 'rentas' } as never)
+    const dialogo = abrirNueva()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Subir Foto del huésped (rentas-huespedes)' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Subir DPI / Documento (rentas-huespedes)' }))
+    // Se arrepiente del documento: no viaja, y al guardar se retira del bucket.
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Quitar DPI / Documento' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: '+ Agregar persona' }))
+    fireEvent.change(within(dialogo).getByLabelText('Nombre *'), { target: { value: 'Luis' } })
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Agregar' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(g.guardar).toHaveBeenCalledTimes(1))
+    expect((h.crear.mock.calls[0][0] as { datos: Record<string, unknown> }).datos)
+      .toMatchObject({ foto_url: 'c1/ind/Foto del huésped.jpg', foto_documento_url: null })
+    expect(g.guardar).toHaveBeenCalledWith({ id: 'nueva', origen: 'rentas' }, expect.objectContaining({ id: 'ind' }), [], [expect.objectContaining({ nombre: 'Luis' })])
+    await waitFor(() => expect(g.retirar).toHaveBeenCalledWith(['c1/ind/DPI / Documento.jpg']))
+  })
+
+  it('cancelar retira lo subido en esta sesión', () => {
+    const dialogo = abrirNueva()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Subir Foto del huésped (rentas-huespedes)' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar' }))
+    expect(g.retirar).toHaveBeenCalledWith(['c1/ind/Foto del huésped.jpg'])
+    expect(h.crear).not.toHaveBeenCalled()
+  })
+
+  it('cambiar de propiedad descarta las fotos ya subidas (son de otra carpeta)', () => {
+    const dialogo = abrirNueva()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Subir Foto del huésped (rentas-huespedes)' }))
+    fireEvent.change(within(dialogo).getByLabelText('Propiedad *'), { target: { value: 'enl' } })
+    expect(within(dialogo).getByRole('button', { name: 'Subir Foto del huésped' })).toBeTruthy()
+  })
+
+  it('editar conserva las fotos que la reserva ya tenía al cancelar', async () => {
+    montar(todos, [{ ...reservas[0], foto_url: 'c1/ind/vieja.jpg' }, reservas[1]])
+    fireEvent.click(within(fila('Ana Pérez')).getByRole('button', { name: /Editar/ }))
+    const dialogo = screen.getByRole('dialog')
+    expect(within(dialogo).getByRole('button', { name: 'Foto del huésped: c1/ind/vieja.jpg' })).toBeTruthy()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Cancelar' }))
+    expect(g.retirar).toHaveBeenCalledWith([])
   })
 })

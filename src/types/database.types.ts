@@ -19751,6 +19751,76 @@ export type Database = {
           },
         ]
       }
+      rentas_huespedes: {
+        Row: {
+          company_id: string
+          creado_por: string | null
+          created_at: string
+          es_menor: boolean
+          fecha_nacimiento: string | null
+          foto_documento_url: string | null
+          foto_url: string | null
+          id: string
+          identificacion: string | null
+          nombre: string
+          propiedad_id: string
+          reserva_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          creado_por?: string | null
+          created_at?: string
+          es_menor?: boolean
+          fecha_nacimiento?: string | null
+          foto_documento_url?: string | null
+          foto_url?: string | null
+          id?: string
+          identificacion?: string | null
+          nombre: string
+          propiedad_id: string
+          reserva_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          creado_por?: string | null
+          created_at?: string
+          es_menor?: boolean
+          fecha_nacimiento?: string | null
+          foto_documento_url?: string | null
+          foto_url?: string | null
+          id?: string
+          identificacion?: string | null
+          nombre?: string
+          propiedad_id?: string
+          reserva_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentas_huespedes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentas_huespedes_propiedad_fk"
+            columns: ["propiedad_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "rentas_propiedades"
+            referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "rentas_huespedes_reserva_id_fkey"
+            columns: ["reserva_id"]
+            isOneToOne: false
+            referencedRelation: "rentas_reservas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rentas_inventario: {
         Row: {
           ambiente: string | null
@@ -20004,9 +20074,12 @@ export type Database = {
           fecha_entrada: string
           fecha_reservacion: string | null
           fecha_salida: string
+          foto_documento_url: string | null
+          foto_url: string | null
           hora_llegada_estimada: string | null
           hora_salida_estimada: string | null
           huesped_email: string | null
+          huesped_pais: string | null
           huesped_nombre: string
           huesped_telefono: string | null
           id: string
@@ -20031,9 +20104,12 @@ export type Database = {
           fecha_entrada: string
           fecha_reservacion?: string | null
           fecha_salida: string
+          foto_documento_url?: string | null
+          foto_url?: string | null
           hora_llegada_estimada?: string | null
           hora_salida_estimada?: string | null
           huesped_email?: string | null
+          huesped_pais?: string | null
           huesped_nombre: string
           huesped_telefono?: string | null
           id?: string
@@ -20058,9 +20134,12 @@ export type Database = {
           fecha_entrada?: string
           fecha_reservacion?: string | null
           fecha_salida?: string
+          foto_documento_url?: string | null
+          foto_url?: string | null
           hora_llegada_estimada?: string | null
           hora_salida_estimada?: string | null
           huesped_email?: string | null
+          huesped_pais?: string | null
           huesped_nombre?: string
           huesped_telefono?: string | null
           id?: string
@@ -20108,6 +20187,7 @@ export type Database = {
           hora_llegada_estimada: string | null
           hora_salida_estimada: string | null
           huesped_email: string | null
+          huesped_pais: string | null
           huesped_nombre: string
           huesped_telefono: string | null
           id: string
@@ -20137,6 +20217,7 @@ export type Database = {
           hora_llegada_estimada?: string | null
           hora_salida_estimada?: string | null
           huesped_email?: string | null
+          huesped_pais?: string | null
           huesped_nombre: string
           huesped_telefono?: string | null
           id?: string
@@ -20166,6 +20247,7 @@ export type Database = {
           hora_llegada_estimada?: string | null
           hora_salida_estimada?: string | null
           huesped_email?: string | null
+          huesped_pais?: string | null
           huesped_nombre?: string
           huesped_telefono?: string | null
           id?: string
