@@ -15,7 +15,7 @@ import {
   type FilaHistorialImport,
   type ResumenImportHistorial,
 } from '../../domain/agua/historialLecturas'
-import { claveSerie, leerNumeroHistorial, normalizarFechaHistorial } from '../../lib/historialConsumo'
+import { claveSerie, leerNumeroHistorial, lotesPorContador, normalizarFechaHistorial } from '../../lib/historialConsumo'
 import { proyectoDestinoInicial } from '../../lib/proyectoDestino'
 
 const COLUMNS: ImportColumn[] = [
@@ -118,6 +118,8 @@ interface Props {
   onLecturaInicialActualizada: (cambios: Array<{ id: string; lectura_inicial: number }>) => void
 }
 
+const LOTE = 500
+
 export function ImportHistorialLecturasModal({ proyectos, contadores, proyectoInicial, onClose, onLecturaInicialActualizada }: Props) {
   const [destinoId, setDestinoId] = useState(() => proyectoDestinoInicial(proyectos, proyectoInicial))
   // validateRow corre al leer el archivo: lee el proyecto elegido en ese momento.
@@ -125,7 +127,8 @@ export function ImportHistorialLecturasModal({ proyectos, contadores, proyectoIn
   destinoRef.current = destinoId
   const acumulado = useRef<ResumenImportHistorial | null>(null)
   // Contadores distintos de toda la importación. La base cuenta los de CADA
-  // lote, y un contador cuyas filas caen en dos lotes se contaría dos veces.
+  // lote; los lotes no parten un contador (makeBatches), y esto cubre el caso
+  // raro de un contador con más filas que un lote.
   const contadoresVistos = useRef(new Set<string>())
   // Si un lote falla y se reintenta, el resumen vuelve a empezar.
   const fallo = useRef(false)
@@ -173,7 +176,10 @@ export function ImportHistorialLecturasModal({ proyectos, contadores, proyectoIn
       columns={COLUMNS}
       validateRow={(row, n) => validarFilaHistorial(row, n, contadores, destinoRef.current)}
       // Cada lote es UNA sentencia en la base, con 8 s de tope (statement_timeout).
-      batchSize={500}
+      batchSize={LOTE}
+      // Un contador nunca se reparte entre lotes: la base resume la lectura
+      // inicial por lote y el aviso suma esos resúmenes.
+      makeBatches={filas => lotesPorContador(filas, f => claveSerie(f.contador), LOTE)}
       optionsPanel={panel}
       importDisabled={!destinoId}
       importDisabledReason="Elija el proyecto."

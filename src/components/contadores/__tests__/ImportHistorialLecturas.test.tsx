@@ -155,6 +155,43 @@ describe('ContadoresSection — Importar historial', () => {
     })))
   })
 
+  it('un contador no se reparte entre lotes: el resumen de lectura inicial no lo cuenta dos veces', async () => {
+    // 300 filas de cada contador. Cortando cada 500, SQ-002 caía en dos lotes y
+    // la base lo informaba dos veces («2 contadores… toman…» de 2 importados → 3).
+    h.importarHistorialLecturas.mockImplementation(async (_p: string, lote: Array<{ contador: string }>) => {
+      const distintos = new Set(lote.map(f => f.contador)).size
+      return {
+        data: { ...resumen({ actualizadas: distintos }), filas: lote.length, insertadas: lote.length, contadores: distintos },
+        error: null,
+      }
+    })
+    render(
+      <ContadoresSection
+        contadores={contadores} tarifas={[] as Tarifa[]} unidades={[] as Unidad[]} proyectos={proyectos}
+        onContadorAdded={() => {}} onContadorUpdated={() => {}} onContadorDeleted={() => {}}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Importar historial' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Importar lecturas históricas desde Excel' })
+    fireEvent.change(within(dialog).getByLabelText('Proyecto *'), { target: { value: 'p2' } })
+
+    const inicio = new Date(Date.UTC(2020, 0, 1))
+    const filas = ['SQ-001', 'SQ-002'].flatMap(serie => Array.from({ length: 300 }, (_, i) => {
+      const d = new Date(inicio.getTime() + i * 86_400_000)
+      return `${serie},${d.toISOString().slice(0, 10)},${1000 + i},,`
+    }))
+    subirCsv(`contador,fecha,lectura,consumo,notas\n${filas.join('\n')}\n`)
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Importar 600 lecturas históricas' }))
+
+    await waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Historial importado',
+      text: expect.stringContaining('600 filas nuevas de 2 contadores. 2 contadores sin lecturas toman'),
+    })))
+    const lotes = h.importarHistorialLecturas.mock.calls.map(c => (c[1] as Array<{ contador: string }>))
+    expect(lotes.map(l => l.length)).toEqual([300, 300])
+    for (const l of lotes) expect(new Set(l.map(f => f.contador)).size).toBe(1)
+  })
+
   it('sin proyecto elegido marca los contadores que no existen y no deja importar', async () => {
     render(
       <ContadoresSection
