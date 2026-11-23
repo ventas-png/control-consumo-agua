@@ -366,7 +366,7 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
         <ImportarReservasModal
           propiedades={deCortoPlazo.filter(p => p.estado !== 'inactiva')}
           propiedadFija={propiedadPorId.get(propiedadFiltro)}
-          reservas={reservas} conceptos={conceptos} hoy={hoy} onClose={() => setImportando(false)}
+          reservas={reservas} nombreProyecto={nombreProyecto} conceptos={conceptos} hoy={hoy} onClose={() => setImportando(false)}
         />
       )}
 

@@ -115,6 +115,9 @@ Lleva dentro de la aplicación la hoja de Excel que las administradoras mantiene
   tiene montos en otras. Una estadía en otra moneda cuenta para la ocupación, no para el dinero. El Panel resume en USD.
 - **Carga masiva** desde la pestaña Reservas: la misma plantilla de Finanzas con las columnas `Propiedad` (nombre o
   código; se omite si hay una propiedad filtrada) y `Moneda`. Código de reserva repetido en la misma propiedad = actualización.
+  La columna opcional `Proyecto` (nombre del condominio, o «Independiente») distingue propiedades con el mismo nombre en
+  proyectos distintos; sin ella, un nombre repetido se rechaza diciendo en qué proyectos está, y un proyecto que no
+  coincide rechaza la fila en vez de cargarla en otra propiedad.
 
 ## Tendencia
 
