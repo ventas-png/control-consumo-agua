@@ -94,6 +94,38 @@ export function claveSerie(serie: string | null | undefined): string {
 }
 
 /**
+ * Reparte las filas de una importación en lotes SIN partir un contador: todas
+ * las filas de un mismo contador van en el mismo lote. La base resume cada lote
+ * por separado (cuántos contadores tomaron su lectura inicial, cuántos la
+ * conservaron y por qué); con un contador repartido en dos lotes esos conteos
+ * se sumaban dos veces y el aviso final daba más contadores de los importados.
+ *
+ * Conserva el orden de aparición. Sólo un contador con más filas que `maximo`
+ * se parte (no hay otra forma de respetar el tope por lote).
+ */
+export function lotesPorContador<T>(filas: T[], clave: (fila: T) => string, maximo: number): T[][] {
+  const grupos = new Map<string, T[]>()
+  for (const fila of filas) {
+    const k = clave(fila)
+    const grupo = grupos.get(k)
+    if (grupo) grupo.push(fila)
+    else grupos.set(k, [fila])
+  }
+  const lotes: T[][] = []
+  let actual: T[] = []
+  for (const grupo of grupos.values()) {
+    if (actual.length > 0 && actual.length + grupo.length > maximo) { lotes.push(actual); actual = [] }
+    if (grupo.length > maximo) {
+      for (let i = 0; i < grupo.length; i += maximo) lotes.push(grupo.slice(i, i + maximo))
+    } else {
+      actual.push(...grupo)
+    }
+  }
+  if (actual.length > 0) lotes.push(actual)
+  return lotes
+}
+
+/**
  * Une historial y lecturas del sistema en una sola serie ordenada por fecha, y
  * completa el consumo que falta con la diferencia contra la lectura anterior.
  * Si las dos fuentes traen la misma fecha, gana la del sistema. Una lectura
