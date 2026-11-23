@@ -107,6 +107,8 @@ export interface DatosReserva {
   notas: string | null
   politica_cancelacion: PoliticaCancelacionRenta | null
   num_mascotas: number
+  /** País de procedencia (ISO alfa-2). Omitido = no se toca. */
+  huesped_pais?: string | null
   /** Datos de la estancia. Quien no los captura (la carga masiva) los omite y no se tocan. */
   fecha_reservacion?: string | null
   hora_llegada_estimada?: string | null

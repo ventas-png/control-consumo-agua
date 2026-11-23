@@ -5,7 +5,7 @@ import type {
 } from '../../../types'
 import {
   ESTADO_RESERVA_LABEL, ESTADOS_RESERVA, PLATAFORMA_LABEL, PLATAFORMAS,
-  mensajeErrorRentas, noches, numeroONulo, reservasSolapadas,
+  mensajeErrorRentas, noches, reservasSolapadas,
 } from '../../../domain/rentas/logica'
 import {
   MONEDA_DEFECTO, POLITICA_CANCELACION_LABEL, POLITICAS_CANCELACION, claveReserva, importesDeFormulario, monedaDeReserva,
@@ -21,6 +21,8 @@ import { EmptyState } from '../../shared/EmptyState'
 import { FilterChips } from '../../shared/FilterChips'
 import { StatusBadge } from '../../shared/StatusBadge'
 import { HoraSelect } from '../../shared/HoraSelect'
+import { PaisSelect } from '../../shared/PaisSelect'
+import { etiquetaPais } from '../../../domain/shared/paises'
 import { MediaScopeProvider } from '../../shared/MediaScopeContext'
 import { GrupoHuespedes } from '../GrupoHuespedes'
 import { FotoHuesped, type DestinoFotos } from '../FotoHuesped'
@@ -51,7 +53,7 @@ interface Form {
   fecha_reservacion: string; hora_llegada: string; hora_salida: string
   foto_url: string | null; foto_documento_url: string | null
   plataforma: PlataformaRenta; codigo_confirmacion: string
-  monto_noche: string; monto_total: string
+  huesped_pais: string
   estado: EstadoReservaRenta; notas: string
   politica_cancelacion: PoliticaCancelacionRenta | ''; num_mascotas: string
   /** Concepto → texto. */
@@ -75,7 +77,7 @@ function formDe(r?: ReservaUnificada, propiedadId = '', liquidacion?: Liquidacio
     fecha_reservacion: txt(r?.fecha_reservacion), hora_llegada: txt(r?.hora_llegada_estimada).slice(0, 5), hora_salida: txt(r?.hora_salida_estimada).slice(0, 5),
     foto_url: r?.foto_url ?? null, foto_documento_url: r?.foto_documento_url ?? null,
     plataforma: r?.plataforma ?? 'directo', codigo_confirmacion: txt(r?.codigo_confirmacion),
-    monto_noche: txt(r?.monto_noche), monto_total: txt(r?.monto_total),
+    huesped_pais: r?.huesped_pais ?? '',
     estado: r?.estado ?? 'confirmada', notas: txt(r?.notas),
   }
 }
@@ -138,10 +140,6 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
   }
 
   const nNoches = noches(form.fecha_entrada, form.fecha_salida)
-  const totalSugerido = (() => {
-    const n = numeroONulo(form.monto_noche)
-    return typeof n === 'number' && nNoches > 0 ? Math.round(n * nNoches * 100) / 100 : null
-  })()
   const solapes = editando
     ? reservasSolapadas(reservas, form.propiedad_id, form.fecha_entrada, form.fecha_salida, editando === 'nueva' ? undefined : editando.id)
     : []
@@ -168,9 +166,6 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
     if (!Number.isInteger(adultos) || adultos < 1) { notify({ variant: 'error', title: 'Indica cuántos adultos son (al menos 1)' }); return }
     if (!Number.isInteger(ninos) || ninos < 0 || !Number.isInteger(bebes) || bebes < 0) { notify({ variant: 'error', title: 'Revisa cuántos niños y bebés son' }); return }
     const enlazada = !!(propiedad.unidad_id && propiedad.project_id)
-    const noche = numeroONulo(form.monto_noche)
-    const total = numeroONulo(form.monto_total)
-    if (noche === undefined || total === undefined) { notify({ variant: 'error', title: 'Revisa los montos', text: 'Deben ser números positivos.' }); return }
     const mascotas = Number(form.num_mascotas || '0')
     if (!Number.isInteger(mascotas) || mascotas < 0) { notify({ variant: 'error', title: 'Revisa cuántas mascotas son' }); return }
     const importes = importesDeFormulario(form.desglose)
@@ -188,7 +183,10 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
       fecha_reservacion: nulo(form.fecha_reservacion), hora_llegada_estimada: nulo(form.hora_llegada), hora_salida_estimada: nulo(form.hora_salida),
       foto_url: form.foto_url, foto_documento_url: form.foto_documento_url,
       plataforma: form.plataforma, codigo_confirmacion: nulo(form.codigo_confirmacion),
-      monto_noche: noche, monto_total: recibido ?? total ?? totalSugerido,
+      huesped_pais: nulo(form.huesped_pais),
+      // El formulario ya no pide montos: el total sale del desglose. Sin desglose se conserva lo que la reserva tuviera.
+      monto_noche: editando === 'nueva' ? null : editando.monto_noche,
+      monto_total: recibido ?? (editando === 'nueva' ? null : editando.monto_total),
       estado: form.estado, notas: nulo(form.notas),
       politica_cancelacion: form.politica_cancelacion === '' ? null : form.politica_cancelacion, num_mascotas: mascotas,
     }
@@ -314,7 +312,7 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
                     </td>
                     <td data-label="Huésped" style={td}>
                       <div>{r.huesped_nombre}</div>
-                      <div style={tenue}>{[r.huesped_telefono, `${r.num_huespedes} huésped${r.num_huespedes === 1 ? '' : 'es'}`].filter(Boolean).join(' · ')}</div>
+                      <div style={tenue}>{[etiquetaPais(r.huesped_pais), r.huesped_telefono, `${r.num_huespedes} huésped${r.num_huespedes === 1 ? '' : 'es'}`].filter(Boolean).join(' · ')}</div>
                     </td>
                     <td data-label="Estancia" style={td}>
                       <div>{formatFechaCalendario(r.fecha_entrada)} → {formatFechaCalendario(r.fecha_salida)}</div>
@@ -395,10 +393,14 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
                 <p style={{ ...tenue, margin: '0.35rem 0 0' }}>Se guarda en la pestaña STR de su condominio.</p>
               )}
             </div>
-            <div style={rejilla(200)}>
+            <div style={rejilla(160)}>
               <div>
                 <label htmlFor="rr-huesped" style={etiqueta}>Huésped *</label>
                 <input id="rr-huesped" type="text" value={form.huesped_nombre} onChange={e => set('huesped_nombre', e.target.value)} style={campo} maxLength={150} />
+              </div>
+              <div>
+                <label htmlFor="rr-pais" style={etiqueta}>País de procedencia</label>
+                <PaisSelect id="rr-pais" value={form.huesped_pais} onChange={codigo => set('huesped_pais', codigo)} style={campo} />
               </div>
               <div>
                 <label htmlFor="rr-tel" style={etiqueta}>Teléfono</label>
@@ -506,23 +508,7 @@ export default function ReservasTab({ propiedades, reservas, proyectos, concepto
                   onChange={(id, texto) => setForm(prev => ({ ...prev, desglose: { ...prev.desglose, [id]: texto } }))} />
               </details>
             )}
-            <div style={rejilla(150)}>
-              <div>
-                <label htmlFor="rr-noche" style={etiqueta}>Monto por noche ({form.moneda})</label>
-                <input id="rr-noche" type="text" inputMode="decimal" value={form.monto_noche} onChange={e => set('monto_noche', e.target.value)} style={campo} />
-              </div>
-              <div>
-                <label htmlFor="rr-total" style={etiqueta}>Total ({form.moneda})</label>
-                <input id="rr-total" type="text" inputMode="decimal" value={form.monto_total} onChange={e => set('monto_total', e.target.value)} style={campo}
-                  placeholder={totalSugerido !== null ? String(totalSugerido) : ''} />
-              </div>
-            </div>
-            {nNoches > 0 && (
-              <p style={{ ...tenue, margin: 0 }}>
-                {nNoches} noche{nNoches === 1 ? '' : 's'}
-                {totalSugerido !== null && form.monto_total.trim() === '' ? ` · si dejas el total vacío se guarda ${formatCurrency(totalSugerido, form.moneda)}` : ''}
-              </p>
-            )}
+            {nNoches > 0 && <p style={{ ...tenue, margin: 0 }}>{nNoches} noche{nNoches === 1 ? '' : 's'}</p>}
             <div>
               <label htmlFor="rr-notas" style={etiqueta}>Notas</label>
               <textarea id="rr-notas" value={form.notas} onChange={e => set('notas', e.target.value)} rows={3} style={campo} maxLength={1000} />

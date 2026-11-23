@@ -202,3 +202,17 @@ npx vitest run src/domain/rentas src/components/rentas src/hooks/__tests__/usePe
 - El solape de fechas entre reservas es un aviso, no un bloqueo (igual que en STR).
 - `locales_comerciales` y `contratos_arrendamiento` de Condominios no se migran: son registros por proyecto y siguen
   donde están.
+
+## País de procedencia del huésped (migración `20261211000000_reservas_huesped_pais`)
+
+- El formulario de reserva ya **no pide «Monto por noche» ni «Total»**: el total de la reserva sale del desglose de cobro
+  («Total recibido»). Una reserva sin desglose queda sin total; al editar una que ya lo tenía (captura anterior o carga
+  masiva) se conserva. Las columnas `monto_noche` / `monto_total` siguen existiendo.
+- En su lugar se captura el **país de procedencia** con un buscador (`components/shared/PaisSelect`): se escribe parte
+  del nombre y se elige de la lista; no acepta texto libre. Se guarda el código ISO 3166-1 alfa-2 en `huesped_pais`,
+  tanto en `rentas_reservas` como en `reservas_str` (propiedades enlazadas). El nombre en español lo da
+  `domain/shared/paises.ts` vía `Intl.DisplayNames`.
+- La lista de reservas muestra bandera y país junto al huésped. La carga masiva acepta la columna opcional `País`
+  (nombre en español, alias como «EEUU», o código); vacía no pisa lo guardado, y un país que no se reconoce rechaza la fila.
+- La pestaña STR de Condominios todavía no muestra ni edita el país.
+

@@ -62,7 +62,7 @@ const proyectos = [{ id: 'p1', nombre: '21B+' }] as Proyecto[]
 const r = (id: string, origen: 'rentas' | 'condominio', propiedad_id: string, huesped: string, entrada: string, salida: string): ReservaUnificada => ({
   id, origen, propiedad_id, huesped_nombre: huesped, huesped_email: null, huesped_telefono: null,
   fecha_entrada: entrada, fecha_salida: salida, num_huespedes: 2, plataforma: 'directo', codigo_confirmacion: null,
-  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0, fecha_reservacion: null, hora_llegada_estimada: null, hora_salida_estimada: null, num_adultos: 1, num_ninos: 0, num_bebes: 0, foto_url: null, foto_documento_url: null,
+  monto_noche: null, monto_total: null, estado: 'confirmada', notas: null, politica_cancelacion: null, num_mascotas: 0, huesped_pais: null, fecha_reservacion: null, hora_llegada_estimada: null, hora_salida_estimada: null, num_adultos: 1, num_ninos: 0, num_bebes: 0, foto_url: null, foto_documento_url: null,
 })
 const reservas = [
   r('r1', 'rentas', 'ind', 'Ana Pérez', '2026-12-10', '2026-12-13'),
@@ -153,13 +153,19 @@ describe('nueva reserva', () => {
     expect(h.crear).not.toHaveBeenCalled()
   })
 
-  it('avisa el solape sin impedir guardar, y calcula el total con las noches', async () => {
+  it('avisa el solape sin impedir guardar; no pide montos y guarda el país elegido en el buscador', async () => {
     const dialogo = abrir()
     fireEvent.change(within(dialogo).getByLabelText('Propiedad *'), { target: { value: 'ind' } })
     fireEvent.change(within(dialogo).getByLabelText('Huésped *'), { target: { value: '  Eva Ruiz ' } })
     fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2026-12-12' } })
     fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2026-12-15' } })
-    fireEvent.change(within(dialogo).getByLabelText('Monto por noche (USD)'), { target: { value: '850,50' } })
+    expect(within(dialogo).queryByLabelText(/Monto por noche/)).toBeNull()
+    expect(within(dialogo).queryByLabelText(/^Total \(/)).toBeNull()
+    const pais = within(dialogo).getByLabelText('País de procedencia')
+    fireEvent.focus(pais)
+    fireEvent.change(pais, { target: { value: 'guat' } })
+    fireEvent.mouseDown(within(dialogo).getByRole('option', { name: /Guatemala/ }))
+    expect((pais as HTMLInputElement).value).toMatch(/Guatemala/)
     expect(within(dialogo).getByRole('status').textContent).toMatch(/se cruzan con la reserva de Ana Pérez/)
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
@@ -167,7 +173,7 @@ describe('nueva reserva', () => {
       propiedad: expect.objectContaining({ id: 'ind', unidad_id: null }),
       datos: expect.objectContaining({
         huesped_nombre: 'Eva Ruiz', fecha_entrada: '2026-12-12', fecha_salida: '2026-12-15',
-        num_huespedes: 1, monto_noche: 850.5, monto_total: 2551.5, estado: 'confirmada', plataforma: 'directo',
+        num_huespedes: 1, monto_noche: null, monto_total: null, huesped_pais: 'GT', estado: 'confirmada', plataforma: 'directo',
       }),
       moneda: 'USD',
     })
@@ -223,6 +229,20 @@ describe('desglose de cobro', () => {
     expect(h.crear).not.toHaveBeenCalled()
   })
 
+  it('editar una reserva sin desglose conserva el total que ya tenía y muestra su país', async () => {
+    montar(todos, reservas.map(x => (x.id === 'r1' ? { ...x, monto_noche: 80, monto_total: 240, huesped_pais: 'US' } : x)))
+    expect(fila('Ana Pérez').textContent).toMatch(/Estados Unidos/)
+    fireEvent.click(within(fila('Ana Pérez')).getByRole('button', { name: /Editar/ }))
+    const dialogo = screen.getByRole('dialog')
+    expect((within(dialogo).getByLabelText('País de procedencia') as HTMLInputElement).value).toMatch(/Estados Unidos/)
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Quitar país' }))
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
+    await waitFor(() => expect(h.actualizar).toHaveBeenCalledTimes(1))
+    expect(h.actualizar).toHaveBeenCalledWith(expect.objectContaining({
+      datos: expect.objectContaining({ monto_noche: 80, monto_total: 240, huesped_pais: null }),
+    }))
+  })
+
   it('editar carga el desglose guardado; sin tocarlo, una reserva sin desglose no escribe ninguno', async () => {
     liquidaciones = new Map([['rentas:r1', { id: 'l1', company_id: 'c1', propiedad_id: 'ind', reserva_id: 'r1', reserva_str_id: null, moneda: 'USD', importes: { a1: 120 }, created_at: '', updated_at: '' }]])
     montar()
@@ -253,7 +273,6 @@ describe('moneda de la reserva', () => {
     fireEvent.change(within(dialogo).getByLabelText('Entrada *'), { target: { value: '2027-02-02' } })
     fireEvent.change(within(dialogo).getByLabelText('Salida *'), { target: { value: '2027-02-03' } })
     fireEvent.change(within(dialogo).getByLabelText('Moneda'), { target: { value: 'GTQ' } })
-    expect(within(dialogo).getByLabelText('Total (GTQ)')).toBeTruthy()
     fireEvent.click(within(dialogo).getByRole('button', { name: 'Guardar' }))
     await waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
     expect(h.crear).toHaveBeenCalledWith(expect.objectContaining({ moneda: 'GTQ', importes: {} }))

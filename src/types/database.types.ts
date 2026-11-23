@@ -20079,6 +20079,7 @@ export type Database = {
           hora_llegada_estimada: string | null
           hora_salida_estimada: string | null
           huesped_email: string | null
+          huesped_pais: string | null
           huesped_nombre: string
           huesped_telefono: string | null
           id: string
@@ -20108,6 +20109,7 @@ export type Database = {
           hora_llegada_estimada?: string | null
           hora_salida_estimada?: string | null
           huesped_email?: string | null
+          huesped_pais?: string | null
           huesped_nombre: string
           huesped_telefono?: string | null
           id?: string
@@ -20137,6 +20139,7 @@ export type Database = {
           hora_llegada_estimada?: string | null
           hora_salida_estimada?: string | null
           huesped_email?: string | null
+          huesped_pais?: string | null
           huesped_nombre?: string
           huesped_telefono?: string | null
           id?: string
@@ -20184,6 +20187,7 @@ export type Database = {
           hora_llegada_estimada: string | null
           hora_salida_estimada: string | null
           huesped_email: string | null
+          huesped_pais: string | null
           huesped_nombre: string
           huesped_telefono: string | null
           id: string
@@ -20213,6 +20217,7 @@ export type Database = {
           hora_llegada_estimada?: string | null
           hora_salida_estimada?: string | null
           huesped_email?: string | null
+          huesped_pais?: string | null
           huesped_nombre: string
           huesped_telefono?: string | null
           id?: string
@@ -20242,6 +20247,7 @@ export type Database = {
           hora_llegada_estimada?: string | null
           hora_salida_estimada?: string | null
           huesped_email?: string | null
+          huesped_pais?: string | null
           huesped_nombre?: string
           huesped_telefono?: string | null
           id?: string

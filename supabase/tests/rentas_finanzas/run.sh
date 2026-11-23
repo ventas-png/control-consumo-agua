@@ -126,6 +126,28 @@ H2=$(huella rent)
 SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d rent -f "$AQUI/assert_estancia.sql" 2>&1) || { echo "$SALIDA" | grep -E "ERROR|FALLO" | head -5; exit 1; }
 echo "$SALIDA" | sed -n 's/.*NOTICE:  OK/  OK/p'
 
+echo "── 3d · país de procedencia del huésped (20261211000000), DOS veces ──"
+PAIS="$MIGS/20261211000000_reservas_huesped_pais.sql"
+aplicar rent "$PAIS"
+H1=$(huella rent)
+aplicar rent "$PAIS"
+H2=$(huella rent)
+[ "$H1" = "$H2" ] || { echo "❌ re-aplicar la migración de país cambió el catálogo"; exit 1; }
+SALIDA=$(psql -q -v ON_ERROR_STOP=1 -d rent -f "$AQUI/assert_pais.sql" 2>&1) || { echo "$SALIDA" | grep -E "ERROR|FALLO" | head -5; exit 1; }
+echo "$SALIDA" | sed -n 's/.*NOTICE:  OK/  OK/p'
+MUTP=$(mktemp)
+sed "s/huesped_pais ~ '\^\[A-Z\]{2}\$'/true/g" "$PAIS" > "$MUTP"
+grep -q "huesped_pais IS NULL OR true" "$MUTP" || { echo "❌ el mutante de país no encontró su línea"; exit 1; }
+psql -q -v ON_ERROR_STOP=1 -d rent -c "ALTER TABLE public.rentas_reservas DROP CONSTRAINT rentas_reservas_huesped_pais_check; ALTER TABLE public.reservas_str DROP CONSTRAINT reservas_str_huesped_pais_check; DELETE FROM public.rentas_reservas WHERE id = 'f1000000-0000-0000-0000-000000000041';" >/dev/null
+aplicar rent "$MUTP"
+if psql -q -v ON_ERROR_STOP=1 -d rent -f "$AQUI/assert_pais.sql" >/dev/null 2>&1; then
+  echo "❌ sin el CHECK del código de país la suite sigue pasando"; exit 1
+fi
+echo "  OK    sin [forma del código de país] la suite falla"
+psql -q -v ON_ERROR_STOP=1 -d rent -c "DELETE FROM public.rentas_reservas WHERE id = 'f1000000-0000-0000-0000-000000000041'; UPDATE public.reservas_str SET huesped_pais = NULL;" >/dev/null
+aplicar rent "$PAIS"
+rm -f "$MUTP"
+
 echo "── 4/4 · mutantes: sin cada compuerta, la suite debe fallar ────────────"
 mutante() {   # $1 = base · $2 = etiqueta · $3 = patrón que se quita · $4 = reemplazo
   grep -qF -- "$3" "$NUESTRA" || { echo "❌ el mutante «$2» no encuentra su línea en la migración: $3"; exit 1; }
