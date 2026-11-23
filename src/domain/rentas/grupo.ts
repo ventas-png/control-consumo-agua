@@ -1,7 +1,7 @@
 // Personas del grupo de una reserva. Dos destinos detrás de la misma pantalla:
 //   · propiedad ENLAZADA   → `huespedes_str`, las mismas filas de la pestaña STR
 //     de Condominios (control de ingreso incluido);
-//   · propiedad INDEPENDIENTE → `rentas_huespedes` (20261207000000).
+//   · propiedad INDEPENDIENTE → `rentas_huespedes` (20261210000000).
 import {
   createCondominioRow, deleteCondominioRowsByIds, updateCondominioRow,
 } from '../condominios/tabMutations'

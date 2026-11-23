@@ -1,4 +1,4 @@
--- Huella del catálogo que deja 20261207000000: si re-aplicarla cambia algo, cambia el hash.
+-- Huella del catálogo que deja 20261210000000: si re-aplicarla cambia algo, cambia el hash.
 SELECT md5(string_agg(x, E'\n' ORDER BY x)) FROM (
   SELECT 'fn|' || p.oid::regprocedure || '|' || md5(pg_get_functiondef(p.oid)) || '|' || coalesce(p.proacl::text, '')
     FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace

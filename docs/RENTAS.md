@@ -138,7 +138,7 @@ El formulario de reserva de Rentas captura lo mismo que el de la pestaña STR de
   - *Enlazadas a un condominio*: las columnas `foto_url` / `foto_documento_url` de `reservas_str` y las filas
     `huespedes_str` de la pestaña STR (bucket `condominios-media`, que autoriza por proyecto). Lo capturado en un
     lado se ve en el otro y sirve al control de ingreso.
-  - *Independientes* (migración `20261207000000_rentas_huespedes`): `rentas_reservas.foto_url` /
+  - *Independientes* (migración `20261210000000_rentas_huespedes`): `rentas_reservas.foto_url` /
     `foto_documento_url` y la tabla `rentas_huespedes`, con las fotos en el bucket privado `rentas-huespedes`, bajo
     `<empresa>/<propiedad>/`. Lo ve quien ve la reserva; sube quien la crea o edita; sólo se borra lo que ninguna
     reserva ni persona nombra, así que el formulario guarda primero y retira después (`retirarFotosHuespedes`), y

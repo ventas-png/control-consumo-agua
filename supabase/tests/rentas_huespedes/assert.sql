@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- Invariantes de 20261207000000_rentas_huespedes, ejercidas COMO cada persona.
+-- Invariantes de 20261210000000_rentas_huespedes, ejercidas COMO cada persona.
 -- Storage se ejerce con las sentencias que la API ejecuta sobre storage.objects.
 --   A · catálogo: columnas, tabla con RLS, bucket privado sólo JPEG, policies, ACL
 --   C · fotos de la reserva: sólo en la carpeta de SU propiedad

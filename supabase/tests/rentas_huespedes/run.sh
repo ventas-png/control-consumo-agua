@@ -24,7 +24,7 @@ STRI="$RAIZ/supabase/tests/str_importacion"
 MIGS="$RAIZ/supabase/migrations"
 RENTAS="$MIGS/20261125000000_rentas_modulo.sql"
 FOTOS="$MIGS/20261202000000_rentas_inventario_fotos.sql"
-NUESTRA="$MIGS/20261207000000_rentas_huespedes.sql"
+NUESTRA="$MIGS/20261210000000_rentas_huespedes.sql"
 
 for d in /usr/lib/postgresql/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 export PATH

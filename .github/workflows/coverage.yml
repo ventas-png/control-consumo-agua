@@ -1015,7 +1015,7 @@ jobs:
           PGPORT_TEST: 55595
         run: supabase/tests/rentas_inventario_fotos/run.sh
 
-      # 20261207000000: fotos del huésped y personas del grupo en reservas de
+      # 20261210000000: fotos del huésped y personas del grupo en reservas de
       # propiedades INDEPENDIENTES. rentas_reservas.foto_url / foto_documento_url y
       # rentas_huespedes (ambas con las rutas atadas a la carpeta de SU propiedad), y
       # el bucket privado rentas-huespedes (documentos de identidad): ve quien ve la
