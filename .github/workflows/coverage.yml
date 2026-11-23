@@ -976,13 +976,15 @@ jobs:
 
       # 20261130000000: historial de lecturas de agua anterior a la plataforma (carga
       # manual). Va en su propia tabla, NO en registros: no cobra, no factura, no entra
-      # en totales ni en el portal. La importación busca cada contador por número de
-      # serie SÓLO en el proyecto elegido, valida el lote entero (todo o nada),
+      # en totales. La importación busca cada contador por número de serie SÓLO en el
+      # proyecto elegido, valida el lote entero (todo o nada),
       # re-importar la misma fecha reemplaza, y para contadores sin lecturas sube
       # lectura_inicial a la última del historial (no si es anterior a la instalación,
       # nunca la baja). Ejercido como cada persona: alcance por proyecto, empresa
       # ajena, cuenta sin permisos, quien captura sin editar contadores.
-      # CONTROL NEGATIVO: siete mutantes.
+      # Desde 20261207000000 el residente LEE en su portal el historial de sus
+      # propios contadores activos (sólo consumo): ni el de otra casa, ni el de un
+      # contador dado de baja, ni escribe. CONTROL NEGATIVO: doce mutantes.
       - name: Agua — historial de lecturas (carga manual, sin cobro)
         env:
           PGBIN: ${{ steps.pg.outputs.bin }}

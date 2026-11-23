@@ -17,7 +17,7 @@ import {
   type HistorialFiltros,
 } from '../../lib/historialFiltros'
 import { tint } from '../shared/statusTone'
-import { fetchHistorialLecturasProyecto, type HistorialLectura } from '../../domain/agua/historialLecturas'
+import { fetchHistorialLecturasProyectoResultado, type HistorialLectura } from '../../domain/agua/historialLecturas'
 import { filasDeHistorial, ESTADO_HISTORICO, type FilaLectura } from '../../lib/historialImportado'
 
 const CargaMasivaLecturasModal = lazy(() => import('../lecturas/CargaMasivaLecturasModal').then(m => ({ default: m.CargaMasivaLecturasModal })))
@@ -128,18 +128,20 @@ export function HistorialSection({
   // proyecto —pueden ser decenas de miles de filas—: el del filtro, o el único
   // que haya. Se mezcla en la tabla marcado «histórico» y fuera de los totales.
   const proyectoHistorial = filtroProyecto || (proyectos.length === 1 ? proyectos[0].id : '')
-  const [historial, setHistorial] = useState<{ proyecto: string; filas: HistorialLectura[] } | null>(null)
+  const [historial, setHistorial] = useState<{ proyecto: string; filas: HistorialLectura[]; error: boolean } | null>(null)
   const [recargaHistorial, setRecargaHistorial] = useState(0)
   useEffect(() => {
     if (!proyectoHistorial) return
     let vigente = true
-    void fetchHistorialLecturasProyecto(proyectoHistorial).then(filas => {
-      if (vigente) setHistorial({ proyecto: proyectoHistorial, filas })
+    void fetchHistorialLecturasProyectoResultado(proyectoHistorial).then(r => {
+      if (vigente) setHistorial({ proyecto: proyectoHistorial, filas: r.filas, error: r.error })
     })
     return () => { vigente = false }
   }, [proyectoHistorial, recargaHistorial])
   const historialDelProyecto = proyectoHistorial && historial?.proyecto === proyectoHistorial ? historial.filas : null
   const cargandoHistorial = !!proyectoHistorial && historialDelProyecto === null
+  // «No se pudo leer» no es «no hay historial»: se dice, en vez de mostrar vacío.
+  const errorHistorial = !!proyectoHistorial && historial?.proyecto === proyectoHistorial && historial.error
 
   const filas: FilaLectura[] = useMemo(() => {
     if (!historialDelProyecto?.length) return registros
@@ -462,10 +464,12 @@ export function HistorialSection({
       </div>
 
       {/* El historial importado se ve en la tabla pero no entra en los totales. */}
-      {(stats.historicas > 0 || cargandoHistorial || (proyectos.length > 1 && !filtroProyecto)) && (
-        <p role="status" style={{ margin: '-8px 0 20px', fontSize: 13, color: 'var(--at-ink-2)' }}>
+      {(stats.historicas > 0 || cargandoHistorial || errorHistorial || (proyectos.length > 1 && !filtroProyecto)) && (
+        <p role="status" style={{ margin: '-8px 0 20px', fontSize: 13, color: errorHistorial ? 'var(--at-danger-strong)' : 'var(--at-ink-2)' }}>
           {cargandoHistorial
             ? '🗂️ Cargando el historial importado…'
+            : errorHistorial
+            ? '⚠️ No se pudo cargar el historial importado de este proyecto. Recargue la página; si sigue igual, avise a soporte.'
             : stats.historicas > 0
               ? `🗂️ ${formatNumber(stats.historicas, 0)} ${stats.historicas === 1 ? 'lectura histórica importada' : 'lecturas históricas importadas'} en la lista. Son de referencia: no generan cobro y no suman en los totales de arriba.`
               : '🗂️ Elija un proyecto en Filtros para ver también su historial importado.'}

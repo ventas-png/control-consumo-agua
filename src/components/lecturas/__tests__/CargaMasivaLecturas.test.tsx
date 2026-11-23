@@ -31,6 +31,8 @@ vi.mock('../../../domain/agua/mutations', () => ({
 }))
 vi.mock('../../../domain/agua/historialLecturas', () => ({
   fetchHistorialLecturasProyecto: h.fetchHistorialLecturasProyecto,
+  // El Historial de Lecturas (que abre esta ventana) lee el historial con esta.
+  fetchHistorialLecturasProyectoResultado: vi.fn(async () => ({ filas: [], error: false })),
   fetchHistorialLecturas: vi.fn(async () => []),
   importarHistorialLecturas: vi.fn(),
 }))

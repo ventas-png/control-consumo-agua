@@ -5,9 +5,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, within, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Registro, Contador, Proyecto, Unidad, Cliente } from '../../../types'
-import { filasDeHistorial } from '../../../lib/historialImportado'
+import { filasDeHistorial, consumosDeHistorial } from '../../../lib/historialImportado'
 
-const h = vi.hoisted(() => ({ fetchHistorialLecturasProyecto: vi.fn() }))
+const h = vi.hoisted(() => ({ fetchHistorialLecturasProyectoResultado: vi.fn() }))
 
 vi.mock('../../../domain/agua/mutations', () => ({
   cambiarEstadoRegistro: vi.fn(async () => ({ error: null })),
@@ -16,7 +16,7 @@ vi.mock('../../../domain/agua/mutations', () => ({
 vi.mock('../../shared/Dialog', () => ({ notify: vi.fn(), confirm: vi.fn(async () => ({ isConfirmed: true })) }))
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}) } }))
 vi.mock('../../../domain/agua/historialLecturas', () => ({
-  fetchHistorialLecturasProyecto: h.fetchHistorialLecturasProyecto,
+  fetchHistorialLecturasProyectoResultado: h.fetchHistorialLecturasProyectoResultado,
 }))
 
 import { HistorialSection } from '../HistorialSection'
@@ -50,8 +50,8 @@ function renderSection(proyectos: Proyecto[]) {
 }
 
 beforeEach(() => {
-  h.fetchHistorialLecturasProyecto.mockReset()
-  h.fetchHistorialLecturasProyecto.mockResolvedValue(historial)
+  h.fetchHistorialLecturasProyectoResultado.mockReset()
+  h.fetchHistorialLecturasProyectoResultado.mockResolvedValue({ filas: historial, error: false })
 })
 afterEach(cleanup)
 
@@ -78,10 +78,19 @@ describe('filasDeHistorial', () => {
   })
 })
 
+describe('consumosDeHistorial', () => {
+  it('da la serie de consumo (anotado o deducido) y deja fuera las filas sin consumo', () => {
+    expect(consumosDeHistorial(historial)).toEqual([
+      { contador_id: 'cont-1', fecha: '2026-09-30T12:00:00', consumo: 30 },
+      { contador_id: 'cont-1', fecha: '2026-10-31T12:00:00', consumo: 12 },
+    ])
+  })
+})
+
 describe('HistorialSection — historial importado en la tabla', () => {
   it('con un solo proyecto lo trae y lo mezcla, marcado «histórico» y sin monto ni acciones', async () => {
     renderSection([proyecto])
-    expect(h.fetchHistorialLecturasProyecto).toHaveBeenCalledWith('p1')
+    expect(h.fetchHistorialLecturasProyectoResultado).toHaveBeenCalledWith('p1')
     await waitFor(() => expect(screen.getAllByText(/histórico/).length).toBeGreaterThanOrEqual(3))
 
     const filas = screen.getAllByRole('row').slice(1)
@@ -109,12 +118,12 @@ describe('HistorialSection — historial importado en la tabla', () => {
 
   it('con varios proyectos no trae nada hasta elegir uno; el filtro «Histórico» deja sólo lo importado', async () => {
     renderSection([proyecto, otro])
-    expect(h.fetchHistorialLecturasProyecto).not.toHaveBeenCalled()
+    expect(h.fetchHistorialLecturasProyectoResultado).not.toHaveBeenCalled()
     expect(screen.getByText(/Elija un proyecto en Filtros/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /Filtros/ }))
     fireEvent.change(screen.getByDisplayValue('Todos los Proyectos'), { target: { value: 'p1' } })
-    expect(h.fetchHistorialLecturasProyecto).toHaveBeenCalledWith('p1')
+    expect(h.fetchHistorialLecturasProyectoResultado).toHaveBeenCalledWith('p1')
     await screen.findByText(/3 lecturas históricas importadas/)
 
     fireEvent.change(screen.getByDisplayValue('Todos los Estados'), { target: { value: 'historico' } })
@@ -123,6 +132,14 @@ describe('HistorialSection — historial importado en la tabla', () => {
 
     // «Pendiente» deja fuera lo importado.
     fireEvent.change(screen.getByDisplayValue('🗂️ Histórico (importado)'), { target: { value: 'pendiente' } })
+    expect(screen.getAllByRole('row').slice(1)).toHaveLength(1)
+  })
+
+  it('si el historial no se pudo leer lo dice, en vez de mostrar la tabla como si no hubiera', async () => {
+    h.fetchHistorialLecturasProyectoResultado.mockResolvedValue({ filas: [], error: true })
+    renderSection([proyecto])
+    expect(await screen.findByText(/No se pudo cargar el historial importado/)).toBeTruthy()
+    // Las lecturas del sistema siguen ahí.
     expect(screen.getAllByRole('row').slice(1)).toHaveLength(1)
   })
 

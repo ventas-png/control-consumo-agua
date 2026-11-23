@@ -124,6 +124,9 @@ export function ImportHistorialLecturasModal({ proyectos, contadores, proyectoIn
   const destinoRef = useRef(destinoId)
   destinoRef.current = destinoId
   const acumulado = useRef<ResumenImportHistorial | null>(null)
+  // Contadores distintos de toda la importación. La base cuenta los de CADA
+  // lote, y un contador cuyas filas caen en dos lotes se contaría dos veces.
+  const contadoresVistos = useRef(new Set<string>())
   // Si un lote falla y se reintenta, el resumen vuelve a empezar.
   const fallo = useRef(false)
 
@@ -176,13 +179,14 @@ export function ImportHistorialLecturasModal({ proyectos, contadores, proyectoIn
       importDisabledReason="Elija el proyecto."
       onInsertBatch={async (batch) => {
         if (!destinoId) return { ok: 0, error: 'Elija el proyecto.' }
-        if (fallo.current) { acumulado.current = null; fallo.current = false }
+        if (fallo.current) { acumulado.current = null; contadoresVistos.current.clear(); fallo.current = false }
         const { data, error } = await importarHistorialLecturas(destinoId, batch)
         if (error || !data) {
           fallo.current = true
           return { ok: 0, error: error ?? 'No se pudo importar el historial.' }
         }
         if (data.lectura_inicial.contadores.length) onLecturaInicialActualizada(data.lectura_inicial.contadores)
+        batch.forEach(f => contadoresVistos.current.add(claveSerie(f.contador)))
         const prev = acumulado.current
         acumulado.current = prev
           ? {
@@ -200,6 +204,7 @@ export function ImportHistorialLecturasModal({ proyectos, contadores, proyectoIn
               },
             }
           : data
+        acumulado.current = { ...acumulado.current, contadores: contadoresVistos.current.size }
         return { ok: batch.length }
       }}
       onClose={onClose}

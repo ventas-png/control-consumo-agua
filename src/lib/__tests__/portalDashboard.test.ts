@@ -225,3 +225,55 @@ describe('construirDashboardData', () => {
     })
   })
 })
+
+describe('construirDashboardData — historial importado', () => {
+  // AHORA es junio de 2026: mayo es «mes anterior» y junio de 2025 «mismo mes
+  // del año anterior».
+  const historial = [
+    { contador_id: 'c1', fecha: '2025-06-30T12:00:00', consumo: 20 },
+    { contador_id: 'c1', fecha: '2026-05-31T12:00:00', consumo: 8 },
+    { contador_id: 'ajeno', fecha: '2026-05-31T12:00:00', consumo: 999 },
+  ]
+
+  it('sin lecturas del sistema, el historial alimenta comparaciones, promedio y gráfica', () => {
+    const d = construirDashboardData(inputs({
+      contadores: [contador({})], unidades: [unidad({})], historial, chartMonthsBack: 24,
+    }))
+    expect(d.consumoPrevMes).toBe(8)
+    expect(d.consumoSameLastYear).toBe(20)
+    expect(d.consumoPromedio).toBeCloseTo((20 + 8) / 12)
+    expect(d.filteredLecturasCount).toBe(2)
+    expect(d.chartDatasets[0].data.reduce((a, b) => a + b, 0)).toBe(28)
+    // No es deuda ni un recibo: nada de importes.
+    expect(d.montoPendiente).toBe(0)
+  })
+
+  it('con la lectura del mes, se compara contra el historial', () => {
+    const d = construirDashboardData(inputs({
+      contadores: [contador({})], unidades: [unidad({})], historial,
+      lecturas: [lectura({ consumo: 10, monto_calculado: 50, estado: 'pendiente' })],
+    }))
+    expect(d.consumoMesActual).toBe(10)
+    expect(d.vsAnterior).toBeCloseTo(((10 - 8) / 8) * 100)
+    expect(d.vsAnioAnterior).toBeCloseTo(((10 - 20) / 20) * 100)
+    expect(d.montoPendiente).toBe(50)
+  })
+
+  it('no cuenta dos veces: el historial de un contador vale hasta el mes anterior a su primera lectura del sistema', () => {
+    const d = construirDashboardData(inputs({
+      contadores: [contador({})], unidades: [unidad({})], historial,
+      lecturas: [lectura({ id: 'l-may', fecha: '2026-05-20', consumo: 7 })],
+    }))
+    // Mayo tiene lectura del sistema (7): el 8 del historial de mayo no se suma.
+    expect(d.consumoPrevMes).toBe(7)
+    expect(d.consumoSameLastYear).toBe(20)
+  })
+
+  it('en moneda la gráfica sólo trae lo cobrado', () => {
+    const d = construirDashboardData(inputs({
+      contadores: [contador({})], unidades: [unidad({})], historial, chartMetric: 'moneda', chartMonthsBack: 24,
+    }))
+    expect(d.chartDatasets[0].data.every(v => v === 0)).toBe(true)
+  })
+})
+
