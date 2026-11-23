@@ -64,6 +64,12 @@ export interface ImportModalProps<T> {
 
   /** Batch size para llamar onInsertBatch. Default 100. */
   batchSize?: number
+  /**
+   * Reparto propio de las filas válidas en lotes, cuando cortar cada
+   * `batchSize` filas no sirve (p. ej. filas que deben viajar juntas).
+   * Si no se pasa, se corta cada `batchSize`.
+   */
+  makeBatches?: (rows: T[]) => T[][]
 
   /** Se llama al cerrar el modal. */
   onClose: () => void
@@ -129,6 +135,7 @@ export function ImportModal<T>({
   validateRow,
   onInsertBatch,
   batchSize = 100,
+  makeBatches,
   onClose,
   onImportado,
   renderErrorRow,
@@ -245,8 +252,11 @@ export function ImportModal<T>({
     setStep('importing')
     const validRows = rows.filter(r => r.valid).map(r => r.data!) as T[]
     let total = 0
-    for (let i = 0; i < validRows.length; i += batchSize) {
-      const batch = validRows.slice(i, i + batchSize)
+    const lotes: T[][] = makeBatches ? makeBatches(validRows) : []
+    if (!makeBatches) {
+      for (let i = 0; i < validRows.length; i += batchSize) lotes.push(validRows.slice(i, i + batchSize))
+    }
+    for (const batch of lotes) {
       const { ok, error } = await onInsertBatch(batch)
       if (error) {
         notify({ variant: 'error', title: 'Error en inserción', text: error })

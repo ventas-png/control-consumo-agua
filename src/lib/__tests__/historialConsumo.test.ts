@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   claveSerie,
+  lotesPorContador,
   estadisticasConsumo,
   leerNumeroHistorial,
   normalizarFechaHistorial,
@@ -122,5 +123,35 @@ describe('estadisticasConsumo', () => {
     expect(estadisticasConsumo([], '2026-11-17')).toEqual({
       promedioReciente: null, nReciente: 0, mismoMesAnterior: null, etiquetaMismoMes: null, nHistorial: 0,
     })
+  })
+})
+
+describe('lotesPorContador', () => {
+  const fila = (c: string, n: number) => ({ c, n })
+  const clave = (f: { c: string }) => f.c
+
+  it('no parte un contador entre lotes, aunque sus filas vengan intercaladas', () => {
+    const filas = [fila('a', 1), fila('b', 1), fila('a', 2), fila('c', 1), fila('b', 2), fila('a', 3)]
+    const lotes = lotesPorContador(filas, clave, 4)
+    expect(lotes.map(l => l.map(f => `${f.c}${f.n}`))).toEqual([['a1', 'a2', 'a3'], ['b1', 'b2', 'c1']])
+    for (const c of ['a', 'b', 'c']) expect(lotes.filter(l => l.some(f => f.c === c))).toHaveLength(1)
+  })
+
+  it('ningún lote pasa del máximo y no se pierde ni repite ninguna fila', () => {
+    const filas = Array.from({ length: 1234 }, (_, i) => fila(`k${i % 37}`, i))
+    const lotes = lotesPorContador(filas, clave, 100)
+    expect(Math.max(...lotes.map(l => l.length))).toBeLessThanOrEqual(100)
+    expect(lotes.flat().map(f => f.n).sort((x, y) => x - y)).toEqual(filas.map(f => f.n))
+  })
+
+  it('sólo parte al contador que no cabe en un lote', () => {
+    const filas = [...Array.from({ length: 5 }, (_, i) => fila('grande', i)), fila('chico', 0)]
+    expect(lotesPorContador(filas, clave, 2).map(l => l.map(f => f.c))).toEqual([
+      ['grande', 'grande'], ['grande', 'grande'], ['grande'], ['chico'],
+    ])
+  })
+
+  it('sin filas no hay lotes', () => {
+    expect(lotesPorContador([], clave, 10)).toEqual([])
   })
 })
