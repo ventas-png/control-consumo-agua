@@ -10,7 +10,7 @@
 //
 // No afecta a los cobros de servicios del mundo real que pagan los residentes
 // (cuotas de condominio, agua): Apple los permite fuera de su sistema
-// (guideline 3.1.5(a)) y siguen disponibles en la app.
+// (guideline 3.1.3(e)) y siguen disponibles en la app.
 //
 // Toda superficie de venta del plan pasa por aquí, para que auditarlas antes de
 // cada envío a las tiendas sea un `grep mostrarVentaDePlanes`.
