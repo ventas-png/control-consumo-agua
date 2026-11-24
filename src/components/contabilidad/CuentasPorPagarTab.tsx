@@ -207,7 +207,7 @@ export function CuentasPorPagarTab({ companyId, projectId, monedaBase }: Props) 
             <button onClick={() => void accion(() => aprobarOrden.mutateAsync(o.id), 'Orden aprobada.')} style={btnLink}>Aprobar</button>
           )}
           {o.estado === 'aprobada' && puedeEjecutarPago && (
-            <button onClick={() => void accion(() => pagarOrden.mutateAsync({ ordenId: o.id }), 'Orden pagada: asiento generado y saldo de la factura actualizado.')} style={btnLink}>
+            <button onClick={() => void accion(() => pagarOrden.mutateAsync({ ordenId: o.id, fechaPago: o.fecha_pago ?? undefined }), 'Orden pagada: asiento generado y saldo de la factura actualizado.')} style={btnLink}>
               Marcar pagada
             </button>
           )}

@@ -419,7 +419,7 @@ const extras: CasoExtra[] = [
   },
   {
     nombre: 'autorizar un proveedor', tabla: 'proveedores', patch: { estado: 'autorizado' },
-    permisos: ['platform.contabilidad.view', 'platform.contabilidad.approve'],
+    permisos: ['platform.contabilidad.view', 'platform.contabilidad.change_status'],
     ui: () => <ProveedoresTab companyId="c1" projectId={PROY} />,
     datos: () => { h.proveedores = [{ ...FERRETERIA, estado: 'borrador' }]; h.prompt.mockResolvedValue({ vence: '' }) },
     clic: () => fireEvent.click(screen.getByText('Autorizar')),

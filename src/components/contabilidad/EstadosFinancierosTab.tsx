@@ -48,7 +48,13 @@ export function EstadosFinancierosTab({ companyId, projectId, ledgerNombre, mone
   )
   const { data: balanceFilas = [], isLoading: cargandoBalance } = useBalanceGeneralQuery(companyId, pid, periodo)
   const { data: flujoFilas = [], isLoading: cargandoFlujo } = useFlujoEfectivoQuery(companyId, pid, periodo)
-  const { data: cierres = [] } = useCierresAnualesQuery(companyId)
+  // La consulta trae los cierres de TODA la empresa; aquí solo cuentan los de la contabilidad activa. Sin este
+  // filtro, cerrar el año en la empresa escondía «Cerrar ejercicio» en cada proyecto (y mezclaba los años al pie).
+  const { data: cierresEmpresa = [] } = useCierresAnualesQuery(companyId)
+  const cierres = useMemo(
+    () => cierresEmpresa.filter((c) => (c.project_id ?? null) === (pid ?? null)),
+    [cierresEmpresa, pid],
+  )
   // Consolidado (solo lectura): ignora el ledger activo — abarca empresa +
   // todos los proyectos, convertidos a la moneda de la EMPRESA. Solo consulta
   // con la vista abierta.

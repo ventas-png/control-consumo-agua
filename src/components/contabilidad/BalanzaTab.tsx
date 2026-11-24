@@ -32,8 +32,9 @@ export function BalanzaTab({ companyId, projectId, monedaBase }: Props) {
     // Solo cuentas de detalle (los rollups duplicarían).
     const detalle = nodos.filter((n) => !n.esRollup)
     return {
-      cargos: detalle.reduce((s, n) => s + n.cargos, 0),
-      abonos: detalle.reduce((s, n) => s + n.abonos, 0),
+      // A centavos: la suma en coma flotante (0.1 + 0.2) marcaba «descuadre» en una balanza cuadrada.
+      cargos: Math.round(detalle.reduce((s, n) => s + n.cargos, 0) * 100) / 100,
+      abonos: Math.round(detalle.reduce((s, n) => s + n.abonos, 0) * 100) / 100,
     }
   }, [nodos])
 
@@ -69,7 +70,7 @@ export function BalanzaTab({ companyId, projectId, monedaBase }: Props) {
         <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} style={{ ...input, width: 150 }} aria-label="Periodo" />
         <span style={{ flex: 1 }} />
         {puedeCrear && (
-          <button onClick={() => setShowRevaluacion(true)} style={btnSecundario} title="Revaluar saldos en moneda extranjera contra 3301">
+          <button onClick={() => setShowRevaluacion(true)} style={btnSecundario} title="Revaluar saldos en moneda extranjera contra la cuenta de Diferencial cambiario">
             💱 Revaluar FX
           </button>
         )}
@@ -134,7 +135,7 @@ export function BalanzaTab({ companyId, projectId, monedaBase }: Props) {
       )}
       <p style={{ fontSize: 11, color: 'var(--at-ink-soft)', margin: 0 }}>
         Saldos en {monedaBase} (moneda base). El saldo final = saldo inicial + cargos − abonos
-        (signo según naturaleza: los negativos indican saldo contrario a la naturaleza de la cuenta).
+        (debe − haber): un saldo acreedor —pasivo, capital, ingresos— se muestra en negativo.
       </p>
     </div>
   )
