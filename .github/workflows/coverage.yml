@@ -991,6 +991,19 @@ jobs:
           PGPORT_TEST: 55594
         run: supabase/tests/historial_lecturas/run.sh
 
+      # 20261212000000: la RLS de lectura de `registros` (y su puerta de MFA) y la
+      # de `bitacora_acciones` llamaban a sus funciones EN CADA FILA: con miles de
+      # lecturas la consulta pasaba del tope de 8 s y las pantallas de agua quedaban
+      # sin datos. Ahora se calculan una vez por consulta. La suite toma la foto de
+      # lo que ve cada persona con las policies anteriores y exige que vea lo mismo
+      # después: proyecto asignado, empresa ajena, filas sin proyecto, residente,
+      # super admin y MFA (leer y escribir). CONTROL NEGATIVO: doce mutantes.
+      - name: Agua — la RLS de lecturas se calcula una vez por consulta
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55598
+        run: supabase/tests/lecturas_rls_por_consulta/run.sh
+
       # 20261204000000: mover una unidad de proyecto arrastra sus contadores, y el
       # contador arrastra su historial importado (antes se quedaban en el proyecto
       # viejo y la carga masiva del historial no los reconocía en el nuevo). Corrige
