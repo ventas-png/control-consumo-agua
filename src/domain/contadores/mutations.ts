@@ -31,3 +31,28 @@ export async function deleteContador(id: string): Promise<{ error: string | null
   const { error } = await supabase.from('contadores').delete().eq('id', id)
   return { error: error?.message ?? null }
 }
+
+/**
+ * Asigna la misma tarifa a varios contadores. Va por lotes para no exceder el
+ * largo de la URL; devuelve los ids que la base realmente actualizó (la RLS
+ * puede dejar fuera filas sin avisar) y el error del lote que haya fallado.
+ */
+export async function asignarTarifaMasiva(
+  ids: string[],
+  tarifaId: string,
+  auditoria: { updated_by: string | null; updated_by_name: string | null },
+): Promise<{ actualizados: string[]; error: string | null }> {
+  const LOTE = 200
+  const actualizados: string[] = []
+  const updated_at = new Date().toISOString()
+  for (let i = 0; i < ids.length; i += LOTE) {
+    const { data, error } = await supabase
+      .from('contadores')
+      .update({ tarifa_id: tarifaId, updated_at, ...auditoria })
+      .in('id', ids.slice(i, i + LOTE))
+      .select('id')
+    if (error) return { actualizados, error: error.message }
+    actualizados.push(...((data ?? []) as { id: string }[]).map(r => r.id))
+  }
+  return { actualizados, error: null }
+}

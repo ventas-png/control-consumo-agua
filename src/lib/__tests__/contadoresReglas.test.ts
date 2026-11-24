@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   construirPayloadContador,
+  contadoresParaCambioTarifa,
+  SIN_TARIFA,
   filtrarContadores,
   resumenPorTipo,
   tarifasParaTipo,
@@ -93,5 +95,24 @@ describe('filtrarContadores / resumenPorTipo / tarifasParaTipo', () => {
       { id: 't3', tipo_agua: 'riego', activa: true } as Tarifa,
     ]
     expect(tarifasParaTipo(tarifas, 'potable').map(t => t.id)).toEqual(['t1'])
+  })
+})
+
+describe('contadoresParaCambioTarifa', () => {
+  const lista = [
+    contador({ id: 'a', project_id: 'p1', tarifa_id: 't1' }),
+    contador({ id: 'b', project_id: 'p2', tarifa_id: 't1' }),
+    contador({ id: 'c', project_id: 'p1', tarifa_id: null }),
+    contador({ id: 'd', project_id: 'p1', tarifa_id: 't2' }),
+    contador({ id: 'e', project_id: 'p1', tarifa_id: 't1', tipo_agua: 'rehuso' as TipoAgua }),
+  ]
+  const ids = (projectId: string, tarifaActual: string) =>
+    contadoresParaCambioTarifa(lista, { projectId, tipoAgua: 'potable', tarifaActual, nuevaTarifaId: 't2' }).map(c => c.id)
+
+  it('filtra por tipología, proyecto y tarifa actual; omite los que ya tienen la nueva', () => {
+    expect(ids('', '')).toEqual(['a', 'b', 'c'])
+    expect(ids('p1', '')).toEqual(['a', 'c'])
+    expect(ids('', 't1')).toEqual(['a', 'b'])
+    expect(ids('p1', SIN_TARIFA)).toEqual(['c'])
   })
 })
