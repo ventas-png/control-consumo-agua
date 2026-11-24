@@ -1004,6 +1004,21 @@ jobs:
           PGPORT_TEST: 55598
         run: supabase/tests/lecturas_rls_por_consulta/run.sh
 
+      # 20261213000000: lo mismo para `contadores` y `unidades`. Sus policies de
+      # lectura llamaban a seis funciones por fila (0,4–1,1 s por consulta en tablas
+      # de ~700 filas) y, pedidas a la vez al abrir una pantalla, pasaban del tope.
+      # Ahora lo que depende del proyecto se calcula una vez por proyecto del
+      # usuario (`mis_proyectos_asignados()`), con las MISMAS funciones por rol. La
+      # suite compara lo que ven dieciséis personas antes y después —incluidas las
+      # que distinguen la regla vigente de una reescritura descuidada: operador con
+      # el proyecto sólo en su perfil, asignación a un proyecto de otra empresa,
+      # inquilina— . CONTROL NEGATIVO: dieciocho mutantes.
+      - name: Agua — la RLS de contadores y unidades se calcula una vez por consulta
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55599
+        run: supabase/tests/padron_rls_por_consulta/run.sh
+
       # 20261204000000: mover una unidad de proyecto arrastra sus contadores, y el
       # contador arrastra su historial importado (antes se quedaban en el proyecto
       # viejo y la carga masiva del historial no los reconocía en el nuevo). Corrige
