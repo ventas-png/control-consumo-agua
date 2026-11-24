@@ -70,7 +70,9 @@ export default defineConfig({
     // generateSW (workbox) en lugar de injectManifest porque no necesitamos
     // un SW custom — solo precaching del app shell + runtime caching para
     // datos. registerType: 'autoUpdate' actualiza el SW sin pedirle al
-    // usuario (la app es interna; los cambios deben llegar rápido).
+    // usuario (la app es interna; los cambios deben llegar rápido). La
+    // recarga de página que eso dispara se aplaza si hay captura de lecturas
+    // en curso: ver PwaUpdatePrompt.
     //
     // Estrategias runtime:
     //   - Fuentes: self-hosted en /fonts (infra:I31); entran al precache vía

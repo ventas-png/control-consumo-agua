@@ -1,23 +1,44 @@
 import { useEffect, useState } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { sectionToPath } from '../lib/routes'
+import { localStorageRutaEnCurso, leerRutaEnCurso } from '../lib/rutaEnCurso'
 
-// Aviso toast cuando el SW detecta una nueva version de la app.
+// Qué pasa cuando el SW detecta una versión nueva de la app.
 //
-// En lugar de hacer "skip waiting" automatico (que cortaria una sesion activa
-// mid-action), mostramos un toast no intrusivo y dejamos que el usuario decida
-// cuando aplicar. registerType: 'autoUpdate' del plugin garantiza que la
-// proxima recarga ya use la nueva version aunque el usuario ignore el toast.
+// El plugin está en registerType: 'autoUpdate' (vite.config.ts): el SW nuevo
+// toma el control solo y, por defecto, el cliente hace `location.reload()` en
+// el acto. Para casi toda la app eso está bien —los cambios llegan rápido—,
+// pero al lecturista lo cortaba A MEDIA CAPTURA: cada despliegue recargaba la
+// pantalla de Nueva Lectura, se perdía lo tecleado y la ruta volvía a la
+// parada 1.
+//
+// Ahora la recarga automática se APLAZA mientras haya trabajo de campo en
+// curso (pantalla de Nueva Lectura abierta o una ruta a medias): en su lugar
+// se muestra el aviso «Nueva versión disponible» y el usuario recarga cuando
+// le viene bien. Fuera de ese caso se recarga como siempre.
 //
 // `onOfflineReady` se dispara la primera vez que el SW termina de precachear
 // el app shell — util para confirmar visualmente al usuario que la app ahora
 // funciona offline.
+
+/** ¿Hay captura de lecturas en curso que una recarga automática interrumpiría? */
+export function debeAplazarRecarga(pathname: string, hayRutaEnCurso: boolean): boolean {
+  return hayRutaEnCurso || pathname === sectionToPath('lecturas')
+}
+
 export function PwaUpdatePrompt() {
   const [showOfflineToast, setShowOfflineToast] = useState(false)
+  // La versión nueva ya está activa pero la recarga se aplazó (ver arriba).
+  const [recargaAplazada, setRecargaAplazada] = useState(false)
   const {
-    needRefresh: [needRefresh, setNeedRefresh],
+    needRefresh: [needRefreshSW, setNeedRefresh],
     offlineReady: [offlineReady, setOfflineReady],
-    updateServiceWorker,
   } = useRegisterSW({
+    onNeedReload() {
+      const hayRuta = leerRutaEnCurso(localStorageRutaEnCurso(), Date.now()) !== null
+      if (debeAplazarRecarga(window.location.pathname, hayRuta)) setRecargaAplazada(true)
+      else window.location.reload()
+    },
     onRegisterError(error) {
       console.error('[PWA] SW registration error:', error)
     },
@@ -35,6 +56,7 @@ export function PwaUpdatePrompt() {
     return undefined
   }, [offlineReady, setOfflineReady])
 
+  const needRefresh = needRefreshSW || recargaAplazada
   if (!needRefresh && !showOfflineToast) return null
 
   return (
@@ -69,7 +91,7 @@ export function PwaUpdatePrompt() {
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
             <button
               type="button"
-              onClick={() => setNeedRefresh(false)}
+              onClick={() => { setNeedRefresh(false); setRecargaAplazada(false) }}
               style={{
                 background: 'none', border: 'none', color: 'var(--at-ink-3)',
                 cursor: 'pointer', fontSize: '13px', padding: '6px 10px',
@@ -79,7 +101,7 @@ export function PwaUpdatePrompt() {
             </button>
             <button
               type="button"
-              onClick={() => updateServiceWorker(true)}
+              onClick={() => window.location.reload()}
               style={{
                 background: 'var(--at-primary)', color: 'white', border: 'none',
                 borderRadius: '8px', padding: '6px 14px', fontSize: '13px',
