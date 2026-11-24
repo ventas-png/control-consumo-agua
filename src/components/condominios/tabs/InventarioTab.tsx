@@ -1,5 +1,5 @@
 import { hoyLocalISO, diasHastaFechaCalendario } from '../../../lib/format'
-import { useState, type CSSProperties} from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { createCondominioRow, deleteCondominioRow, updateCondominioRow } from '../../../domain/condominios/tabMutations'
 import type { AreaCondominio, ItemInventario, CategoriaInventario, EstadoInventario, PrestamoEquipo } from '../../../types'
 import { areaUnicaPorNombre, nombreAreaDe, vinculoArea } from '../../../domain/condominios/areas'
@@ -10,6 +10,9 @@ import { Button } from '../../shared/Button'
 import { DataTable, type DataTableColumn } from '../../shared/DataTable'
 import { useTranslation, type TranslationKey } from '../../../lib/i18n'
 import { ImportInventarioModal } from '../ImportInventarioModal'
+import { SecureImage } from '../../shared/SecureImage'
+import { removeCondominiosMedia } from '../../../domain/shared/storage'
+import { FotoSuministroModal } from './suministros/FotoSuministroModal'
 
 interface Props {
   inventario: ItemInventario[]
@@ -61,8 +64,11 @@ const blank = (): Partial<ItemInventario> => ({
   area_id: '', ubicacion: '', estado: 'disponible', cantidad: 1, cantidad_minima: 0,
   unidad_medida: 'unidad', costo_unitario: undefined,
   prestable_con_costo: false, costo_renta_unidad: undefined,
-  proveedor: '', fecha_adquisicion: '', fecha_vencimiento: '', notas: '',
+  proveedor: '', fecha_adquisicion: '', fecha_vencimiento: '', notas: '', foto_url: null,
 })
+
+/** Carpeta de las fotos bajo `<project_id>/` en `condominios-media` (como suministros y equipos). */
+const FOTO_FOLDER = 'inventario'
 
 export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, companyId, moneda, canCreate, canEdit, canDelete, puedeConfigurarAreas, onIrATab, onRefresh }: Props) {
   const { t } = useTranslation()
@@ -74,6 +80,8 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  /** Qué ventana de foto está abierta: la de la ficha (guarda ya) o la del formulario (guarda con el item). */
+  const [fotoAbierta, setFotoAbierta] = useState<'detalle' | 'form' | null>(null)
   // La ficha abre en ventana al pulsar la fila. Se guarda el id y no la fila:
   // tras editar o cambiar el estado, el detalle muestra la fila recargada.
   const [detalleId, setDetalleId] = useState<string | null>(null)
@@ -107,7 +115,40 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
   // El área guardada puede estar inactiva: se sigue ofreciendo para no perderla.
   const areaFueraDeLista = form.area_id && !areasActivas.some(a => a.id === form.area_id) ? form.area_id : null
 
+  // ── Foto (columna foto_url, bucket condominios-media) ──
+  // Una fila guardada nunca debe apuntar a un archivo borrado: la foto anterior
+  // se borra DESPUÉS de que la fila deja de nombrarla. Lo que se sube en el
+  // formulario y no se guarda no lo nombra nadie: se borra al descartarse el
+  // borrador (cancelar una edición, abrir otro, salir de la pestaña).
+  /** La foto que la fila en edición tiene guardada (un item nuevo no tiene). */
+  const fotoGuardada = editando?.foto_url ?? null
+  function descartarFotoPendiente() {
+    if (form.foto_url && form.foto_url !== fotoGuardada) void removeCondominiosMedia([form.foto_url])
+  }
+  const descartarRef = useRef(descartarFotoPendiente)
+  descartarRef.current = descartarFotoPendiente
+  const savingRef = useRef(false)
+  useEffect(() => () => { if (!savingRef.current) descartarRef.current() }, [])
+
+  /** La foto elegida en la ventana viaja con el item; la pendiente que reemplaza ya no sirve. */
+  function elegirFotoForm(foto: string | null) {
+    if (form.foto_url && form.foto_url !== foto && form.foto_url !== fotoGuardada) void removeCondominiosMedia([form.foto_url])
+    setForm(f => ({ ...f, foto_url: foto }))
+  }
+
+  /** Desde la ficha la foto se guarda en el acto, sin pasar por el formulario. */
+  async function guardarFoto(i: ItemInventario, foto: string | null): Promise<boolean> {
+    const { error } = await updateCondominioRow('inventario_condominio', i.id, { foto_url: foto })
+    if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); return false }
+    // La fila ya no apunta a la anterior: ahora sí se puede borrar.
+    if (i.foto_url && i.foto_url !== foto) void removeCondominiosMedia([i.foto_url])
+    notify({ variant: 'success', title: t(foto ? 'condominios.inventario.foto_guardada' : 'condominios.inventario.foto_quitada'), text: i.nombre })
+    onRefresh()
+    return true
+  }
+
   function startEdit(i: ItemInventario) {
+    descartarFotoPendiente()
     setForm({
       nombre: i.nombre, categoria: i.categoria, descripcion: i.descripcion ?? '',
       numero_serie: i.numero_serie ?? '', ubicacion: i.ubicacion ?? '',
@@ -117,7 +158,7 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
       unidad_medida: i.unidad_medida, costo_unitario: i.costo_unitario ?? undefined,
       prestable_con_costo: i.prestable_con_costo ?? false, costo_renta_unidad: i.costo_renta_unidad ?? undefined,
       proveedor: i.proveedor ?? '', fecha_adquisicion: i.fecha_adquisicion ?? '',
-      fecha_vencimiento: i.fecha_vencimiento ?? '', notas: i.notas ?? '',
+      fecha_vencimiento: i.fecha_vencimiento ?? '', notas: i.notas ?? '', foto_url: i.foto_url ?? null,
     })
     setEditId(i.id)
     setShowForm(true)
@@ -125,12 +166,17 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
 
   function abrirNuevo() {
     // Una edición cancelada no se cuela en el item nuevo.
-    if (editId) { setEditId(null); setForm(blank()) }
+    if (editId) { descartarFotoPendiente(); setEditId(null); setForm(blank()) }
     setShowForm(true)
   }
 
-  // Cancelar cierra sin borrar lo escrito; no se cierra a mitad del guardado.
-  function cerrarForm() { if (!saving) setShowForm(false) }
+  // Cancelar cierra sin borrar lo escrito de un item nuevo (su foto incluida);
+  // una edición cancelada se descarta. No se cierra a mitad del guardado.
+  function cerrarForm() {
+    if (saving) return
+    setShowForm(false)
+    if (editId) { descartarFotoPendiente(); setEditId(null); setForm(blank()) }
+  }
 
   async function handleSave() {
     if (saving) return
@@ -159,11 +205,16 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
       fecha_adquisicion: form.fecha_adquisicion || null,
       fecha_vencimiento: form.fecha_vencimiento || null,
       notas: form.notas || null,
+      foto_url: form.foto_url || null,
     }
+    savingRef.current = true
     const { error } = editId
       ? await updateCondominioRow('inventario_condominio', editId, payload)
       : await createCondominioRow('inventario_condominio', payload)
+    savingRef.current = false
     if (error) { notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message }); setSaving(false); return }
+    // Se reemplazó o se quitó la foto: la fila ya no apunta a la anterior.
+    if (fotoGuardada && fotoGuardada !== payload.foto_url) void removeCondominiosMedia([fotoGuardada])
     setSaving(false); setShowForm(false); setEditId(null); setForm(blank()); onRefresh()
   }
 
@@ -172,8 +223,11 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
     if (!canDelete) return
     const r = await confirm({ title: t('condominios.inventario.delete_confirm'), icon: 'warning', variant: 'danger', confirmText: t('condominios.comun.delete') })
     if (!r.isConfirmed) return
+    const foto = inventario.find(i => i.id === id)?.foto_url
     const { error } = await deleteCondominioRow('inventario_condominio', id)
     if (error) return notify({ variant: 'error', title: t('condominios.comun.error'), text: error.message })
+    // Sin la fila, su foto ya no la nombra nadie.
+    if (foto) void removeCondominiosMedia([foto])
     setDetalleId(null)
     onRefresh()
   }
@@ -349,6 +403,22 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
               <input id="inv-vencimiento" style={inputStyle} type="date" value={form.fecha_vencimiento ?? ''} onChange={e => setForm(f => ({ ...f, fecha_vencimiento: e.target.value }))} />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
+              <div style={labelStyle}>{t('condominios.inventario.foto')}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {form.foto_url && (
+                  <SecureImage src={form.foto_url} alt={t('condominios.inventario.foto_de', { nombre: form.nombre?.trim() || t('condominios.inventario.foto_titulo') })}
+                    style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)', display: 'block' }} />
+                )}
+                <button type="button" onClick={() => setFotoAbierta('form')}
+                  style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
+                  📷 {t(form.foto_url ? 'condominios.inventario.foto_cambiar' : 'condominios.inventario.foto_agregar')}
+                </button>
+                {(form.foto_url || null) !== fotoGuardada && (
+                  <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>{t('condominios.inventario.foto_con_item')}</span>
+                )}
+              </div>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
               <label htmlFor="inv-descripcion" style={labelStyle}>{t('condominios.inventario.descripcion')}</label>
               <textarea id="inv-descripcion" style={{ ...inputStyle, resize: 'vertical', minHeight: '56px' }} value={form.descripcion ?? ''} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
             </div>
@@ -398,7 +468,10 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
               return (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '16px' }}>{CATEGORIA_ICON[i.categoria]}</span>
+                    {i.foto_url
+                      ? <SecureImage src={i.foto_url} alt="" placeholder={<span style={{ fontSize: '16px' }}>{CATEGORIA_ICON[i.categoria]}</span>}
+                          style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--at-line)', flexShrink: 0, display: 'block' }} />
+                      : <span style={{ fontSize: '16px' }}>{CATEGORIA_ICON[i.categoria]}</span>}
                     <span style={{ fontWeight: 700, color: 'var(--at-ink)', fontSize: '14px' }}>{i.nombre}</span>
                   </div>
                   {ubicacionDe(i) && <div style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>📍 {ubicacionDe(i)}</div>}
@@ -520,6 +593,16 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
                 📅 {t('condominios.inventario.vence_label', { fecha: i.fecha_vencimiento ?? '' })}
               </div>
             )}
+            {(i.foto_url || canEdit) && (
+              <button type="button" onClick={() => setFotoAbierta('detalle')}
+                aria-label={`${t(i.foto_url ? 'condominios.inventario.foto_ver' : 'condominios.inventario.foto_agregar')}: ${i.nombre}`}
+                title={t(i.foto_url ? 'condominios.inventario.foto_ver' : 'condominios.inventario.foto_agregar')}
+                style={{ width: i.foto_url ? 120 : 96, height: i.foto_url ? 120 : 76, marginBottom: '12px', padding: 0, overflow: 'hidden', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: i.foto_url ? '1px solid var(--at-line)' : '2px dashed var(--at-line-strong)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                {i.foto_url
+                  ? <SecureImage src={i.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  : <><span aria-hidden="true" style={{ fontSize: 22 }}>📷</span><span style={{ fontSize: 10 }}>{t('condominios.inventario.foto_agregar')}</span></>}
+              </button>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: (i.descripcion || i.notas) ? '14px' : 0 }}>
               {datos.map(d => (
                 <div key={d.label} style={{ background: 'var(--at-surface-2)', borderRadius: '8px', padding: '8px 12px' }}>
@@ -537,6 +620,19 @@ export function InventarioTab({ inventario, prestamos = [], areas, proyectoId, c
           </EditModal>
         )
       })()}
+
+      {/* Las ventanas de foto van después del formulario y de la ficha: se abren
+          desde ellos y deben quedar encima (EditModal apila por orden de montaje). */}
+      {fotoAbierta === 'detalle' && detalle && (
+        <FotoSuministroModal titulo={t('condominios.inventario.foto_titulo')} folder={FOTO_FOLDER} sinFoto={t('condominios.inventario.foto_vacia')}
+          nombre={detalle.nombre} valor={detalle.foto_url ?? null} editable={canEdit}
+          onGuardar={foto => guardarFoto(detalle, foto)} onClose={() => setFotoAbierta(null)} />
+      )}
+      {fotoAbierta === 'form' && showForm && (
+        <FotoSuministroModal titulo={t('condominios.inventario.foto_titulo')} folder={FOTO_FOLDER} sinFoto={t('condominios.inventario.foto_vacia')}
+          nombre={form.nombre?.trim() || t('condominios.inventario.form_title_new')} valor={form.foto_url ?? null} editable
+          accion={t('condominios.inventario.foto_usar')} onGuardar={foto => { elegirFotoForm(foto); return true }} onClose={() => setFotoAbierta(null)} />
+      )}
 
       {showImportModal && (
         <ImportInventarioModal
