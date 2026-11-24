@@ -214,5 +214,7 @@ npx vitest run src/domain/rentas src/components/rentas src/hooks/__tests__/usePe
   `domain/shared/paises.ts` vía `Intl.DisplayNames`.
 - La lista de reservas muestra bandera y país junto al huésped. La carga masiva acepta la columna opcional `País`
   (nombre en español, alias como «EEUU», o código); vacía no pisa lo guardado, y un país que no se reconoce rechaza la fila.
-- La pestaña STR de Condominios todavía no muestra ni edita el país.
+- La pestaña STR de Condominios captura el mismo dato con el mismo buscador (junto al huésped) y lo muestra en la
+  tarjeta de la reserva: es la misma columna `reservas_str.huesped_pais`, así que lo puesto en un lado se ve en el otro.
+  La carga masiva de STR todavía no trae columna de país.
 
