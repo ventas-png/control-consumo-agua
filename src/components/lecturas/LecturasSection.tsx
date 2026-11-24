@@ -9,7 +9,7 @@ import { hoyLocalISO, formatFechaCalendario } from '../../lib/format'
 import { completeRelevantOcurrencia, markRutaCompletada } from '../../domain/rutas/mutations'
 import { calcularCostoTarifa, validarLectura } from '../../lib/business'
 import { fetchHistorialLecturas, type HistorialLectura } from '../../domain/agua/historialLecturas'
-import { estadisticasConsumo, serieConsumo } from '../../lib/historialConsumo'
+import { estadisticasConsumo, fechaBaseDelHistorial, serieConsumo } from '../../lib/historialConsumo'
 import {
   localStorageOutbox,
   leerPendientes,
@@ -274,7 +274,19 @@ export function LecturasSection({
     if (historial.length > 0) {
       return { lectura: historial[0].lectura_actual, fecha: historial[0].fecha, esPrimera: false }
     }
-    return { lectura: contador?.lectura_inicial ?? 0, fecha: contador?.fecha_instalacion ?? null, esPrimera: true }
+    // Sin lecturas del sistema la base es `lectura_inicial`. Si esa lectura la
+    // dejó el historial importado, su fecha es la de esa lectura del historial
+    // y no la de instalación (misma regla que el servidor, 20261215000000).
+    const delHistorial = fechaBaseDelHistorial(
+      historialContador.filter(h => h.contador_id === contadorId),
+      contador?.lectura_inicial,
+      contador?.fecha_instalacion,
+    )
+    return {
+      lectura: contador?.lectura_inicial ?? 0,
+      fecha: delHistorial ? `${delHistorial}T12:00:00` : contador?.fecha_instalacion ?? null,
+      esPrimera: true,
+    }
   }
 
   const ultimaLecturaInfo = contadorSeleccionado ? getUltimaLectura(contadorSeleccionado.id) : { lectura: 0, fecha: null, esPrimera: true }

@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   claveSerie,
+  fechaBaseDelHistorial,
   lotesPorContador,
   estadisticasConsumo,
   leerNumeroHistorial,
@@ -153,5 +154,36 @@ describe('lotesPorContador', () => {
 
   it('sin filas no hay lotes', () => {
     expect(lotesPorContador([], clave, 10)).toEqual([])
+  })
+})
+
+describe('fechaBaseDelHistorial', () => {
+  const h = [
+    { fecha: '2026-08-25', lectura: 3354 },
+    { fecha: '2026-10-25', lectura: 3407 },
+    { fecha: '2026-09-25', lectura: 3381 },
+  ]
+
+  it('si la lectura inicial es la última del historial, la fecha es la de esa lectura', () => {
+    expect(fechaBaseDelHistorial(h, 3407, '2024-01-14')).toBe('2026-10-25')
+  })
+
+  it('una fila más reciente sin lectura (sólo consumo) no cuenta', () => {
+    expect(fechaBaseDelHistorial([...h, { fecha: '2026-11-10', lectura: null }], 3407, '2024-01-14')).toBe('2026-10-25')
+  })
+
+  it('si la lectura inicial no es la del historial, no hay fecha del historial', () => {
+    expect(fechaBaseDelHistorial(h, 0, '2024-01-14')).toBeNull()
+    expect(fechaBaseDelHistorial(h, 3381, '2024-01-14')).toBeNull()
+  })
+
+  it('si esa lectura es anterior a la instalación, tampoco', () => {
+    expect(fechaBaseDelHistorial(h, 3407, '2026-11-01')).toBeNull()
+    expect(fechaBaseDelHistorial(h, 3407, '2026-10-25')).toBe('2026-10-25')
+    expect(fechaBaseDelHistorial(h, 3407, null)).toBe('2026-10-25')
+  })
+
+  it('sin historial no hay fecha', () => {
+    expect(fechaBaseDelHistorial([], 0, '2024-01-14')).toBeNull()
   })
 })
