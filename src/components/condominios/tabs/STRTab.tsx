@@ -15,6 +15,8 @@ import { SecureImage } from '../../shared/SecureImage'
 import { SecureFileLink } from '../../shared/SecureFileLink'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { HoraSelect } from '../../shared/HoraSelect'
+import { PaisSelect } from '../../shared/PaisSelect'
+import { etiquetaPais } from '../../../domain/shared/paises'
 import { ImportarReservasSTRModal } from './ImportarReservasSTRModal'
 
 interface HuespedSTRForm {
@@ -62,7 +64,7 @@ const POLITICA_LABEL: Record<PoliticaCancelacionSTR, string> = {
 }
 
 const blank = (): Partial<ReservaSTR> => ({
-  huesped_nombre: '', huesped_email: '', huesped_telefono: '',
+  huesped_nombre: '', huesped_email: '', huesped_telefono: '', huesped_pais: null,
   codigo_confirmacion: '', fecha_reservacion: '',
   fecha_entrada: '', fecha_salida: '',
   hora_llegada_estimada: '', hora_salida_estimada: '',
@@ -124,7 +126,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
   function startEdit(r: ReservaSTR) {
     setForm({
       huesped_nombre: r.huesped_nombre, huesped_email: r.huesped_email ?? '',
-      huesped_telefono: r.huesped_telefono ?? '', unidad_id: r.unidad_id ?? undefined,
+      huesped_telefono: r.huesped_telefono ?? '', huesped_pais: r.huesped_pais ?? null, unidad_id: r.unidad_id ?? undefined,
       codigo_confirmacion: r.codigo_confirmacion ?? '',
       fecha_reservacion: r.fecha_reservacion ?? '',
       fecha_entrada: r.fecha_entrada, fecha_salida: r.fecha_salida,
@@ -224,6 +226,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
       huesped_nombre: form.huesped_nombre!.trim(),
       huesped_email: form.huesped_email || null,
       huesped_telefono: form.huesped_telefono || null,
+      huesped_pais: form.huesped_pais || null,
       codigo_confirmacion: form.codigo_confirmacion?.trim() || null,
       fecha_reservacion: form.fecha_reservacion || null,
       unidad_id: form.unidad_id || null,
@@ -327,6 +330,10 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
             <div>
               <label style={labelStyle}>Huésped *</label>
               <input style={inputStyle} value={form.huesped_nombre ?? ''} onChange={e => setForm(f => ({ ...f, huesped_nombre: e.target.value }))} placeholder="Nombre completo" />
+            </div>
+            <div>
+              <label htmlFor="str-pais" style={labelStyle}>País de procedencia</label>
+              <PaisSelect id="str-pais" style={inputStyle} value={form.huesped_pais ?? ''} onChange={codigo => setForm(f => ({ ...f, huesped_pais: codigo || null }))} />
             </div>
             <div>
               <label style={labelStyle}>Email</label>
@@ -598,6 +605,7 @@ export function STRTab({ reservasSTR, unidades, proyectoId, companyId, moneda, c
                     <div>🕒 {r.hora_llegada_estimada ? `Llegada ${r.hora_llegada_estimada.slice(0, 5)}` : ''}{r.hora_llegada_estimada && r.hora_salida_estimada ? ' · ' : ''}{r.hora_salida_estimada ? `Salida ${r.hora_salida_estimada.slice(0, 5)}` : ''}</div>
                   )}
                   <div>👥 {r.num_adultos} adultos{r.num_ninos > 0 ? ` · ${r.num_ninos} niños` : ''}{r.num_bebes > 0 ? ` · ${r.num_bebes} bebés` : ''}{r.mascotas ? ' · 🐾 mascotas' : ''}</div>
+                  {r.huesped_pais && <div>{etiquetaPais(r.huesped_pais)}</div>}
                   {r.huesped_telefono && <div>📞 {r.huesped_telefono}</div>}
                   {r.codigo_confirmacion && <div>🔖 {r.codigo_confirmacion}</div>}
                   {r.politica_cancelacion && r.politica_cancelacion !== 'na' && <div>📋 {POLITICA_LABEL[r.politica_cancelacion]}</div>}
