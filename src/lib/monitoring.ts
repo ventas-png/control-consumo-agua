@@ -40,6 +40,7 @@ export function initMonitoring(): void {
         'stripe',
         'create-user',
         'delete-user',
+        'update-user',
         'delete-own-account',
         'create-payment-intent',
       ]

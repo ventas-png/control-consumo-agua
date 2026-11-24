@@ -6,11 +6,12 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: () => ({}), auth: {} } }))
 
 import {
-  esPrincipalEmpresa, necesitaAsistentePrimerProyecto, puedeCrearProyectos, puedeEditarAsignaciones, puedeEliminarUsuario, veAsistentePrimerProyecto, ROLES_ELIMINABLES,
+  esPrincipalEmpresa, necesitaAsistentePrimerProyecto, puedeCrearProyectos, puedeEditarAsignaciones, puedeEditarUsuario, puedeEliminarUsuario, veAsistentePrimerProyecto, ROLES_EDITABLES, ROLES_ELIMINABLES,
 } from '../usuarios'
 import { isPrincipalRole as principalCreate, canCreateRole, createRoleDenial } from '../../../../supabase/functions/create-user/validate'
 import { isPrincipalRole as principalInvite, canInviteRole } from '../../../../supabase/functions/invite-user/validate'
 import { DELETABLE_ROLES, canManageUsers, checkDeleteTargetGate, isSuperAdminRole } from '../../../../supabase/functions/delete-user/validate'
+import { EDITABLE_ROLES, checkEditTargetGate } from '../../../../supabase/functions/update-user/validate'
 
 const ROLES_CHECK_PRODUCCION = ['super_admin', 'superadmin', 'company_owner', 'admin', 'operator', 'user', 'viewer', 'visor', 'operador', 'cliente', 'collector']
 // lo que ESPERA el servidor (is_super_admin() OR is_company_owner())
@@ -174,5 +175,31 @@ describe('necesitaAsistentePrimerProyecto · toda la compuerta del asistente del
 
   it('una empresa que ya tiene proyectos jamás lo ve (1, 2, muchos)', () => {
     for (const totalProyectos of [1, 2, 8]) expect(necesitaAsistentePrimerProyecto({ ...base, totalProyectos })).toBe(false)
+  })
+})
+
+describe('paridad de «Editar» entre el cliente (puedeEditarUsuario) y el edge update-user (checkEditTargetGate)', () => {
+  it('los roles editables del cliente son los del servidor', () => {
+    expect(ROLES_EDITABLES).toEqual(EDITABLE_ROLES)
+  })
+
+  it('para todo rol de actor y de objetivo, con y sin empresa, de la misma o de otra: el botón se ofrece ⇔ el servidor lo aceptaría', () => {
+    const empresas = ['C', 'OTRA', null, ''] as const
+    for (const actorRol of [...ROLES_CHECK_PRODUCCION, '', 'Company_Owner']) {
+      for (const objetivoRol of [...ROLES_CHECK_PRODUCCION, '']) {
+        for (const actorEmpresa of empresas) {
+          for (const objetivoEmpresa of empresas) {
+            const servidor = checkEditTargetGate({ callerRole: actorRol, callerCompanyId: actorEmpresa, target: { role: objetivoRol, company_id: objetivoEmpresa } }).ok
+            const cliente = puedeEditarUsuario({ role: actorRol, company_id: actorEmpresa }, { role: objetivoRol, company_id: objetivoEmpresa })
+            expect(cliente, `${actorRol}@${actorEmpresa} → ${objetivoRol}@${objetivoEmpresa}`).toBe(servidor)
+          }
+        }
+      }
+    }
+  })
+
+  it('un administrador no edita a nadie; el propietario sí a un operador de su empresa', () => {
+    expect(puedeEditarUsuario({ role: 'admin', company_id: 'C' }, { role: 'operator', company_id: 'C' })).toBe(false)
+    expect(puedeEditarUsuario({ role: 'company_owner', company_id: 'C' }, { role: 'operator', company_id: 'C' })).toBe(true)
   })
 })

@@ -10,6 +10,11 @@ verify_jwt = false
 [functions.delete-user]
 verify_jwt = false
 
+# El propietario edita nombre, correo y contraseña de una persona de su empresa:
+# valida el JWT a mano con _shared/auth.requireUser, igual que delete-user.
+[functions.update-user]
+verify_jwt = false
+
 # La persona autenticada elimina SU PROPIA cuenta (App Store 5.1.1 v / Google
 # Play «Account deletion»): valida el JWT a mano con _shared/auth.requireUser.
 [functions.delete-own-account]

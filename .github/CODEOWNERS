@@ -24,6 +24,7 @@
 # ── Edge functions sensibles (pagos, usuarios, OAuth) ──────────────────────
 /supabase/functions/create-user/                  @ventas-png
 /supabase/functions/delete-user/                  @ventas-png
+/supabase/functions/update-user/                  @ventas-png
 /supabase/functions/create-cliente-account/       @ventas-png
 /supabase/functions/google-oauth-initiate/        @ventas-png
 /supabase/functions/google-oauth-callback/        @ventas-png
