@@ -7,6 +7,9 @@ import {
   filtrarClientesDisponibles,
   filtrarContadoresDisponibles,
   filtrarUnidadesDisponibles,
+  filtrarRutasPorProyecto,
+  opcionesFiltroProyecto,
+  RUTAS_SIN_PROYECTO,
   validarRuta,
   type RutaForm,
 } from '../rutasReglas'
@@ -155,5 +158,40 @@ describe('construirWhatsAppRuta', () => {
     expect(r?.tel).toBe('50244445678')
     expect(r?.msg).toContain('Total de contadores: 2')
     expect(r?.msg).toContain('📝 Sector 3')
+  })
+})
+
+describe('filtro de la lista de rutas por proyecto', () => {
+  const proyectos = [{ id: 'p1', nombre: '21B+' }, { id: 'p2', nombre: 'La Arboleda' }, { id: 'p3', nombre: 'Parajes Vermont' }]
+  const rutas = [
+    ruta({ id: 'a', project_id: 'p1' }),
+    ruta({ id: 'b', project_id: 'p1' }),
+    ruta({ id: 'c', project_id: 'p2' }),
+    ruta({ id: 'd', project_id: null }),
+    ruta({ id: 'e', project_id: 'p-de-otra-lista' }),
+  ]
+  const ids = (rs: Ruta[]) => rs.map(r => r.id)
+
+  it('sin filtro devuelve todas, en el mismo orden', () => {
+    expect(ids(filtrarRutasPorProyecto(rutas, '', proyectos))).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  it('con un proyecto devuelve sólo las suyas', () => {
+    expect(ids(filtrarRutasPorProyecto(rutas, 'p1', proyectos))).toEqual(['a', 'b'])
+    expect(ids(filtrarRutasPorProyecto(rutas, 'p3', proyectos))).toEqual([])
+  })
+
+  it('«Sin proyecto» junta las que no tienen proyecto y las de un proyecto que no está en la lista', () => {
+    expect(ids(filtrarRutasPorProyecto(rutas, RUTAS_SIN_PROYECTO, proyectos))).toEqual(['d', 'e'])
+  })
+
+  it('las opciones cuentan las rutas de cada proyecto y agregan «Sin proyecto» sólo si hay', () => {
+    expect(opcionesFiltroProyecto(rutas, proyectos)).toEqual([
+      { value: 'p1', label: '21B+', cantidad: 2 },
+      { value: 'p2', label: 'La Arboleda', cantidad: 1 },
+      { value: 'p3', label: 'Parajes Vermont', cantidad: 0 },
+      { value: RUTAS_SIN_PROYECTO, label: 'Sin proyecto', cantidad: 2 },
+    ])
+    expect(opcionesFiltroProyecto(rutas.slice(0, 3), proyectos).map(o => o.value)).toEqual(['p1', 'p2', 'p3'])
   })
 })

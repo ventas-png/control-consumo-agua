@@ -12,6 +12,9 @@ import {
   filtrarClientesDisponibles,
   filtrarContadoresDisponibles,
   filtrarUnidadesDisponibles,
+  filtrarRutasPorProyecto,
+  opcionesFiltroProyecto,
+  RUTAS_SIN_PROYECTO,
   validarRuta,
   type RutaForm,
   type TipoRuta,
@@ -19,6 +22,18 @@ import {
 import { EMPTY_FORM, type RutasCtx } from './ctx'
 import { RutaEditor } from './RutaEditor'
 import { RutaCard } from './RutaCard'
+import { inputStyle } from './ui'
+
+// El filtro de proyecto sobrevive a salir de la pantalla (p. ej. al ejecutar
+// una ruta y volver) mientras la pestaña siga abierta. Si el almacenamiento no
+// está disponible, simplemente arranca en «Todos los proyectos».
+function claveFiltroProyecto(companyId?: string) {
+  return `rutas:filtro-proyecto:${companyId ?? ''}`
+}
+
+function leerFiltroGuardado(companyId?: string): string {
+  try { return sessionStorage.getItem(claveFiltroProyecto(companyId)) ?? '' } catch { return '' }
+}
 
 interface Props {
   clientes: Cliente[]
@@ -67,6 +82,25 @@ export function RutasSection({
   const [usuarios, setUsuarios] = useState<AppUser[]>([])
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
   const dragOver = useRef<number | null>(null)
+  const [filtroProyecto, setFiltroProyecto] = useState(() => leerFiltroGuardado(companyId))
+
+  // Con un solo proyecto (y ninguna ruta suelta) el filtro no aporta nada. Un
+  // valor guardado que ya no corresponde a ninguna opción (proyecto quitado,
+  // ya no quedan rutas sin proyecto) se ignora en vez de dejar la lista vacía.
+  const opcionesProyecto = opcionesFiltroProyecto(rutas, proyectos)
+  const mostrarFiltroProyecto = opcionesProyecto.length > 1
+  const filtroVigente = mostrarFiltroProyecto && opcionesProyecto.some(o => o.value === filtroProyecto)
+    ? filtroProyecto
+    : ''
+  const rutasVisibles = filtrarRutasPorProyecto(rutas, filtroVigente, proyectos)
+
+  function cambiarFiltroProyecto(valor: string) {
+    setFiltroProyecto(valor)
+    try {
+      if (valor) sessionStorage.setItem(claveFiltroProyecto(companyId), valor)
+      else sessionStorage.removeItem(claveFiltroProyecto(companyId))
+    } catch { /* sin almacenamiento: el filtro sólo dura mientras la pantalla esté abierta */ }
+  }
 
   const canEdit = userRole !== 'viewer' && userRole !== 'operator'
   // Eliminar conserva la condición de rol y además exige el permiso granular (RBAC)
@@ -89,7 +123,11 @@ export function RutasSection({
   }, [form.project_id])
 
   function abrirCrear() {
-    setForm({ ...EMPTY_FORM, project_id: proyectos.length === 1 ? proyectos[0].id : '' })
+    // Con la lista filtrada por un proyecto, la ruta nueva nace en ese proyecto.
+    const proyectoInicial = filtroVigente && filtroVigente !== RUTAS_SIN_PROYECTO
+      ? filtroVigente
+      : proyectos.length === 1 ? proyectos[0].id : ''
+    setForm({ ...EMPTY_FORM, project_id: proyectoInicial })
     setTipoRuta('clientes')
     setClientesEnRuta([])
     setContadoresEnRuta([])
@@ -405,16 +443,31 @@ export function RutasSection({
   // ─── LISTA DE RUTAS ────────────────────────────────────────────────────────
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div style={{ fontSize: '22px', fontWeight: 700 }}>Rutas de Lectura</div>
-        {canEdit && (
-          <button
-            onClick={abrirCrear}
-            style={{ padding: '10px 20px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
-          >
-            + Nueva Ruta
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', maxWidth: '100%' }}>
+          {mostrarFiltroProyecto && (
+            <select
+              aria-label="Filtrar rutas por proyecto"
+              value={filtroVigente}
+              onChange={e => cambiarFiltroProyecto(e.target.value)}
+              style={{ ...inputStyle, width: '260px', maxWidth: '100%', background: 'var(--at-surface)', color: 'var(--at-ink)' }}
+            >
+              <option value="">Todos los proyectos ({rutas.length})</option>
+              {opcionesProyecto.map(o => (
+                <option key={o.value} value={o.value}>{o.label} ({o.cantidad})</option>
+              ))}
+            </select>
+          )}
+          {canEdit && (
+            <button
+              onClick={abrirCrear}
+              style={{ padding: '10px 20px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              + Nueva Ruta
+            </button>
+          )}
+        </div>
       </div>
 
       {rutas.length === 0 && (
@@ -427,8 +480,22 @@ export function RutasSection({
 
       {/* min(100%, …): en teléfonos de menos de ~345px útiles la tarjeta de
           320px se salía por la derecha. */}
+      {rutas.length > 0 && rutasVisibles.length === 0 && (
+        <div style={{ background: 'var(--at-surface)', borderRadius: '16px', padding: '32px', textAlign: 'center', border: '1px solid var(--at-line)', color: 'var(--at-ink-3)' }}>
+          <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>
+            {filtroVigente === RUTAS_SIN_PROYECTO ? 'No hay rutas sin proyecto' : 'Este proyecto no tiene rutas'}
+          </div>
+          <button
+            onClick={() => cambiarFiltroProyecto('')}
+            style={{ padding: '8px 16px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+          >
+            Ver todas las rutas
+          </button>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '16px' }}>
-        {rutas.map(ruta => <RutaCard key={ruta.id} ruta={ruta} ctx={ctx} />)}
+        {rutasVisibles.map(ruta => <RutaCard key={ruta.id} ruta={ruta} ctx={ctx} />)}
       </div>
     </div>
   )
