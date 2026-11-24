@@ -108,3 +108,32 @@ export function resumenPorTipo(
 export function tarifasParaTipo(tarifas: Tarifa[], tipo: TipoAgua): Tarifa[] {
   return tarifas.filter(t => t.tipo_agua === tipo && t.activa)
 }
+
+// ── Cambio masivo de tarifa ─────────────────────────────────────────────────
+
+/** Valor del filtro "tarifa actual" para los contadores que no tienen tarifa. */
+export const SIN_TARIFA = '__sin_tarifa__'
+
+export interface CriterioCambioTarifa {
+  /** '' = todos los proyectos. */
+  projectId: string
+  tipoAgua: TipoAgua
+  /** '' = cualquier tarifa, SIN_TARIFA = solo los que no tienen, o el id de una tarifa. */
+  tarifaActual: string
+  nuevaTarifaId: string
+}
+
+/**
+ * Contadores a los que se les cambiaría la tarifa con ese criterio. Los que ya
+ * tienen la tarifa nueva quedan fuera: no hay nada que cambiarles.
+ */
+export function contadoresParaCambioTarifa(contadores: Contador[], criterio: CriterioCambioTarifa): Contador[] {
+  const { projectId, tipoAgua, tarifaActual, nuevaTarifaId } = criterio
+  return contadores.filter(c => {
+    if (c.tipo_agua !== tipoAgua) return false
+    if (projectId && c.project_id !== projectId) return false
+    if (tarifaActual === SIN_TARIFA && c.tarifa_id) return false
+    if (tarifaActual && tarifaActual !== SIN_TARIFA && c.tarifa_id !== tarifaActual) return false
+    return (c.tarifa_id ?? '') !== nuevaTarifaId
+  })
+}

@@ -21,6 +21,7 @@ import { ContadorFormModal } from './ContadorFormModal'
 import { buildContadoresColumns } from './columnas'
 
 const ImportContadoresModal = lazy(() => import('./ImportContadoresModal').then(m => ({ default: m.ImportContadoresModal })))
+const CambioTarifaMasivoModal = lazy(() => import('./CambioTarifaMasivoModal').then(m => ({ default: m.CambioTarifaMasivoModal })))
 const ImportHistorialLecturasModal = lazy(() => import('./ImportHistorialLecturasModal').then(m => ({ default: m.ImportHistorialLecturasModal })))
 
 interface Props {
@@ -57,6 +58,7 @@ export function ContadoresSection({
   const [filterUnidad, setFilterUnidad] = useState<string>('')
   const [showImport, setShowImport] = useState(false)
   const [showImportHistorial, setShowImportHistorial] = useState(false)
+  const [showCambioTarifa, setShowCambioTarifa] = useState(false)
 
   const canEdit = !['viewer', 'visor', 'cliente'].includes(currentUser.role)
   // Eliminar conserva la condición de rol y además exige el permiso granular (RBAC)
@@ -310,6 +312,25 @@ export function ContadoresSection({
               >
                 Importar historial
               </button>
+              {contadores.length > 0 && tarifas.length > 0 && (
+                <button
+                  onClick={() => setShowCambioTarifa(true)}
+                  title="Asignar o cambiar la tarifa de muchos contadores a la vez"
+                  style={{
+                    padding: '10px 18px',
+                    background: 'var(--at-surface)',
+                    color: 'var(--at-primary)',
+                    border: '2px solid var(--at-primary)',
+                    borderRadius: '8px',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Cambiar tarifa
+                </button>
+              )}
               <button
                 onClick={startCreate}
                 style={{
@@ -397,6 +418,19 @@ export function ContadoresSection({
       </div>
     </div>
 
+    {showCambioTarifa && canEdit && (
+      <Suspense fallback={null}>
+      <CambioTarifaMasivoModal
+        contadores={contadores}
+        tarifas={tarifas}
+        proyectos={proyectos}
+        moneda={moneda}
+        tipoInicial={filterTipo}
+        onClose={() => setShowCambioTarifa(false)}
+        onAplicado={(ids, tarifaId) => ids.forEach(id => onContadorUpdated(id, { tarifa_id: tarifaId }))}
+      />
+      </Suspense>
+    )}
     {showImportHistorial && (
       <Suspense fallback={null}>
       <ImportHistorialLecturasModal

@@ -20,13 +20,19 @@ export interface EstadoDosClientes {
   /** Llamadas a auth.admin.createUser. */
   createUser: Array<Record<string, unknown>>
   deleteUser: string[]
+  /** Llamadas a auth.admin.updateUserById (id + atributos). */
+  updateUser: Array<{ id: string; attrs: Record<string, unknown> }>
+  /** Lo que devuelve auth.admin.getUserById (por omisión, un usuario con correo «actual@x.test»). */
+  usuarioAuth: unknown
+  /** Lo que devuelve auth.admin.updateUserById (por omisión { error: null }). */
+  resultadoUpdateUser: unknown
   writes: Escritura[]
   /** Lecturas del cliente CON JWT (tabla + columnas). */
   lecturasLlamador: Array<{ table: string; cols: string }>
 }
 
 export function estadoVacio(): EstadoDosClientes {
-  return { user: null, perfilLlamador: null, lecturas: {}, escrituras: {}, createUser: [], deleteUser: [], writes: [], lecturasLlamador: [] }
+  return { user: null, perfilLlamador: null, lecturas: {}, escrituras: {}, createUser: [], deleteUser: [], updateUser: [], usuarioAuth: null, resultadoUpdateUser: null, writes: [], lecturasLlamador: [] }
 }
 
 function builder(st: EstadoDosClientes, table: string, esLlamador: boolean) {
@@ -66,6 +72,8 @@ export function makeCreateClient(st: EstadoDosClientes) {
         admin: {
           createUser: async (a: Record<string, unknown>) => { st.createUser.push(a); return { data: { user: { id: 'nuevo-1' } }, error: null } },
           deleteUser: async (id: string) => { st.deleteUser.push(id); return { error: null } },
+          getUserById: async (id: string) => st.usuarioAuth ?? { data: { user: { id, email: 'actual@x.test' } }, error: null },
+          updateUserById: async (id: string, attrs: Record<string, unknown>) => { st.updateUser.push({ id, attrs }); return st.resultadoUpdateUser ?? { data: { user: { id } }, error: null } },
         },
       },
       from: (table: string) => builder(st, table, false),
