@@ -1,13 +1,13 @@
 // T7 / plat:P12 — Extraído de EmpresaSection.
 // Sección de usuarios de la empresa: barra de acciones (reportes, trazabilidad,
 // papelera, auditoría, alta), banner de ayuda RBAC, lista de usuarios con sus
-// chips de rol y acciones (asignar acceso, roles/permisos, activar, eliminar),
+// chips de rol y acciones (editar, asignar acceso, roles/permisos, activar, eliminar),
 // y todos los modales asociados. Posee su propio estado de modales y las
 // mutaciones de usuario; refresca la vista vía `onReload`.
 import { useState } from 'react'
 import { notify } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
-import { createCompanyUser, deleteCompanyUser, esPrincipalEmpresa, MOTIVO_SOLO_PRINCIPAL, puedeEditarAsignaciones, puedeEliminarUsuario, setUsuarioActivo } from '../../domain/empresa/usuarios'
+import { createCompanyUser, deleteCompanyUser, esPrincipalEmpresa, MOTIVO_SOLO_PRINCIPAL, MOTIVO_SOLO_PRINCIPAL_EDITAR, puedeEditarAsignaciones, puedeEditarUsuario, puedeEliminarUsuario, setUsuarioActivo, updateCompanyUser, type UpdateUserCambios } from '../../domain/empresa/usuarios'
 import { insertUserRoles, ensureCompanyRoleFromTemplate } from '../../domain/empresa/roles'
 import type { UserSession, Proyecto } from '../../types'
 import { AsignacionModal } from './AsignacionModal'
@@ -40,6 +40,8 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   const [showFinancialAudit, setShowFinancialAudit] = useState(false)
   const [showPapelera, setShowPapelera] = useState(false)
   const [showSavedReports, setShowSavedReports] = useState(false)
+  // Persona cuyos datos se están cargando o guardando en «Editar» (deshabilita su botón: evita abrir dos formularios con un doble clic).
+  const [editandoId, setEditandoId] = useState<string | null>(null)
 
   // El PRINCIPAL de la empresa (propietario o superadministrador): el único que asigna proyectos, permisos (roles y llaves) y administradores. Un administrador, acotado o
   // exento, no: el servidor lo rechaza (migraciones 20261026000600 y 20261026000700), así que aquí no se ofrece y se explica. La pantalla /empresa sólo la abre el
@@ -204,6 +206,71 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
     onReload()
   }
 
+  // Editar nombre, correo y contraseña. El correo y la contraseña viven en auth.users: los lee y los escribe el edge update-user (sólo el principal). Primero se
+  // piden los datos actuales (el correo no está en la lista) para precargar el formulario; sólo se envía lo que la persona cambió de verdad.
+  async function editarUsuario(usuario: Usuario) {
+    if (!permisoEditar(usuario)) return
+    setEditandoId(usuario.id)
+    try {
+      const actual = await updateCompanyUser(usuario.id)
+      if (actual.error || !actual.data) {
+        notify({ variant: 'error', title: 'No se pudieron cargar los datos', text: actual.error ?? 'Intenta de nuevo.' })
+        return
+      }
+      const nombreActual = actual.data.full_name || usuario.full_name
+      const emailActual = actual.data.email ?? ''
+
+      const result = await openPromptDialog({
+        title: 'Editar usuario',
+        description: 'Cambia el nombre, el correo con el que inicia sesión o su contraseña. Los roles y los proyectos se cambian desde «Roles y permisos» y «Acceso».',
+        fields: [
+          { name: 'nombre', label: 'Nombre completo', required: true, autoFocus: true, initialValue: nombreActual },
+          { name: 'email', label: 'Correo electrónico', type: 'email', required: true, autoComplete: 'off', initialValue: emailActual, helpText: 'Es el correo con el que la persona inicia sesión.' },
+          { name: 'password', label: 'Nueva contraseña', type: 'password', autoComplete: 'new-password', helpText: 'Déjala en blanco para no cambiarla. Mínimo 8 caracteres.' },
+        ],
+        submitText: 'Guardar cambios',
+        validate: (data) => {
+          if (!data.nombre?.trim()) return 'El nombre es obligatorio'
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((data.email ?? '').trim())) return 'Escribe un correo electrónico válido'
+          if (data.password && data.password.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
+          return null
+        },
+      })
+      if (!result) return
+
+      const cambios: UpdateUserCambios = {}
+      const nombre = result.nombre.trim()
+      const email = result.email.trim().toLowerCase()
+      if (nombre !== nombreActual) cambios.full_name = nombre
+      if (email !== emailActual.trim().toLowerCase()) cambios.email = email
+      if (result.password) cambios.password = result.password
+      if (Object.keys(cambios).length === 0) {
+        notify({ variant: 'info', title: 'Sin cambios', duration: 1500 })
+        return
+      }
+
+      const { error } = await updateCompanyUser(usuario.id, cambios)
+      if (error) {
+        notify({ variant: 'error', title: 'No se pudo guardar', text: error })
+        // Un fallo a medias (p. ej. el acceso sí cambió y el nombre no) deja la lista desfasada: se vuelve a leer.
+        onReload()
+        return
+      }
+      notify({
+        variant: 'success',
+        title: 'Usuario actualizado',
+        text: cambios.password ? 'Comparte la nueva contraseña con la persona por un medio seguro.' : undefined,
+        duration: cambios.password ? 4000 : 1500,
+      })
+      onReload()
+    } catch (err) {
+      console.error('update-user request failed:', err)
+      notify({ variant: 'error', title: 'Error de conexión', text: 'No se pudo contactar el servicio de edición de usuarios. Intente nuevamente; si el problema persiste, contacte al soporte técnico.' })
+    } finally {
+      setEditandoId(null)
+    }
+  }
+
   async function eliminarUsuario(usuario: Usuario) {
     const result = await openPromptDialog({
       title: 'Eliminar usuario definitivamente',
@@ -253,6 +320,9 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
   // useEmpresaSectionDataQuery filtrada por currentUser.company_id (EmpresaSection), así que no hace falta traer app_users.company_id fila por fila.
   const permisoEliminar = (u: Usuario) =>
     puedeEliminarUsuario({ role: currentUser.role, company_id: currentUser.company_id }, { role: u.role, company_id: currentUser.company_id })
+  // «Editar» (nombre, correo y contraseña): sólo el principal, y nunca sobre otro propietario (espejo de checkEditTargetGate del edge update-user).
+  const permisoEditar = (u: Usuario) =>
+    puedeEditarUsuario({ role: currentUser.role, company_id: currentUser.company_id }, { role: u.role, company_id: currentUser.company_id })
   // ¿Puede quien mira cambiar los proyectos de esa fila? Sólo el principal (ver puedeEditarAsignaciones); el motivo distingue la autoedición del resto.
   const permisoAcceso = (u: Usuario) => puedeEditarAsignaciones({ id: currentUser.user_id, role: currentUser.role }, u)
 
@@ -422,6 +492,25 @@ export function EmpresaUsuariosSection({ currentUser, usuarios, proyectos, onRel
                 </div>
 
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {/* Editar nombre, correo y contraseña: del principal (edge update-user). A quien no lo es se le muestra deshabilitado con el motivo. */}
+                  <button
+                    onClick={() => void editarUsuario(u)}
+                    disabled={!permisoEditar(u) || editandoId !== null}
+                    title={permisoEditar(u) ? 'Editar nombre, correo y contraseña' : (esPrincipal ? 'Esta cuenta no se edita desde aquí.' : MOTIVO_SOLO_PRINCIPAL_EDITAR)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '5px',
+                      padding: '6px 10px', borderRadius: '7px', border: '1px solid var(--at-primary-soft)',
+                      background: 'var(--at-primary-tint)', color: 'var(--at-accent-2)',
+                      cursor: permisoEditar(u) && editandoId === null ? 'pointer' : 'not-allowed',
+                      opacity: permisoEditar(u) ? (editandoId === u.id ? 0.7 : 1) : 0.55,
+                      fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    {editandoId === u.id ? 'Cargando…' : 'Editar'}
+                  </button>
                   {/* Solo el principal (propietario o superadministrador) asigna proyectos: un administrador no cambia los de nadie, ni los suyos
                       (ampliaría su alcance o, borrándolos, quedaría exento). El servidor lo rechaza (migración 20261026000600): aquí no se ofrece y se explica. */}
                   <button

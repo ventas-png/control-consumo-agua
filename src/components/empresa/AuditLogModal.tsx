@@ -31,6 +31,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   grant_permission:  { label: 'Agregó permiso',   color: 'var(--at-success)' },
   revoke_permission: { label: 'Quitó permiso',    color: 'var(--at-danger)' },
   user_deleted:      { label: 'Eliminó usuario',  color: 'var(--at-danger)' },
+  user_updated:      { label: 'Editó usuario',    color: 'var(--at-warning)' },
 }
 
 export function AuditLogModal({ onClose }: Props) {
@@ -182,6 +183,13 @@ function DetailsCell({ details }: { details: Record<string, unknown> | null }) {
   const summary = useMemo(() => {
     if (!details || Object.keys(details).length === 0) return null
     const parts: string[] = []
+    // user_updated (edge update-user): qué datos de la persona cambió el propietario. La contraseña nunca viaja en la bitácora, sólo que se cambió.
+    if (Array.isArray(details.changed)) {
+      const nombres: Record<string, string> = { full_name: 'nombre', email: 'correo', password: 'contraseña' }
+      parts.push(`cambió: ${details.changed.map(c => nombres[String(c)] ?? String(c)).join(', ')}`)
+      if (typeof details.email_after === 'string') parts.push(`→ ${details.email_after}`)
+      return parts.join(' ')
+    }
     if (details.permission_key) parts.push(String(details.permission_key))
     if (details.effect)         parts.push(`(${details.effect})`)
     if (details.name)           parts.push(`"${details.name}"`)

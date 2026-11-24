@@ -49,6 +49,8 @@ const AUTENTICA_ANTES = [
   'google-oauth-callback',
   'invite-user',
   'create-user',
+  // requireUser (JWT) + gate del principal antes del límite por user.id.
+  'update-user',
   'create-broadcast',
   'create-payment-intent',
   'timbrar-documento',

@@ -26,6 +26,7 @@ import {
   insertUserProjectAssignments,
   createCompanyUser,
   deleteCompanyUser,
+  updateCompanyUser,
 } from '../usuarios'
 
 const fetchMock = vi.fn()
@@ -100,5 +101,30 @@ describe('deleteCompanyUser (edge delete-user)', () => {
   it('!ok → error del edge', async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'no permitido' }) })
     expect(await deleteCompanyUser('u1')).toEqual({ error: 'no permitido' })
+  })
+})
+
+describe('updateCompanyUser (edge update-user)', () => {
+  it('sin cambios → consulta: envía sólo user_id con el token y devuelve los datos actuales', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, changed: [], full_name: 'Ana', email: 'ana@x.test' }) })
+    expect(await updateCompanyUser('u1')).toEqual({ data: { full_name: 'Ana', email: 'ana@x.test', changed: [] }, error: null })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toContain('/functions/v1/update-user')
+    expect(JSON.parse(init.body)).toEqual({ user_id: 'u1' })
+    expect(init.headers.Authorization).toBe('Bearer tok')
+  })
+
+  it('con cambios → los envía junto al user_id', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, changed: ['email'], full_name: 'Ana', email: 'b@x.test' }) })
+    const r = await updateCompanyUser('u1', { email: 'b@x.test' })
+    expect(r.data?.changed).toEqual(['email'])
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ user_id: 'u1', email: 'b@x.test' })
+  })
+
+  it('!ok → error del edge; sin cuerpo legible → mensaje por omisión', async () => {
+    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'no permitido' }) })
+    expect(await updateCompanyUser('u1', { full_name: 'X' })).toEqual({ data: null, error: 'no permitido' })
+    fetchMock.mockResolvedValueOnce({ ok: false, json: async () => { throw new Error('html') } })
+    expect(await updateCompanyUser('u1', { full_name: 'X' })).toEqual({ data: null, error: 'No se pudo editar el usuario.' })
   })
 })

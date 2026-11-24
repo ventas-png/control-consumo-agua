@@ -143,6 +143,24 @@ export function puedeEliminarUsuario(actor: PersonaEliminacion, objetivo: Person
   return true
 }
 
+/** Roles que el edge update-user deja editar al propietario (espejo de EDITABLE_ROLES de supabase/functions/update-user/validate.ts). */
+export const ROLES_EDITABLES = ['admin', 'operator', 'operador', 'viewer', 'visor', 'collector']
+
+/** Lo que se dice a quien no es el principal sobre el botón «Editar». */
+export const MOTIVO_SOLO_PRINCIPAL_EDITAR = 'Solo el propietario de la empresa edita el nombre, el correo y la contraseña de una persona.'
+
+/**
+ * ¿Se ofrece «Editar» (nombre, correo y contraseña) sobre esa persona? Espeja checkEditTargetGate de update-user: el superadministrador, a cualquiera; el propietario,
+ * SÓLO dentro de su propia empresa y a los roles editables (nunca a otro propietario ni a un superadministrador). Un administrador NO edita a nadie: cambiar el correo o la
+ * contraseña de alguien equivale a poder entrar como esa persona, y esa autoridad es del principal. El servidor es el que manda; esto sólo evita ofrecer lo que será rechazado.
+ */
+export function puedeEditarUsuario(actor: PersonaEliminacion, objetivo: PersonaEliminacion): boolean {
+  if (actor.role === 'super_admin' || actor.role === 'superadmin') return true
+  if (actor.role !== 'company_owner') return false
+  if (!actor.company_id || objetivo.company_id !== actor.company_id) return false
+  return !!objetivo.role && ROLES_EDITABLES.includes(objetivo.role)
+}
+
 /** Lo que el servidor devuelve (ASIGNACION_PROPIA_NO_PERMITIDA) cuando alguien intenta cambiar sus propias asignaciones. */
 export const MOTIVO_AUTOASIGNACION =
   'No puedes cambiar tus propios proyectos. Pídele el cambio al propietario de la empresa o al superadministrador.'
@@ -403,4 +421,40 @@ export async function deleteCompanyUser(
     return { error: err.error ?? 'No se pudo eliminar el usuario.' }
   }
   return { error: null }
+}
+
+/** Lo que se le pide cambiar a `update-user`. Un campo ausente NO se toca. */
+export interface UpdateUserCambios {
+  full_name?: string
+  email?: string
+  password?: string
+}
+
+/** Lo que `update-user` contesta: los datos como quedaron y qué campos cambió de verdad. */
+export interface UpdateUserResultado {
+  full_name: string
+  email: string | null
+  changed: string[]
+}
+
+/**
+ * Edita el nombre, el correo o la contraseña de una persona de la empresa vía el edge `update-user` (el correo y la contraseña viven en auth.users: sólo se escriben con
+ * service_role; el edge valida con el token de la sesión que quien llama sea el propietario). Sin `cambios` no escribe nada y devuelve los datos actuales: así se precarga
+ * el formulario (el correo no está en app_users). NO lanza por un rechazo del servidor: la UI inspecciona `error`.
+ */
+export async function updateCompanyUser(
+  userId: string,
+  cambios: UpdateUserCambios = {},
+): Promise<{ data: UpdateUserResultado | null; error: string | null }> {
+  const { data: session } = await supabase.auth.getSession()
+  const token = session.session?.access_token
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+  const res = await fetch(`${supabaseUrl}/functions/v1/update-user`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token ?? ''}` },
+    body: JSON.stringify({ user_id: userId, ...cambios }),
+  })
+  const body = (await res.json().catch(() => ({}))) as { error?: string; full_name?: string; email?: string | null; changed?: string[] }
+  if (!res.ok) return { data: null, error: body.error ?? 'No se pudo editar el usuario.' }
+  return { data: { full_name: body.full_name ?? '', email: body.email ?? null, changed: body.changed ?? [] }, error: null }
 }
