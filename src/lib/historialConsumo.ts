@@ -194,3 +194,31 @@ export function estadisticasConsumo(
     nHistorial: serie.filter(p => p.origen === 'historial').length,
   }
 }
+
+/**
+ * Fecha (AAAA-MM-DD) de la base de la PRIMERA lectura del sistema cuando esa
+ * base viene del historial importado, o `null` si no viene de ahí.
+ *
+ * La importación deja como `lectura_inicial` del contador la última lectura del
+ * historial. Entonces la «lectura anterior» de la primera lectura nueva es esa,
+ * y su fecha también: no la de instalación del contador. Espeja la regla de
+ * `agua_lectura_contexto` (20261215000000), que es la que decide lo que se
+ * guarda: la última fila CON lectura, sólo si su valor es la lectura inicial y
+ * no es anterior a la instalación.
+ */
+export function fechaBaseDelHistorial(
+  historial: Array<{ fecha: string; lectura: number | null }>,
+  lecturaInicial: number | null | undefined,
+  fechaInstalacion: string | null | undefined,
+): string | null {
+  let ultima: { fecha: string; lectura: number } | null = null
+  for (const h of historial) {
+    if (h.lectura === null) continue
+    if (!ultima || h.fecha > ultima.fecha) ultima = { fecha: h.fecha, lectura: h.lectura }
+  }
+  if (!ultima) return null
+  if (ultima.lectura !== Number(lecturaInicial ?? 0)) return null
+  const instalacion = fechaInstalacion ? fechaInstalacion.slice(0, 10) : null
+  if (instalacion && ultima.fecha.slice(0, 10) < instalacion) return null
+  return ultima.fecha.slice(0, 10)
+}

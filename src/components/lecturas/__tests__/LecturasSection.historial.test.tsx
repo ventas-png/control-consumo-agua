@@ -27,7 +27,7 @@ const tarifa = { id: 't-1', nombre: 'Residencial', precio_m3: 5, canon_fijo: 0, 
 // La lectura inicial ya es la última del historial (490): así la dejó la importación.
 const contador = {
   id: 'c-1', numero_serie: '21B-001', unidad_id: 'un-1', tarifa_id: 't-1', project_id: 'p1',
-  lectura_inicial: 490, activo: true, tipo_agua: 'potable',
+  lectura_inicial: 490, activo: true, tipo_agua: 'potable', fecha_instalacion: '2024-01-14',
 } as unknown as Contador
 
 const historial = [
@@ -83,5 +83,21 @@ describe('Nueva Lectura — tendencia con el historial importado', () => {
     elegirContador()
     await waitFor(() => expect(h.fetchHistorialLecturas).toHaveBeenCalled())
     expect(screen.queryByTestId('tendencia-consumo')).toBeNull()
+  })
+
+  it('la fecha de la lectura anterior es la de la última lectura del historial, no la de instalación', async () => {
+    elegirContador()
+    await screen.findByTestId('tendencia-consumo')
+    const fecha = screen.getByLabelText('Fecha Lectura Anterior') as HTMLInputElement
+    await waitFor(() => expect(fecha.value).toBe('2026-10-31'))
+    // Del 31 de octubre al 17 de noviembre: 17 días, no los ~1 000 desde la instalación.
+    expect((screen.getByDisplayValue('17 días') as HTMLInputElement).id).toBe('lectura-dias-servicio')
+  })
+
+  it('sin historial, la primera lectura sigue partiendo de la fecha de instalación', async () => {
+    h.fetchHistorialLecturas.mockResolvedValue([])
+    elegirContador()
+    await waitFor(() => expect(h.fetchHistorialLecturas).toHaveBeenCalled())
+    expect((screen.getByLabelText('Fecha Lectura Anterior') as HTMLInputElement).value).toBe('2024-01-14')
   })
 })
