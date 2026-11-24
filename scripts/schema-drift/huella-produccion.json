@@ -1,18 +1,18 @@
 {
-  "_README": "Instantánea del CATÁLOGO de producción (proyecto nnsqmeigtgewatameexo, esquema public), capturada el 2026-11-24 mediante fingerprint.sql (guard centinela y CTE sin modificaciones) por el conector Supabase, solo SELECT. Refleja producción tras desplegar PR1153 (20261213000000_padron_rls_una_vez_por_consulta: la RLS de lectura de contadores y unidades se calcula una vez por consulta) y 20261214000000_audit_log_allow_user_updated.",
+  "_README": "Instantánea del CATÁLOGO de producción (proyecto nnsqmeigtgewatameexo, esquema public), capturada el 2026-11-24 mediante fingerprint.sql (guard centinela y CTE sin modificaciones) por el conector Supabase, solo SELECT. Refleja producción tras desplegar PR1155 (20261214000000_audit_log_allow_user_updated: el CHECK de permission_audit_log.action admite 'user_updated') y PR1153 (20261213000000_padron_rls_una_vez_por_consulta: la policy de lectura de contadores y unidades se calcula una vez por consulta, con la función nueva mis_proyectos_asignados()).",
   "_CANONICO": "La serialización que se hashea está definida en fingerprint.sql y es la MISMA consulta que corre contra la reconstrucción: orden por bytes (COLLATE \"C\"), separadores de control \\x1e/\\x1f que no pueden aparecer en DDL, y NULL explícito \\x1d distinto de la cadena vacía. NO se normalizan espacios en ninguna dimensión: el DDL se hashea en crudo, porque un colapso global borraría diferencias reales dentro de literales, cuerpos dollar-quoted y definiciones de vista. Ver la regla 6 de fingerprint.sql.",
   "_ADVERTENCIA": "Esta instantánea envejece. Para refrescarla, ejecutar manualmente `fingerprint.sql` en el SQL Editor del proyecto de producción, exportar el único resultado y reemplazar `grupos` sólo después de validar su formato y compararlo con la reconstrucción del repositorio.",
-  "_DELTA": "Respecto de la captura anterior (2026-11-23T23:21:30Z (medido)): 3 grupos cambiados, 2 nuevos, 0 desaparecidos; 3979 -> 3981. Nuevos: funcion:mis_proyectos_asignados() y funcion:mis_proyectos_asignados()/grants. Cambiados: tabla:contadores/policies y tabla:unidades/policies (contadores_select y unidades_select; siguen siendo 4 en cada tabla) y tabla:permission_audit_log/constraints (de 20261214000000). Quedan con la huella exacta que ya producía la reconstrucción del repositorio.",
-  "_PROCEDENCIA": "fingerprint.sql completo (guard centinela y CTE intactos; sólo la proyección final cambia para agregar, y se quitaron las líneas de comentario) ejecutado contra producción por el conector Supabase, solo SELECT y en transacción READ ONLY, en UNA consulta; el guard no abortó. La consulta devolvió: total (3981), sha256 del texto completo y las líneas de las cinco claves que difieren. El archivo se recompuso sobre los 3979 de la captura anterior agregando las dos claves nuevas y cambiando las otras tres, con los valores medidos en sus líneas. El sha256 del texto completo recompuesto coincide con el medido en producción: 8daede0a434f06706be458f9f34fb0896f9f1b935193b70a24c601c305d5fce4; al coincidir el total, ninguna otra clave difiere. El historial de producción registra 20261213000000 y 20261214000000 con sus propias versiones.",
+  "_DELTA": "Respecto de la captura anterior (2026-11-23T23:21:30Z (medido)): 3 grupos cambiados, 2 nuevos, 0 desaparecidos; 3979 -> 3981. Cambiados: tabla:permission_audit_log/constraints (permission_audit_log_action_check; siguen siendo 5), tabla:contadores/policies y tabla:unidades/policies (contadores_select y unidades_select; siguen siendo 4 cada una). Nuevos: funcion:mis_proyectos_asignados() y su /grants. Todos quedan con la huella exacta que ya producía la reconstrucción del repositorio. Ninguna clave de drift ya declarado cae en las cubetas revisadas.",
+  "_PROCEDENCIA": "fingerprint.sql completo (guard centinela y CTE intactos; sólo la proyección final cambia para agregar, y se quitaron las líneas de comentario) ejecutado contra producción por el conector Supabase, solo SELECT y con SET TRANSACTION READ ONLY; el guard no abortó. Se midió en dos pasos el mismo día: tras PR1155 (20:10 UTC; difería sólo la cubeta 9e) y, aplicada ya también PR1153, de nuevo a las 20:30 UTC sobre esa base, en UNA consulta que recibió las 256 cubetas (left(md5(clave completa), 2); sha256 de sus líneas, 16 hex) y devolvió: total (3981), sha256 del texto completo y las cubetas que difieren (20, 2c, 87, dd; 65 líneas). El archivo se recompuso reemplazando esas cubetas por las líneas medidas; coinciden una a una con la reconstrucción del repositorio. El sha256 del texto completo recompuesto coincide con el medido en producción: 8daede0a434f06706be458f9f34fb0896f9f1b935193b70a24c601c305d5fce4. El historial de producción registra 20261213000000 (padron_rls_una_vez_por_consulta) y 20261214000000 (audit_log_allow_user_updated) con su propia versión.",
   "capturada": "2026-11-24",
-  "capturada_utc": "2026-11-24T20:55:24Z (medido)",
+  "capturada_utc": "2026-11-24T20:30:56Z (medido)",
   "main_sha": "d33c3cde2d9073a67c527a409caa18222464474c",
   "proyecto": "nnsqmeigtgewatameexo",
   "postgres": "17.6",
   "postgres_medido": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 13.2.0, 64-bit",
   "migraciones_registradas": 955,
   "migracion_maxima": "20261214000000",
-  "_METADATOS_NO_MEDIDOS": "La versión de PostgreSQL (17.6), el total de migraciones (955) y la versión máxima (20261214000000) se midieron en la misma consulta SELECT que midió la huella; la fecha UTC (2026-11-24 20:55 UTC) es el now() de esa consulta.",
+  "_METADATOS_NO_MEDIDOS": "La versión de PostgreSQL (17.6), el total de migraciones (955) y la versión máxima (20261214000000) se midieron en la misma consulta SELECT que midió la huella; la fecha UTC (2026-11-24 20:30 UTC) es el now() de esa consulta.",
   "algoritmo": "sha256",
   "grupos": {
     "funcion:actividad_equipo(p_project_id uuid, p_desde date, p_hasta date)": "e1f035b14d4d717bd790f4840e713e51f784be01c73afbf9933f6334489a13ff:1",
@@ -1059,6 +1059,8 @@
     "funcion:minutas_equipo_proyecto(p_project_id uuid)/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
     "funcion:mis_broadcast_ids()": "a9f4eda82ef0db2aaf4598748b47ccc9c6918c98739cbf6cf71908df3426c788:1",
     "funcion:mis_broadcast_ids()/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
+    "funcion:mis_proyectos_asignados()": "d0cc254b5e0c586f49fe756e18d587b1432ef9a5b9aa57903d431f831e434f85:1",
+    "funcion:mis_proyectos_asignados()/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
     "funcion:mis_proyectos_ids()": "4bf6543d7c99cb6643b77f4b230e8d694cc484e97c691c068e30fe6dbfc2c3ea:1",
     "funcion:mis_proyectos_ids()/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1",
     "funcion:mis_unidad_roles()": "c046d7a9fa6f34fcb562f5bcbe3b3791fe06d406154b9b418b0b36f73810a16b:1",
@@ -3993,8 +3995,6 @@
     "tabla:rentas_huespedes/indices": "4ec9343f76b18b26615bdc1765d7a2da13e84a4240ea0d0f20258c1a48e51a45:3",
     "tabla:rentas_huespedes/policies": "d4fa8cbbd3e6c0dfb4d24098c9ef7b6384bef6358794c5686bf5fce9ee7018f3:4",
     "tabla:rentas_huespedes/rls": "69d139577e61955e905c297c740b9d5e2b0f06c7874bb5c77aed7bf34959c136:1",
-    "tabla:rentas_huespedes/triggers": "f8d86990b2d0014da1e678925ca2c4c6c33499b5fa8f12e367fb7f8ba7270188:3",
-    "funcion:mis_proyectos_asignados()": "d0cc254b5e0c586f49fe756e18d587b1432ef9a5b9aa57903d431f831e434f85:1",
-    "funcion:mis_proyectos_asignados()/grants": "f87f132c48f7276eb776d666a507cbc5e81f2d7a33eeed63e433af6cd702e759:1"
+    "tabla:rentas_huespedes/triggers": "f8d86990b2d0014da1e678925ca2c4c6c33499b5fa8f12e367fb7f8ba7270188:3"
   }
 }

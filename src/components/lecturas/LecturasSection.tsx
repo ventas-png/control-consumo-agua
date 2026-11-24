@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, Suspense, type CSSProperties, type ChangeEvent} from 'react'
+import { useState, useEffect, useMemo, useRef, Suspense, type CSSProperties, type ChangeEvent} from 'react'
 import { lazySafe as lazy } from '../../lib/lazyWithPreload'
 import { notify, confirm } from '../shared/Dialog'
 import { openPromptDialog } from '../shared/PromptDialog'
@@ -17,6 +17,13 @@ import {
   sincronizarPendientes,
   nuevaClaveIdempotencia,
 } from '../../lib/lecturasOutbox'
+import {
+  localStorageRutaEnCurso,
+  leerRutaEnCurso,
+  guardarProgresoRuta,
+  limpiarRutaEnCurso,
+  indiceDeReanudacion,
+} from '../../lib/rutaEnCurso'
 import { APP_CONFIG } from '../../lib/config'
 import { watchLocation } from '../../lib/nativeGeo'
 import { isNative } from '../../lib/platform'
@@ -86,53 +93,101 @@ export function LecturasSection({
   const [sincronizando, setSincronizando] = useState(false)
   const [showCargaMasiva, setShowCargaMasiva] = useState(false)
 
-  // En modo ruta, derivar unidades según el tipo de ruta
-  const unidadesOrdenadas: Unidad[] = rutaActiva
+  // En modo ruta, las PARADAS según el tipo de ruta. En una ruta por
+  // contadores cada parada lleva SU contador: se arma en el mismo paso que la
+  // unidad para que índice de parada y contador no se desalineen cuando algún
+  // contador de la ruta ya no existe o quedó sin unidad.
+  const paradasRuta: { unidad: Unidad; contadorId: string | null }[] | null = rutaActiva
     ? rutaActiva.tipo_ruta === 'contadores'
       ? (rutaActiva.contador_ids ?? [])
           .map(cid => contadores.find(c => c.id === cid))
           .filter((c): c is Contador => !!c && !!c.unidad_id)
-          .map(c => unidades.find(u => u.id === c.unidad_id!))
-          .filter((u): u is Unidad => !!u)
-      : rutaActiva.tipo_ruta === 'unidades'
-      ? (rutaActiva.unidad_ids ?? [])
-          .map(uid => unidades.find(u => u.id === uid))
-          .filter((u): u is Unidad => !!u)
-      : (rutaActiva.cliente_ids ?? [])
-          .flatMap(cid => unidades.filter(u => u.cliente_id === cid))
+          .map(c => ({ unidad: unidades.find(u => u.id === c.unidad_id!), contadorId: c.id }))
+          .filter((p): p is { unidad: Unidad; contadorId: string } => !!p.unidad)
+      : (rutaActiva.tipo_ruta === 'unidades'
+          ? (rutaActiva.unidad_ids ?? [])
+              .map(uid => unidades.find(u => u.id === uid))
+              .filter((u): u is Unidad => !!u)
+          : (rutaActiva.cliente_ids ?? [])
+              .flatMap(cid => unidades.filter(u => u.cliente_id === cid))
+        ).map(unidad => ({ unidad, contadorId: null }))
+    : null
+  const unidadesOrdenadas: Unidad[] = paradasRuta
+    ? paradasRuta.map(p => p.unidad)
     : unidades.filter(u => u.activo)
+  /** Contador que toca en la parada `i` (sólo rutas por contadores). */
+  const contadorDeParada = (i: number): string => paradasRuta?.[i]?.contadorId ?? ''
 
   const enModoRuta = !!rutaActiva || rutaModoManual
 
+  // Posición de la ruta persistida en el dispositivo (lib/rutaEnCurso): una
+  // recarga a media ruta la retoma en vez de volver a la parada 1.
+  const progresoStore = useMemo(() => localStorageRutaEnCurso(), [])
+  const guardarProgreso = (index: number, leidos: Set<string>) => {
+    if (rutaActiva) guardarProgresoRuta(progresoStore, rutaActiva.id, { index, leidos }, Date.now())
+  }
+
+  // Arranque de la ruta. Espera a que haya paradas (tras una recarga la ruta se
+  // reactiva antes de que carguen unidades y contadores) y corre UNA vez por
+  // ruta: un refetch que vacíe la lista un instante no debe borrar lo tecleado.
+  const rutaArrancadaRef = useRef<string | null>(null)
+  const hayParadas = unidadesOrdenadas.length > 0
   useEffect(() => {
-    if (rutaActiva && unidadesOrdenadas.length > 0) {
-      setRutaIndex(0)
-      setContadoresLeidos(new Set())
-      setSelectedUnidadId(unidadesOrdenadas[0].id)
-      // En modo contadores, pre-seleccionar el contador específico de la ruta
-      if (rutaActiva.tipo_ruta === 'contadores' && rutaActiva.contador_ids?.length) {
-        setSelectedContadorId(rutaActiva.contador_ids[0])
-      } else {
-        setSelectedContadorId('')
-      }
-      setLecturaActual('')
+    if (!rutaActiva) { rutaArrancadaRef.current = null; return }
+    if (!paradasRuta || !hayParadas || rutaArrancadaRef.current === rutaActiva.id) return
+    rutaArrancadaRef.current = rutaActiva.id
+
+    const guardada = leerRutaEnCurso(progresoStore, Date.now())
+    const previa = guardada && guardada.rutaId === rutaActiva.id ? guardada : null
+    const leidos = new Set(previa?.leidos ?? [])
+    const idx = previa
+      ? indiceDeReanudacion(
+          paradasRuta.map(p => ({
+            contadorIds: p.contadorId
+              ? [p.contadorId]
+              : contadores.filter(c => c.unidad_id === p.unidad.id && c.activo).map(c => c.id),
+          })),
+          previa.index,
+          leidos,
+        )
+      : 0
+
+    setContadoresLeidos(leidos)
+    setLecturaActual('')
+    if (idx >= paradasRuta.length) {
+      // La recarga cayó después de guardar la última lectura y antes de cerrar
+      // la ruta: no queda nada por leer, sólo falta cerrarla.
+      void finalizarRuta()
+      return
+    }
+    setRutaIndex(idx)
+    setSelectedUnidadId(paradasRuta[idx].unidad.id)
+    setSelectedContadorId(paradasRuta[idx].contadorId ?? '')
+    if (idx > 0) {
+      notify({
+        variant: 'info',
+        title: 'Ruta retomada',
+        text: `Continuás en la parada ${idx + 1} de ${paradasRuta.length}; las lecturas anteriores ya están guardadas.`,
+        duration: 3500,
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rutaActiva?.id])
+  }, [rutaActiva?.id, hayParadas])
 
   // Al navegar por la ruta en modo contadores, pre-seleccionar el contador del paso actual
   useEffect(() => {
-    if (rutaActiva?.tipo_ruta === 'contadores' && rutaActiva.contador_ids?.length) {
-      const cid = rutaActiva.contador_ids[rutaIndex]
-      if (cid) setSelectedContadorId(cid)
-    }
+    const cid = contadorDeParada(rutaIndex)
+    if (cid) setSelectedContadorId(cid)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rutaIndex])
 
-  // Al cambiar de unidad, limpiar contador seleccionado
+  // Al cambiar de unidad, limpiar el contador seleccionado… salvo en una ruta
+  // por contadores, donde la parada ya dice cuál toca. (Limpiarlo siempre
+  // dejaba la primera parada de esas rutas sin contador preseleccionado.)
   useEffect(() => {
-    setSelectedContadorId('')
+    setSelectedContadorId(contadorDeParada(rutaIndex))
     setLecturaActual('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUnidadId])
 
   // El flag "medidor reseteado" es por-lectura: limpiarlo al cambiar de contexto.
@@ -435,7 +490,7 @@ export function LecturasSection({
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       setPendientes(encolarLectura(outbox, construirCaptura(null), etiquetaPendiente, Date.now()))
       notify({ variant: 'info', title: '📴 Guardada sin conexión', text: 'La lectura quedó en la cola local; sincronizala cuando recuperes señal.' })
-      limpiarFormulario()
+      await trasGuardar(contadorSeleccionado.id)
       return
     }
 
@@ -465,7 +520,7 @@ export function LecturasSection({
       if (esFalloDeRed(mensaje)) {
         setPendientes(encolarLectura(outbox, construirCaptura(fotoPath), etiquetaPendiente, Date.now()))
         notify({ variant: 'info', title: '📴 Guardada en la cola', text: 'No hubo conexión al guardar; la lectura quedó pendiente de sincronizar.' })
-        limpiarFormulario()
+        await trasGuardar(contadorSeleccionado.id)
         return
       }
       console.error('Error registrando lectura:', mensaje)
@@ -476,97 +531,123 @@ export function LecturasSection({
     const nuevoRegistro = data
     onRegistroAdded(nuevoRegistro)
 
+    // La lectura YA entró: se anota antes del diálogo de WhatsApp. Abrir
+    // WhatsApp saca al navegador de primer plano y el sistema puede recargar la
+    // pestaña al volver; con esto la ruta retoma en la parada siguiente.
+    const leidos = marcarLeido(contadorSeleccionado.id)
+
     const result = await confirm({ title: 'Lectura Guardada', text: '¿Deseas enviar el recibo por WhatsApp?', icon: 'question', confirmText: 'Enviar WhatsApp', cancelText: 'No, gracias' })
 
     if (result.isConfirmed) enviarWhatsApp(nuevoRegistro)
 
-    if (enModoRuta) {
-      // Marcar este contador como leído en la sesión actual
-      const nuevosLeidos = new Set(contadoresLeidos).add(contadorSeleccionado.id)
-      setContadoresLeidos(nuevosLeidos)
+    await trasGuardar(contadorSeleccionado.id, leidos)
+  }
 
-      // Contadores activos de la unidad actual que aún no se han leído
-      const pendientes = contadoresDeUnidad.filter(c => !nuevosLeidos.has(c.id))
+  /** Anota un contador como leído en esta ejecución y lo persiste. */
+  function marcarLeido(contadorId: string): Set<string> {
+    if (!enModoRuta) return contadoresLeidos
+    const nuevosLeidos = new Set(contadoresLeidos).add(contadorId)
+    setContadoresLeidos(nuevosLeidos)
+    guardarProgreso(rutaIndex, nuevosLeidos)
+    return nuevosLeidos
+  }
 
-      if (pendientes.length > 0) {
-        // Hay contadores pendientes en esta misma unidad — preguntar al operador
-        const lista = pendientes
-          .map(c => `${c.numero_serie}${c.descripcion ? ` — ${c.descripcion}` : ''} (${c.tipo_agua})`)
-          .join(', ')
+  /**
+   * Qué sigue una vez que la lectura quedó a salvo —en el servidor o en la cola
+   * offline—: en modo ruta, avanzar; fuera de él, limpiar el formulario. Una
+   * lectura encolada sin señal también avanza la ruta: antes dejaba al
+   * lecturista clavado en la misma parada hasta recuperar conexión.
+   */
+  async function trasGuardar(contadorId: string, leidosPrevios?: Set<string>) {
+    if (!enModoRuta) { limpiarFormulario(); return }
+    const nuevosLeidos = leidosPrevios ?? marcarLeido(contadorId)
 
-        const pregunta = await confirm({
-          icon: 'question',
-          title: 'Contadores pendientes',
-          text: `Esta unidad tiene ${pendientes.length} contador${pendientes.length > 1 ? 'es' : ''} sin leer: ${lista}. ¿Desea registrarlos antes de continuar?`,
-          confirmText: 'Sí, registrar',
-          cancelText: 'No, siguiente parada',
-        })
+    // Contadores activos de la unidad actual que aún no se han leído
+    const pendientes = contadoresDeUnidad.filter(c => !nuevosLeidos.has(c.id))
 
-        if (pregunta.isConfirmed) {
-          // Seleccionar el contador pendiente (auto si solo hay uno, selector si hay varios)
-          let contadorElegidoId = pendientes[0].id
-          if (pendientes.length > 1) {
-            const options = pendientes.map(c => ({
-              value: c.id,
-              label: `${c.numero_serie}${c.descripcion ? ` — ${c.descripcion}` : ''}`,
-            }))
-            const seleccion = await openPromptDialog({
-              title: 'Seleccione el contador',
-              fields: [{
-                name: 'contador',
-                label: 'Contador',
-                control: 'select',
-                options,
-                initialValue: pendientes[0].id,
-                required: true,
-                autoFocus: true,
-              }],
-              submitText: 'Seleccionar',
-            })
-            if (seleccion?.contador) contadorElegidoId = seleccion.contador
-          }
-          // Quedarse en la misma unidad con el contador elegido
-          setSelectedContadorId(contadorElegidoId)
-          setLecturaActual('')
-          setNotas('')
-          setFoto(null)
-          setFotoFile(null)
-          return
+    if (pendientes.length > 0) {
+      // Hay contadores pendientes en esta misma unidad — preguntar al operador
+      const lista = pendientes
+        .map(c => `${c.numero_serie}${c.descripcion ? ` — ${c.descripcion}` : ''} (${c.tipo_agua})`)
+        .join(', ')
+
+      const pregunta = await confirm({
+        icon: 'question',
+        title: 'Contadores pendientes',
+        text: `Esta unidad tiene ${pendientes.length} contador${pendientes.length > 1 ? 'es' : ''} sin leer: ${lista}. ¿Desea registrarlos antes de continuar?`,
+        confirmText: 'Sí, registrar',
+        cancelText: 'No, siguiente parada',
+      })
+
+      if (pregunta.isConfirmed) {
+        // Seleccionar el contador pendiente (auto si solo hay uno, selector si hay varios)
+        let contadorElegidoId = pendientes[0].id
+        if (pendientes.length > 1) {
+          const options = pendientes.map(c => ({
+            value: c.id,
+            label: `${c.numero_serie}${c.descripcion ? ` — ${c.descripcion}` : ''}`,
+          }))
+          const seleccion = await openPromptDialog({
+            title: 'Seleccione el contador',
+            fields: [{
+              name: 'contador',
+              label: 'Contador',
+              control: 'select',
+              options,
+              initialValue: pendientes[0].id,
+              required: true,
+              autoFocus: true,
+            }],
+            submitText: 'Seleccionar',
+          })
+          if (seleccion?.contador) contadorElegidoId = seleccion.contador
         }
-      }
-
-      // Sin pendientes (o el operador eligió saltar) → avanzar al siguiente en la ruta
-      const nextIndex = rutaIndex + 1
-      if (nextIndex < unidadesOrdenadas.length) {
-        setRutaIndex(nextIndex)
-        setSelectedUnidadId(unidadesOrdenadas[nextIndex].id)
-        setSelectedContadorId('')
+        // Quedarse en la misma unidad con el contador elegido
+        setSelectedContadorId(contadorElegidoId)
         setLecturaActual('')
         setNotas('')
         setFoto(null)
         setFotoFile(null)
-      } else {
-        if (rutaActiva) {
-          const esRecurrente = !!rutaActiva.frecuencia && rutaActiva.frecuencia !== 'unica'
-          if (esRecurrente) {
-            await completeRelevantOcurrencia(rutaActiva.id)
-          } else {
-            await markRutaCompletada(rutaActiva.id)
-          }
-          onRutaCompletada?.(rutaActiva.id)
-          onClearRuta?.()
-        } else {
-          setRutaModoManual(false)
-        }
-        notify({ variant: 'success', title: 'Ruta Finalizada', text: '¡Has completado todas las lecturas de la ruta!' })
-        limpiarFormulario()
-        setSelectedUnidadId('')
-        setRutaIndex(0)
-        setContadoresLeidos(new Set())
+        return
       }
-    } else {
-      limpiarFormulario()
     }
+
+    // Sin pendientes (o el operador eligió saltar) → avanzar al siguiente en la ruta
+    const nextIndex = rutaIndex + 1
+    if (nextIndex < unidadesOrdenadas.length) {
+      guardarProgreso(nextIndex, nuevosLeidos)
+      setRutaIndex(nextIndex)
+      setSelectedUnidadId(unidadesOrdenadas[nextIndex].id)
+      setSelectedContadorId(contadorDeParada(nextIndex))
+      setLecturaActual('')
+      setNotas('')
+      setFoto(null)
+      setFotoFile(null)
+    } else {
+      await finalizarRuta()
+    }
+  }
+
+  /** Cierra la ruta: la marca completada (o su ocurrencia) y limpia la pantalla. */
+  async function finalizarRuta() {
+    if (rutaActiva) {
+      limpiarRutaEnCurso(progresoStore)
+      const esRecurrente = !!rutaActiva.frecuencia && rutaActiva.frecuencia !== 'unica'
+      if (esRecurrente) {
+        await completeRelevantOcurrencia(rutaActiva.id)
+      } else {
+        await markRutaCompletada(rutaActiva.id)
+      }
+      onRutaCompletada?.(rutaActiva.id)
+      onClearRuta?.()
+    } else {
+      setRutaModoManual(false)
+    }
+    notify({ variant: 'success', title: 'Ruta Finalizada', text: '¡Has completado todas las lecturas de la ruta!' })
+    limpiarFormulario()
+    setSelectedUnidadId('')
+    setRutaIndex(0)
+    setContadoresLeidos(new Set())
   }
 
   function toggleModoManual() {
@@ -586,6 +667,8 @@ export function LecturasSection({
 
   function detenerRuta() {
     if (rutaActiva) {
+      // Detenerla es una decisión del operador: no debe retomarse sola.
+      limpiarRutaEnCurso(progresoStore)
       onClearRuta?.()
     } else {
       setRutaModoManual(false)

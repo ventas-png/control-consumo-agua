@@ -168,6 +168,61 @@ export function filtrarUnidadesDisponibles(
 }
 
 /**
+ * Valor del filtro de la lista de rutas que agrupa las que no tienen proyecto
+ * o tienen uno que ya no está en la lista de proyectos visibles (la tarjeta
+ * tampoco muestra proyecto en ese caso).
+ */
+export const RUTAS_SIN_PROYECTO = '__sin_proyecto__'
+
+export interface OpcionFiltroProyecto {
+  value: string
+  label: string
+  cantidad: number
+}
+
+function rutaSinProyecto(ruta: Ruta, idsProyectos: Set<string>): boolean {
+  return !ruta.project_id || !idsProyectos.has(ruta.project_id)
+}
+
+/**
+ * Filtra la lista de rutas por proyecto. `filtro` vacío = todas;
+ * `RUTAS_SIN_PROYECTO` = las que no pertenecen a ninguno de `proyectos`.
+ */
+export function filtrarRutasPorProyecto(
+  rutas: Ruta[],
+  filtro: string,
+  proyectos: { id: string }[],
+): Ruta[] {
+  if (!filtro) return rutas
+  if (filtro === RUTAS_SIN_PROYECTO) {
+    const ids = new Set(proyectos.map(p => p.id))
+    return rutas.filter(r => rutaSinProyecto(r, ids))
+  }
+  return rutas.filter(r => r.project_id === filtro)
+}
+
+/**
+ * Opciones del selector de proyecto de la lista de rutas, cada una con cuántas
+ * rutas tiene: todos los proyectos en el orden recibido y, sólo si hay alguna,
+ * «Sin proyecto» al final. No incluye la opción «Todos».
+ */
+export function opcionesFiltroProyecto(
+  rutas: Ruta[],
+  proyectos: { id: string; nombre: string }[],
+): OpcionFiltroProyecto[] {
+  const ids = new Set(proyectos.map(p => p.id))
+  const porProyecto = new Map<string, number>()
+  let sinProyecto = 0
+  for (const r of rutas) {
+    if (rutaSinProyecto(r, ids)) sinProyecto++
+    else porProyecto.set(r.project_id!, (porProyecto.get(r.project_id!) ?? 0) + 1)
+  }
+  const opciones = proyectos.map(p => ({ value: p.id, label: p.nombre, cantidad: porProyecto.get(p.id) ?? 0 }))
+  if (sinProyecto > 0) opciones.push({ value: RUTAS_SIN_PROYECTO, label: 'Sin proyecto', cantidad: sinProyecto })
+  return opciones
+}
+
+/**
  * Construye el destino y mensaje de WhatsApp para notificar la asignación de
  * una ruta. Devuelve null si la ruta no tiene teléfono asignado.
  */

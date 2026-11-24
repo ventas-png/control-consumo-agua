@@ -44,6 +44,7 @@ import { AuthSplash, DualServicePortal, PresenceBar } from './components/app/she
 import { APP_ROUTES, renderAppRoute, type AppRoutesCtx } from './components/app/routes'
 import { MfaGate } from './components/auth/MfaGate'
 import { necesitaAsistentePrimerProyecto } from './domain/empresa/usuarios'
+import { localStorageRutaEnCurso, leerRutaEnCurso, iniciarRutaEnCurso } from './lib/rutaEnCurso'
 
 // F3.13: ComponentShowcase dev route (/dev/components). `lazy()` va a nivel de
 // módulo, no dentro del render: llamarlo en cada render crea un TIPO de componente
@@ -244,10 +245,31 @@ function AppShell() {
     }
   }, [])
 
+  // La ruta en ejecución se anota en el dispositivo (lib/rutaEnCurso): si la
+  // app se recarga a media ruta, se retoma donde iba en vez de volver a la
+  // parada 1. La posición la mantiene LecturasSection; aquí sólo se recuerda
+  // CUÁL ruta y de quién.
+  const rutaEnCursoStore = useMemo(() => localStorageRutaEnCurso(), [])
+  const userIdRuta = currentUser?.user_id
   const onEjecutarRuta = useCallback((ruta: Ruta) => {
+    if (userIdRuta) iniciarRutaEnCurso(rutaEnCursoStore, ruta.id, userIdRuta, Date.now())
     setRutaActivaParaLecturas(ruta)
     navigate(sectionToPath('lecturas'))
-  }, [navigate])
+  }, [navigate, rutaEnCursoStore, userIdRuta])
+
+  // Tras una recarga: si este usuario dejó una ruta a medias, se reactiva en
+  // cuanto las rutas cargan. Detenerla o completarla la borra del dispositivo,
+  // así que no reaparece.
+  useEffect(() => {
+    if (!userIdRuta || rutaActivaParaLecturas) return
+    const enCurso = leerRutaEnCurso(rutaEnCursoStore, Date.now())
+    if (!enCurso || enCurso.userId !== userIdRuta) return
+    const ruta = agua.rutas.find((r: Ruta) => r.id === enCurso.rutaId)
+    if (!ruta) return
+    const esRecurrente = !!ruta.frecuencia && ruta.frecuencia !== 'unica'
+    if (ruta.completada && !esRecurrente) return
+    setRutaActivaParaLecturas(ruta)
+  }, [userIdRuta, rutaActivaParaLecturas, agua.rutas, rutaEnCursoStore])
 
   const clearRutaActiva = useCallback(() => setRutaActivaParaLecturas(null), [])
 
