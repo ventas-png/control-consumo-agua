@@ -1047,8 +1047,13 @@ export interface SuministroCondominio {
   rendimiento?: number | null
   /** En qué se mide el rendimiento: aplicaciones, limpiezas, m², días… */
   rendimiento_unidad?: string | null
-  /** Ruta de la foto del insumo en `condominios-media`; SecureImage la firma al mostrarla. */
+  /**
+   * LEGADO (20261119000000): la única foto de antes. Al guardar se pasa a
+   * `fotos` y queda en null; para mostrar, usar `fotosDeSuministro`.
+   */
   foto_url?: string | null
+  /** Rutas de las fotos en `condominios-media`, hasta 6 (20261216000300). Opcional: antes de la migración no viene. */
+  fotos?: string[] | null
   notas?: string | null
   activo: boolean
   created_at: string
