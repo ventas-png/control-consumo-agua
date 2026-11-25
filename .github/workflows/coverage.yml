@@ -874,6 +874,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55701
         run: supabase/tests/conta_revaluar_cierre_rbac/run.sh
+      # 20261221000000: en `rutas`, crear/editar/eliminar exigen agua.rutas.
+      # create/edit/delete y el acceso al proyecto, y quien ejecuta la ruta
+      # (asignado o con agua.lecturas.create) sólo puede darla por completada.
+      # Sobre la cadena ENTERA, con los triggers reales de la tabla: control
+      # negativo (un visor crea, «ver» reescribe, «Eliminar» por RBAC no borra),
+      # cada clave por separado, el sello de cierre y la guarda de postcondición.
+      - name: Rutas — crear, editar y eliminar exigen su permiso
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55702
+        run: supabase/tests/rutas_escribir_por_permiso/run.sh
       # 20261029000100 + 20261030000000: purgar_empresa, la purga atómica del
       # edge delete-company, y su política de retención. Todo o nada con fallos
       # inyectados en cada punto; cada categoría de retención detiene la purga

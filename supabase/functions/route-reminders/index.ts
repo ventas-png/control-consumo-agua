@@ -8,7 +8,6 @@ import {
   type Recipient,
   type Row,
   applyVars,
-  autorizadoParaEmpresa,
   batchHorizonDate,
   buildInAppRows,
   buildRawMessage,
@@ -21,9 +20,11 @@ import {
   renderRecordatorio,
   todayGT,
 } from './logic.ts'
+import { autorizarRecordatorio, type ClienteRpc } from './autorizacion.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') ?? ''
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') ?? ''
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://administratodo.com'
@@ -234,21 +235,26 @@ Deno.serve(async (req: Request) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
     const token = (req.headers.get('authorization') ?? '').replace('Bearer ', '').trim()
 
-    // ── Auth: interno (cron, service key) o admin (JWT) ──
+    // ── Auth: interno (cron, service key) o usuario de la empresa (JWT) ──
+    // La identidad sale del JWT que valida GoTrue; el permiso lo decide la base
+    // (autorizacion.ts) cuando ya se sabe de qué ruta se trata.
     let internal = false
-    let callerIsSuperAdmin = false
-    let callerCompanyId: string | null = null
+    let usuario: ClienteRpc | null = null
 
     if (token && await timingSafeEqualSecret(token, SERVICE_ROLE_KEY)) {
       internal = true
     } else if (token) {
       const { data: { user }, error } = await admin.auth.getUser(token)
       if (error || !user) return json({ error: 'Unauthorized' }, 401)
-      const { data: au } = await admin.from('app_users').select('company_id, role').eq('id', user.id).maybeSingle()
-      if (!au) return json({ error: 'Forbidden' }, 403)
-      if (au.role === 'super_admin') callerIsSuperAdmin = true
-      else if (au.role === 'company_owner' || au.role === 'admin') callerCompanyId = au.company_id as string
-      else return json({ error: 'Solo administradores pueden enviar recordatorios' }, 403)
+      if (!ANON_KEY) {
+        console.error('[route-reminders] falta SUPABASE_ANON_KEY: no se puede autorizar')
+        return json({ error: 'Servicio mal configurado' }, 503)
+      }
+      // Cliente LIMITADO A ESE JWT: auth.uid() es este usuario en los helpers.
+      usuario = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      }) as unknown as ClienteRpc
     } else {
       return json({ error: 'Unauthorized' }, 401)
     }
@@ -278,7 +284,7 @@ Deno.serve(async (req: Request) => {
         totalEmailed += res.emailed; totalNotified += res.notified; processed++
       }
     } else {
-      // Manual: una ruta/ocurrencia concreta (admin con JWT, o interno con ids).
+      // Manual: una ruta/ocurrencia concreta (usuario con JWT, o interno con ids).
       let occ: Row | null = null
       let route: Row | null = null
 
@@ -288,29 +294,43 @@ Deno.serve(async (req: Request) => {
       } else if (body.ruta_id) {
         const { data: r } = await admin.from('rutas').select('*').eq('id', body.ruta_id).maybeSingle()
         route = (r as Row) ?? null
-        if (route) {
-          // Generar ocurrencias por si la ruta es nueva y aún no tiene.
-          await admin.rpc('generar_ocurrencias_rutas', { p_dias_adelante: 60 })
-          const hoy = todayGT()
-          const { data: ups } = await admin.from('ruta_ocurrencias').select('*')
-            .eq('ruta_id', body.ruta_id).eq('estado', 'pendiente')
-            .gte('fecha', hoy).order('fecha', { ascending: true }).limit(1)
-          if (ups && ups.length) occ = ups[0] as Row
-          if (!occ) {
-            const { data: past } = await admin.from('ruta_ocurrencias').select('*')
-              .eq('ruta_id', body.ruta_id).eq('estado', 'pendiente')
-              .order('fecha', { ascending: false }).limit(1)
-            if (past && past.length) occ = past[0] as Row
+      }
+
+      if (!route) return json({ error: 'No hay una ocurrencia pendiente para esta ruta' }, 404)
+
+      // Autorización ANTES de cualquier efecto (generar ocurrencias, enviar):
+      // empresa + proyecto + agua.rutas.edit, resueltos por la base.
+      if (!internal) {
+        const permitido = await autorizarRecordatorio(usuario, {
+          company_id: (route.company_id as string | null) ?? null,
+          project_id: (route.project_id as string | null) ?? null,
+        })
+        if (!permitido.ok) {
+          console.warn('[route-reminders] denegado', permitido.motivo, permitido.detalle)
+          if (permitido.motivo === 'error_autorizacion') {
+            return json({ error: 'No se pudo verificar la autorización' }, 503)
           }
+          return json({ error: 'No tienes permiso para enviar recordatorios de esta ruta' }, 403)
         }
       }
 
-      if (!route || !occ) return json({ error: 'No hay una ocurrencia pendiente para esta ruta' }, 404)
-
-      // Autorización por empresa para el camino admin.
-      if (!autorizadoParaEmpresa({ internal, callerIsSuperAdmin, callerCompanyId }, route.company_id)) {
-        return json({ error: 'Forbidden' }, 403)
+      if (!occ && body.ruta_id) {
+        // Generar ocurrencias por si la ruta es nueva y aún no tiene.
+        await admin.rpc('generar_ocurrencias_rutas', { p_dias_adelante: 60 })
+        const hoy = todayGT()
+        const { data: ups } = await admin.from('ruta_ocurrencias').select('*')
+          .eq('ruta_id', body.ruta_id).eq('estado', 'pendiente')
+          .gte('fecha', hoy).order('fecha', { ascending: true }).limit(1)
+        if (ups && ups.length) occ = ups[0] as Row
+        if (!occ) {
+          const { data: past } = await admin.from('ruta_ocurrencias').select('*')
+            .eq('ruta_id', body.ruta_id).eq('estado', 'pendiente')
+            .order('fecha', { ascending: false }).limit(1)
+          if (past && past.length) occ = past[0] as Row
+        }
       }
+
+      if (!occ) return json({ error: 'No hay una ocurrencia pendiente para esta ruta' }, 404)
 
       const res = await processOccurrence(admin, occ, route)
       totalEmailed += res.emailed; totalNotified += res.notified; processed++

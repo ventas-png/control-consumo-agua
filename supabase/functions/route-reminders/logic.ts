@@ -94,21 +94,6 @@ export function dedupeRecipients(candidates: Recipient[]): Recipient[] {
 }
 
 // ---------------------------------------------------------------------------
-// Autorización por empresa (camino admin con JWT)
-// ---------------------------------------------------------------------------
-
-/**
- * Gate de tenant: interno (service key) y super_admin pasan siempre; un
- * admin/owner solo puede enviar recordatorios de rutas de SU empresa.
- */
-export function autorizadoParaEmpresa(
-  auth: { internal: boolean; callerIsSuperAdmin: boolean; callerCompanyId: string | null },
-  routeCompanyId: string | null,
-): boolean {
-  return auth.internal || auth.callerIsSuperAdmin || routeCompanyId === auth.callerCompanyId
-}
-
-// ---------------------------------------------------------------------------
 // Plantilla de recordatorio
 // ---------------------------------------------------------------------------
 

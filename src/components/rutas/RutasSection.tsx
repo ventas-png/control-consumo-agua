@@ -102,21 +102,14 @@ export function RutasSection({
     } catch { /* sin almacenamiento: el filtro sólo dura mientras la pantalla esté abierta */ }
   }
 
-  // Crear y editar siguen el permiso RBAC del módulo (agua.rutas.create/edit),
+  // Cada botón sigue el permiso RBAC del módulo (agua.rutas.create/edit/delete),
   // no el rol de plataforma: el «Admin Agua» se crea con rol base `operator`
-  // (EmpresaUsuariosSection) y recibe sus permisos por user_roles, así que
-  // excluir a `operator` le ocultaba «+ Nueva Ruta» aunque tuviera el permiso.
-  // La base lo admite: rutas_insert/rutas_update solo acotan por empresa.
+  // (EmpresaUsuariosSection) y recibe sus permisos por user_roles. La base
+  // aplica las mismas claves (20261221000000) y «Recordar» (route-reminders)
+  // pide agua.rutas.edit, así que el botón visible es el que el servidor acepta.
   const canCreate = canCreateProp && userRole !== 'viewer'
   const canEdit = canEditProp && userRole !== 'viewer'
-  // Eliminar y «Recordar» siguen además atados al rol de plataforma porque así
-  // lo exige el servidor: la policy rutas_delete pide app_users.role admin o
-  // company_owner (un DELETE rechazado por RLS no da error, la tarjeta
-  // desaparecería sin borrarse) y la función route-reminders responde 403 a
-  // cualquier otro rol.
-  const esAdministrador = userRole === 'admin' || userRole === 'company_owner' || userRole === 'super_admin'
-  const canDelete = canDeleteProp && esAdministrador
-  const canRecordar = canEdit && esAdministrador
+  const canDelete = canDeleteProp && userRole !== 'viewer'
 
   // Los operadores asignables dependen del PROYECTO de la ruta, no de la
   // empresa: quien no tiene acceso al condominio no puede leer sus contadores
@@ -433,7 +426,7 @@ export function RutasSection({
   const hoy = hoyLocalISO()
 
   const ctx: RutasCtx = {
-    clientes, contadores, unidades, proyectos, canEdit, canDelete, canRecordar, onEjecutarRuta,
+    clientes, contadores, unidades, proyectos, canEdit, canDelete, onEjecutarRuta,
     editando, form, setForm, tipoRuta, setTipoRuta,
     clientesEnRuta, contadoresEnRuta, setContadoresEnRuta,
     unidadesEnRuta, setUnidadesEnRuta,
