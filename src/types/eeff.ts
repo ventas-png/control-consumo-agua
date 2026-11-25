@@ -35,6 +35,8 @@ export interface FlujoEfectivoFila {
 export interface CierreEjercicio {
   id: string
   company_id: string
+  /** null = contabilidad de la empresa; uuid = la del proyecto. */
+  project_id: string | null
   anio: number
   asiento_id: string
   cerrado_por: string | null

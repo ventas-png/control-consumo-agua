@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { DataTable, type DataTableColumn } from '../shared'
 import { FilterChips } from '../shared/FilterChips'
 import { StatusBadge } from '../shared/StatusBadge'
-import { useAsientosQuery } from '../../domain/contabilidad/queries'
+import { useAsientosQuery, useHayAperturaQuery } from '../../domain/contabilidad/queries'
 import { formatCurrency, formatDateShort, mesLocalISO } from '../../lib/format'
 import { TIPO_ASIENTO_LABELS, type AsientoContable } from '../../types/contabilidad'
 import { AsientoFormModal } from './AsientoFormModal'
@@ -39,10 +39,8 @@ export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
     projectId,
   })
 
-  const hayApertura = useMemo(
-    () => asientos.some((a) => a.tipo === 'apertura' && a.estado === 'publicado'),
-    [asientos],
-  )
+  // Mientras no se sabe, no se ofrece: `undefined` cuenta como «ya hay».
+  const { data: hayApertura = true } = useHayAperturaQuery(companyId, projectId)
 
   const columns: DataTableColumn<AsientoContable>[] = [
     {

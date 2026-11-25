@@ -75,7 +75,9 @@ const TONO_ESTADO: Record<EstadoProveedor, 'success' | 'warning' | 'info' | 'neu
 }
 
 export function ProveedoresTab({ companyId, projectId = null, proyectos = [] }: Props) {
-  const { puedeCrear, puedeEditar, puedeAutorizar } = usePermisosContabilidad()
+  // Autorizar y suspender dependen de «Cambiar estado»: es lo que exige el servidor (cxp_tg_proveedor_estado). Con
+  // «Autorizar / Denegar» el botón aparecía y el servidor lo rechazaba; con «Cambiar estado» solo, no aparecía.
+  const { puedeCrear, puedeEditar, puedeCambiarEstado } = usePermisosContabilidad()
   const { data: proveedores = [], isLoading } = useProveedoresQuery(companyId)
   const guardar = useGuardarProveedorMutation(companyId)
   const cambiarEstado = useCambiarEstadoProveedorMutation()
@@ -243,10 +245,10 @@ export function ProveedoresTab({ companyId, projectId = null, proyectos = [] }: 
             )}
             <button onClick={(e) => { e.stopPropagation(); setFichaDe(p) }} style={btnLink}>Ficha</button>
             <button onClick={(e) => { e.stopPropagation(); setDocumentosDe(p) }} style={btnLink}>Papelería</button>
-            {puedeAutorizar && estado !== 'autorizado' && (
+            {puedeCambiarEstado && estado !== 'autorizado' && (
               <button onClick={(e) => { e.stopPropagation(); void autorizar(p) }} style={btnLink}>Autorizar</button>
             )}
-            {puedeAutorizar && estado === 'autorizado' && (
+            {puedeCambiarEstado && estado === 'autorizado' && (
               <button onClick={(e) => { e.stopPropagation(); void suspender(p, 'suspendido') }} style={btnLink}>Suspender</button>
             )}
           </div>

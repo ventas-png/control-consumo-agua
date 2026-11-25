@@ -104,6 +104,33 @@ export function useAsientosQuery(companyId?: string, filtro: AsientosFiltro = {}
   })
 }
 
+/**
+ * ¿El ledger ya tiene su apertura publicada? Se pregunta aparte del listado:
+ * el listado va filtrado por mes y estado, y deducirlo de ahí volvía a ofrecer
+ * «Saldos iniciales» en cualquier mes distinto al de la apertura (la segunda
+ * apertura choca con uq_conta_asiento_apertura y dejaba un borrador huérfano).
+ * La key cuelga del prefijo de `asientos` para invalidarse con ellos.
+ */
+export function useHayAperturaQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.asientos(companyId, projectId, 'apertura-publicada', 'existe'),
+    enabled: !!companyId,
+    queryFn: async () => {
+      const filas = await runQuery<Array<{ id: string }>>((signal) => {
+        let q = supabase
+          .from('conta_asientos')
+          .select('id')
+          .eq('company_id', companyId!)
+          .eq('tipo', 'apertura')
+          .eq('estado', 'publicado')
+        q = projectId ? q.eq('project_id', projectId) : q.is('project_id', null)
+        return q.limit(1).abortSignal(signal)
+      })
+      return (filas ?? []).length > 0
+    },
+  })
+}
+
 /** Detalle de una póliza: cabecera + líneas con su cuenta (código/nombre). */
 export function useAsientoDetalleQuery(asientoId?: string) {
   return useQuery({

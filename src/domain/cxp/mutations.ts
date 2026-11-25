@@ -241,7 +241,8 @@ export function useMarcarOrdenPagadaMutation(companyId?: string) {
           .from('ordenes_pago')
           .update({
             estado: 'pagada',
-            fecha_pago: vars.fechaPago ?? hoyLocalISO(),
+            // Se respeta la fecha capturada en la orden (si no es futura): es la del asiento del egreso.
+            fecha_pago: vars.fechaPago && vars.fechaPago <= hoyLocalISO() ? vars.fechaPago : hoyLocalISO(),
             pagada_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })

@@ -168,9 +168,10 @@ export function TiposCargoTab({ companyId, projectId }: Props) {
         impuesto calculado.
       </p>
       <p style={{ margin: 0, color: 'var(--at-ink-soft)', fontSize: 13 }}>
-        Esta configuración todavía no genera asientos: la contabilización de cargos con estas
-        cuentas llega en la siguiente entrega. Mientras tanto, cuotas y cobros siguen usando el
-        mapeo general de la pestaña Configuración, como hasta ahora.
+        Las cuotas clasificadas, su mora y los cargos adicionales se contabilizan con estas cuentas.
+        Si a un tipo le falta su configuración, el cargo queda en «Pendientes» hasta configurarlo y
+        reprocesarlo. Las cuotas sin clasificar y los recibos de agua siguen usando el mapeo general
+        de la pestaña Configuración.
       </p>
 
       {soloLectura && (

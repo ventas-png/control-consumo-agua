@@ -42,6 +42,8 @@ vi.mock('../../../domain/compras/mutations', () => ({
   useCrearContrasenaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useEnlazarGastoAFacturaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDescartarDuplicadoMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useAnularContrasenaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCrearOrdenPagoDeContrasenaMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 vi.mock('../../../domain/proveedores/contratosCompras', async (orig) => ({
   ...(await orig<typeof import('../../../domain/proveedores/contratosCompras')>()),

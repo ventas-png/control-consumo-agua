@@ -35,9 +35,11 @@ import {
   useRecepcionesQuery,
 } from '../../domain/compras/queries'
 import {
+  useAnularContrasenaMutation,
   useCambiarEstadoOrdenCompraMutation,
   useCambiarEstadoRecepcionMutation,
   useCrearOrdenCompraMutation,
+  useCrearOrdenPagoDeContrasenaMutation,
   useCrearRecepcionMutation,
   useDescartarDuplicadoMutation,
   useEnlazarGastoAFacturaMutation,
@@ -57,6 +59,7 @@ import {
   type OrdenCompraConRelaciones,
   type RecepcionConRelaciones,
 } from '../../types/compras'
+import { METODOS_PAGO_CXP } from '../../types/cxp'
 import { Campo, btnLink, btnPrimario, btnSecundario, input, usePermisosContabilidad } from './ui'
 
 interface Props {
@@ -105,6 +108,8 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
   const cambiarRecepcion = useCambiarEstadoRecepcionMutation()
   const enlazarGasto = useEnlazarGastoAFacturaMutation()
   const descartarDuplicado = useDescartarDuplicadoMutation(companyId)
+  const pagarContrasena = useCrearOrdenPagoDeContrasenaMutation(companyId)
+  const anularContrasena = useAnularContrasenaMutation()
 
   const hoy = hoyLocalISO()
   const autorizados = useMemo(
@@ -259,6 +264,49 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
     {
       key: 'estado', header: 'Estado', accessor: (c) => c.estado, width: 110,
       render: (c) => <StatusBadge tone={TONO_CP[c.estado] ?? 'neutral'}>{ESTADO_CONTRASENA_LABELS[c.estado]}</StatusBadge>,
+    },
+    {
+      // Sin estas dos acciones la contraseña emitida no tenía salida: reserva el saldo de sus facturas (el servidor
+      // rechaza pagarlas una por una con COMPRAS_PAGO_EXCEDE_SALDO) y nada en pantalla la pagaba ni la anulaba.
+      key: 'acciones', header: '',
+      render: (c) => (
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+          {c.estado === 'emitida' && puedeCrear && (
+            <button style={btnLink} onClick={async () => {
+              const r = await openPromptDialog({
+                title: 'Orden de pago de la contraseña',
+                description: `Una sola orden por ${formatCurrency(c.total, c.moneda ?? monedaBase)} liquida todas las facturas de la contraseña. Nace en borrador: se aprueba y se marca pagada en «Cuentas por pagar › Órdenes de pago».`,
+                fields: [
+                  { name: 'metodo', label: 'Método', control: 'select', options: METODOS_PAGO_CXP, initialValue: 'transferencia' },
+                  { name: 'referencia', label: 'Referencia (No. cheque / transferencia)' },
+                  { name: 'notas', label: 'Notas', control: 'textarea', rows: 2 },
+                ],
+                submitText: 'Crear orden',
+              })
+              if (!r) return
+              await accion(() => pagarContrasena.mutateAsync({
+                contrasena: c,
+                metodo_pago: r.metodo || 'transferencia',
+                referencia: r.referencia?.trim() || null,
+                notas: r.notas?.trim() || null,
+                clave_idempotencia: nuevaClaveIdempotencia('op'),
+              }), 'Orden de pago creada en borrador; apruébala y márcala pagada en «Cuentas por pagar».')
+            }}>Crear orden de pago</button>
+          )}
+          {c.estado === 'emitida' && puedeCambiarEstadoPaso && (
+            <button style={btnLink} onClick={async () => {
+              const r = await openPromptDialog({
+                title: 'Anular contraseña',
+                description: 'Sus facturas quedan libres para pagarse por separado o entrar en otra contraseña.',
+                fields: [{ name: 'motivo', label: '¿Por qué se anula?', control: 'textarea', rows: 2 }],
+              })
+              const motivo = r?.motivo?.trim()
+              if (!motivo) return
+              await accion(() => anularContrasena.mutateAsync({ id: c.id, motivo }), 'Contraseña anulada.')
+            }}>Anular</button>
+          )}
+        </div>
+      ),
     },
   ]
 

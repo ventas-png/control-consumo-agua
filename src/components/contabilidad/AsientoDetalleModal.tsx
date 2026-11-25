@@ -5,7 +5,7 @@ import { useAsientoDetalleQuery } from '../../domain/contabilidad/queries'
 import { useAnularAsientoMutation, usePublicarAsientoMutation } from '../../domain/contabilidad/mutations'
 import { formatCurrency, formatDateShort, formatNumber } from '../../lib/format'
 import { TIPO_ASIENTO_LABELS } from '../../types/contabilidad'
-import { btnPeligro, btnPrimario, btnSecundario } from './ui'
+import { btnPeligro, btnPrimario, btnSecundario, usePermisosContabilidad } from './ui'
 
 interface Props {
   asientoId: string
@@ -19,6 +19,8 @@ export function AsientoDetalleModal({ asientoId, monedaBase, onClose }: Props) {
   const { data: asiento, isLoading } = useAsientoDetalleQuery(asientoId)
   const publicar = usePublicarAsientoMutation()
   const anular = useAnularAsientoMutation()
+  // Publicar y anular exigen «Cambiar estado» en el servidor: sin él los botones solo devolvían «no autorizado».
+  const { puedeCambiarEstado } = usePermisosContabilidad()
 
   async function onPublicar() {
     try {
@@ -59,12 +61,12 @@ export function AsientoDetalleModal({ asientoId, monedaBase, onClose }: Props) {
         asiento && (
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button onClick={onClose} style={btnSecundario}>Cerrar</button>
-            {asiento.estado !== 'anulado' && !asiento.anulado_por_id && (
+            {puedeCambiarEstado && asiento.estado !== 'anulado' && !asiento.anulado_por_id && (
               <button onClick={() => void onAnular()} disabled={anular.isPending} style={btnPeligro}>
                 Anular
               </button>
             )}
-            {asiento.estado === 'borrador' && (
+            {puedeCambiarEstado && asiento.estado === 'borrador' && (
               <button onClick={() => void onPublicar()} disabled={publicar.isPending} style={btnPrimario}>
                 Publicar
               </button>

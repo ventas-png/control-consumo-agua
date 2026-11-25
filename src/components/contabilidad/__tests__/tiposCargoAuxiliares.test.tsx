@@ -12,7 +12,7 @@
 //   · la cuenta de impuesto sólo aparece donde el servidor dice que aplica;
 //   · el estado que calcula el servidor se muestra, incluido su motivo;
 //   · un rechazo del servidor se muestra legible, sin el código técnico;
-//   · la pantalla avisa que la configuración todavía no genera asientos;
+//   · la pantalla dice que los cargos se contabilizan con esta configuración;
 //   · asignar un auxiliar sin código deja que el servidor proponga uno;
 //   · ante un rechazo —incluida una escritura que no afectó ninguna fila— lo
 //     elegido o escrito se CONSERVA, para corregir y reintentar;
@@ -203,9 +203,9 @@ describe('TiposCargoTab', () => {
     expect(screen.getByRole('button', { name: 'Quitar' })).toBeTruthy()
   })
 
-  it('avisa que la configuración todavía no genera asientos', () => {
+  it('dice que los cargos se contabilizan con estas cuentas y que lo que falte queda en Pendientes', () => {
     montar(<TiposCargoTab companyId="emp-1" projectId={null} />)
-    expect(screen.getByText(/todavía no genera asientos/)).toBeTruthy()
+    expect(screen.getByText(/se contabilizan con estas cuentas/)).toBeTruthy()
   })
 
   it('ante un rechazo conserva las cuentas elegidas para reintentar', async () => {

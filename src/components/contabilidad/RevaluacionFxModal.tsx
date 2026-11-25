@@ -43,7 +43,7 @@ export function RevaluacionFxModal({ projectId, monedaBase, onClose }: { project
           variant: 'success',
           title: 'Revaluación aplicada',
           text: ajustadas > 0
-            ? `${ajustadas} cuenta(s) ajustada(s) contra 3301 Diferencial cambiario.`
+            ? `${ajustadas} cuenta(s) ajustada(s) contra la cuenta de Diferencial cambiario.`
             : 'No hubo ajustes que aplicar.',
           duration: 2600,
         })
@@ -64,8 +64,8 @@ export function RevaluacionFxModal({ projectId, monedaBase, onClose }: { project
       <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--at-ink-3)', lineHeight: 1.6 }}>
         Compara el saldo en libros ({monedaBase}) de cada cuenta con moneda propia contra su saldo en
         moneda origen a la tasa vigente de la fecha, y genera el asiento de ajuste contra{' '}
-        <strong>3301 Diferencial cambiario</strong>. Las cuentas sin tipo de cambio registrado no se
-        ajustan: capture la tasa en la pestaña Mapeo.
+        <strong>la cuenta especial «Diferencial cambiario»</strong>. Las cuentas sin tipo de cambio registrado no se
+        ajustan: capture la tasa en Configuración › Tipos de cambio (mensuales).
       </p>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
