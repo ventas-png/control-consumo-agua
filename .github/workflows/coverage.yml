@@ -856,6 +856,16 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55541
         run: supabase/tests/fail_open_sin_perfil/run.sh
+      # 20261220000000: revaluar FX y cierre anual vuelven a aceptar el permiso
+      # del rol (20260918121413 había pisado el RBAC de 20260818000000 al
+      # reescribir las dos RPC). Sobre la cadena ENTERA: control negativo (el
+      # contador con todas las claves es rechazado), cada RPC con SU clave,
+      # quien no la tiene sigue fuera, idempotencia y ACL intacta.
+      - name: Contabilidad — revaluar FX y cierre anual por permiso del rol
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55701
+        run: supabase/tests/conta_revaluar_cierre_rbac/run.sh
       # 20261029000100 + 20261030000000: purgar_empresa, la purga atómica del
       # edge delete-company, y su política de retención. Todo o nada con fallos
       # inyectados en cada punto; cada categoría de retención detiene la purga
