@@ -7,7 +7,7 @@ import { formatFechaCalendario } from '../../lib/format'
 
 export function RutaCard({ ruta, ctx }: { ruta: Ruta; ctx: RutasCtx }) {
   const {
-    clientes, contadores, unidades, proyectos, canEdit, canDelete, canRecordar, hoy,
+    clientes, contadores, unidades, proyectos, canEdit, canDelete, hoy,
     recordandoId, onEjecutarRuta, handleRecordarAhora, abrirEditar, handleEliminar,
   } = ctx
 
@@ -67,7 +67,7 @@ export function RutaCard({ ruta, ctx }: { ruta: Ruta; ctx: RutasCtx }) {
             ▶ Ejecutar
           </button>
         )}
-        {canRecordar && (
+        {canEdit && (
           <button
             onClick={() => handleRecordarAhora(ruta)}
             disabled={recordandoId === ruta.id}

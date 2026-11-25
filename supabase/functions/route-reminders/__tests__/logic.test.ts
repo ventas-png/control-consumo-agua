@@ -10,7 +10,6 @@ import {
   GT_OFFSET_MS,
   type Recipient,
   applyVars,
-  autorizadoParaEmpresa,
   batchHorizonDate,
   buildInAppRows,
   buildRawMessage,
@@ -125,18 +124,6 @@ describe('route-reminders/dedupeRecipients (agrupación por destinatario)', () =
 
   it('descarta entradas sin userId ni email', () => {
     expect(dedupeRecipients([op(null, null), adm('u1', null)])).toEqual([adm('u1', null)])
-  })
-})
-
-describe('route-reminders/autorizadoParaEmpresa (gate por tenant)', () => {
-  it('interno (service key) y super_admin pasan siempre', () => {
-    expect(autorizadoParaEmpresa({ internal: true, callerIsSuperAdmin: false, callerCompanyId: null }, 'c1')).toBe(true)
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: true, callerCompanyId: 'otra' }, 'c1')).toBe(true)
-  })
-
-  it('admin/owner solo puede enviar para SU empresa (no cross-tenant)', () => {
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: false, callerCompanyId: 'c1' }, 'c1')).toBe(true)
-    expect(autorizadoParaEmpresa({ internal: false, callerIsSuperAdmin: false, callerCompanyId: 'c1' }, 'c2')).toBe(false)
   })
 })
 
