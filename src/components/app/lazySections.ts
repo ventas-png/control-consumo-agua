@@ -37,6 +37,7 @@ export const AdminClientDashboard = lazyWithPreload(() => import('../admin-dashb
 export const MapaSection = lazyWithPreload(() => import('../mapa/MapaSection').then(m => ({ default: m.MapaSection })))
 export const CalidadSection = lazyWithPreload(() => import('../calidad/CalidadSection').then(m => ({ default: m.CalidadSection })))
 export const RutasSection = lazyWithPreload(() => import('../rutas/RutasSection').then(m => ({ default: m.RutasSection })))
+export const LecturasPendientesSection = lazyWithPreload(() => import('../lecturas/LecturasPendientesSection').then(m => ({ default: m.LecturasPendientesSection })))
 export const ConfiguracionSection = lazyWithPreload(() => import('../configuracion/ConfiguracionSection').then(m => ({ default: m.ConfiguracionSection })))
 export const PerfilSection = lazyWithPreload(() => import('../perfil/PerfilSection').then(m => ({ default: m.PerfilSection })))
 export const EmpresaSection = lazyWithPreload(() => import('../empresa/EmpresaSection').then(m => ({ default: m.EmpresaSection })))
@@ -64,6 +65,7 @@ const SECTION_PRELOADERS: Partial<Record<AppSection, () => void>> = {
   cobros: () => { CobrosSection.preload() },
   mapa: () => { MapaSection.preload() },
   rutas: () => { RutasSection.preload() },
+  lecturas_pendientes: () => { LecturasPendientesSection.preload() },
   tarifas: () => { TarifasSection.preload() },
   unidades: () => { UnidadesSection.preload() },
   contadores: () => { ContadoresSection.preload() },

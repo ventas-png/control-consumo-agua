@@ -86,6 +86,10 @@ export function usePermissions(session: UserSession | null): PermissionsAPI {
 
       if (isExempt) return true
 
+      // Lecturas pendientes no es un módulo con permisos propios: la ve quien
+      // ve Nueva Lectura o Rutas (lo mismo que exige la RLS de la tabla).
+      if (moduleKey === 'lecturas_pendientes') return has('lecturas', 'view') || has('rutas', 'view')
+
       // Condominios shortcuts in the sidebar map to fine-grained tab permissions.
       const condTab = CONDOMINIOS_SIDEBAR_TAB_MAP[moduleKey]
       if (condTab) return perms?.has(`condominios.tab.${condTab}`) ?? false

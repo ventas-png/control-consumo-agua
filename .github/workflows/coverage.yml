@@ -195,6 +195,14 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
         run: scripts/rls-evidencias-sandbox.sh
 
+      # Lecturas omitidas en ruta: sólo se escriben por RPC, cada quien ve las
+      # de sus proyectos, una lectura nueva las resuelve y las fotos de
+      # evidencia van por carpeta de proyecto.
+      - name: Lecturas omitidas — RPC, visibilidad por proyecto y evidencias
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+        run: scripts/rls-lecturas-omitidas-sandbox.sh
+
       # payment_requests guarda el camino de dinero del pago en línea. El
       # fixture monta el estado INSEGURO de producción —policy
       # `payment_requests_select TO public USING (true)` incluida—, comprueba

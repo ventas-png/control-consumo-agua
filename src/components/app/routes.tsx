@@ -11,11 +11,12 @@ import { ErrorBoundary } from '../ErrorBoundary'
 import { RoleGuard, AccessDenied } from '../shared/AccessDenied'
 import { SinProyectoAsignado } from '../condominios/SinProyectoAsignado'
 import type { AguaData } from '../../hooks/useAguaData'
+import { esRutaDePendientes } from '../../lib/lecturasOmitidasReglas'
 import {
   AdminClientDashboard, CalidadSection, ClientesSection, CobrosSection,
   ComunicacionSection, CondominiosDashboard, CondominiosSection,
   ContabilidadSection, ContadoresSection, ConfiguracionSection,
-  DashboardSection, EmpresaSection, HistorialSection, LecturasSection,
+  DashboardSection, EmpresaSection, HistorialSection, LecturasPendientesSection, LecturasSection,
   MapaSection, PerfilSection, RentasSection, RutasSection, ServiciosEnergiaSection,
   SuperAdminSection, TarifasSection, UnidadesSection,
 } from './lazySections'
@@ -103,7 +104,7 @@ export const APP_ROUTES: AppRouteDef[] = [
   },
   {
     path: '/lecturas', sectionName: 'lecturas', module: 'lecturas',
-    render: ({ aguaModulo: agua, rutaActivaParaLecturas, clearRutaActiva }) => (
+    render: ({ aguaModulo: agua, rutaActivaParaLecturas, clearRutaActiva, navigateSection }) => (
       <LecturasSection
         clientes={agua.clientes}
         unidades={agua.unidades}
@@ -116,11 +117,30 @@ export const APP_ROUTES: AppRouteDef[] = [
         rutaActiva={rutaActivaParaLecturas}
         onClearRuta={clearRutaActiva}
         onRutaCompletada={id => {
+          // La ruta de pendientes vive sólo en memoria: no hay fila que
+          // marcar; al terminarla se vuelve a la lista de pendientes.
+          if (esRutaDePendientes({ id })) { navigateSection('lecturas_pendientes'); return }
           // Las rutas recurrentes no se marcan como completadas: cada
           // ocurrencia se completa por separado y la ruta sigue activa.
           const r = agua.rutas.find(x => x.id === id)
           if (!r || (r.frecuencia ?? 'unica') === 'unica') agua.updateRuta(id, { completada: true })
         }}
+      />
+    ),
+  },
+  {
+    path: '/lecturas-pendientes', sectionName: 'lecturas_pendientes', module: 'lecturas_pendientes',
+    render: ({ aguaModulo: agua, canCreate, canEdit, onEjecutarRuta }) => (
+      <LecturasPendientesSection
+        unidades={agua.unidades}
+        contadores={agua.contadores}
+        clientes={agua.clientes}
+        rutas={agua.rutas}
+        proyectos={agua.proyectos}
+        registros={agua.registros}
+        onRecorrer={onEjecutarRuta}
+        canTomar={canCreate('lecturas')}
+        canDescartar={canEdit('rutas')}
       />
     ),
   },

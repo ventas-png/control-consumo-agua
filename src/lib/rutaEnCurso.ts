@@ -14,8 +14,15 @@
 // El almacenamiento se abstrae para probar la lógica sin navegador, igual que
 // en lecturasOutbox.
 
+import type { Ruta } from '../types'
+
 export interface RutaEnCurso {
   rutaId: string
+  /**
+   * Copia de la ruta cuando NO vive en la base (la ruta «de pendientes» que se
+   * arma en memoria): sin ella, tras una recarga no habría de dónde sacarla.
+   */
+  ruta?: Ruta
   /** Quién la ejecuta: el progreso de un usuario no se le retoma a otro. */
   userId: string
   /** Índice de la parada actual dentro de la ruta. */
@@ -64,7 +71,8 @@ export function leerRutaEnCurso(storage: RutaEnCursoStorage, ahora: number): Rut
     if (ahora - actualizadaEn > RUTA_EN_CURSO_TTL_MS) return null
     const index = typeof v.index === 'number' && Number.isInteger(v.index) && v.index >= 0 ? v.index : 0
     const leidos = Array.isArray(v.leidos) ? v.leidos.filter((x): x is string => typeof x === 'string') : []
-    return { rutaId: v.rutaId, userId: v.userId, index, leidos, actualizadaEn }
+    const ruta = v.ruta && typeof v.ruta === 'object' && v.ruta.id === v.rutaId ? v.ruta : undefined
+    return { rutaId: v.rutaId, userId: v.userId, index, leidos, actualizadaEn, ...(ruta ? { ruta } : {}) }
   } catch {
     return null
   }
@@ -80,11 +88,13 @@ export function iniciarRutaEnCurso(
   rutaId: string,
   userId: string,
   ahora: number,
+  /** Sólo para rutas que no están en la base (ver `RutaEnCurso.ruta`). */
+  ruta?: Ruta,
 ): RutaEnCurso {
   const previa = leerRutaEnCurso(storage, ahora)
   const estado: RutaEnCurso = previa && previa.rutaId === rutaId && previa.userId === userId
     ? { ...previa, actualizadaEn: ahora }
-    : { rutaId, userId, index: 0, leidos: [], actualizadaEn: ahora }
+    : { rutaId, userId, index: 0, leidos: [], actualizadaEn: ahora, ...(ruta ? { ruta } : {}) }
   storage.escribir(JSON.stringify(estado))
   return estado
 }

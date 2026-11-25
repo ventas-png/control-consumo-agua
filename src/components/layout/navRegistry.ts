@@ -55,6 +55,7 @@ export const SECTION_CRUMBS: Record<AppSection, SectionCrumbMeta> = {
   cobros: { label: 'Cobros', group: GROUP_AGUA },
   lecturas: { label: 'Nueva Lectura', group: GROUP_AGUA },
   rutas: { label: 'Rutas', group: GROUP_AGUA },
+  lecturas_pendientes: { label: 'Lecturas pendientes', group: GROUP_AGUA },
   calidad: { label: 'Calidad Agua', group: GROUP_AGUA },
   mapa: { label: 'Mapa', group: GROUP_AGUA },
   tabla: { label: 'Historial', group: GROUP_AGUA },

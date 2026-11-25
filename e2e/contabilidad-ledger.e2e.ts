@@ -77,7 +77,11 @@ test.describe('CONTABILIDAD · ledger por empresa y proyecto', () => {
     await login(page)
     await gotoSection(page, '/contabilidad')
 
-    const pestaña = page.getByRole('tab', { name: /Pendientes/i }).or(page.getByRole('button', { name: /Pendientes/i }))
+    // Dentro del contenido (<main>): el menú lateral también tiene un botón
+    // «Lecturas pendientes» (Manejo Agua) que, por ir antes en el DOM, se
+    // llevaba el `.first()` y sacaba a la prueba de Contabilidad.
+    const contenido = page.getByRole('main')
+    const pestaña = contenido.getByRole('tab', { name: /Pendientes/i }).or(contenido.getByRole('button', { name: /Pendientes/i }))
     if (!(await exists(pestaña.first()))) test.skip(true, 'Contabilidad no disponible para este rol')
     await pestaña.first().click()
 
