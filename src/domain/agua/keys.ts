@@ -19,6 +19,10 @@ export const aguaKeys = {
   clientes: (companyId?: string) => [...aguaKeys.all, 'clientes', companyId ?? null] as const,
   registros: (companyId?: string) => [...aguaKeys.all, 'registros', companyId ?? null] as const,
   rutas: (companyId?: string) => [...aguaKeys.all, 'rutas', companyId ?? null] as const,
+  // Lecturas que no se pudieron tomar en ruta. Sin scope de empresa en la key
+  // a propósito: la RLS ya acota, y así guardar o saltar desde Nueva Lectura
+  // invalida la lista sin conocer la empresa.
+  lecturasOmitidas: (estado?: string) => [...aguaKeys.all, 'lecturas-omitidas', ...(estado ? [estado] : [])] as const,
   tarifas: (companyId?: string) => [...aguaKeys.all, 'tarifas', companyId ?? null] as const,
   contadores: (companyId?: string) => [...aguaKeys.all, 'contadores', companyId ?? null] as const,
   unidades: (companyId?: string) => [...aguaKeys.all, 'unidades', companyId ?? null] as const,

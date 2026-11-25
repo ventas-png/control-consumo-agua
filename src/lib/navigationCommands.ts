@@ -39,6 +39,7 @@ export const NAV_COMMANDS: NavCommandDef[] = [
   { id: 'cobros',           label: 'Cobros',             icon: '💰', category: 'Agua',         shortcut: 'g b', module: 'cobros', moduleRoleBypass: ['collector'] },
   { id: 'mapa',             label: 'Mapa',               icon: '🗺',  category: 'Agua',         shortcut: 'g m', module: 'mapa' },
   { id: 'rutas',            label: 'Rutas',              icon: '🛣',  category: 'Agua',         shortcut: 'g r', module: 'rutas' },
+  { id: 'lecturas_pendientes', label: 'Lecturas pendientes', icon: '⏭️', category: 'Agua',      module: 'lecturas_pendientes' },
   { id: 'calidad',          label: 'Calidad del agua',   icon: '💧', category: 'Agua',                          module: 'calidad' },
   { id: 'contadores',       label: 'Contadores',         icon: '🔢', category: 'Agua',                          module: 'contadores' },
   { id: 'tarifas',          label: 'Tarifas',            icon: '💲', category: 'Agua',                          module: 'tarifas' },

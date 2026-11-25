@@ -7,6 +7,7 @@ import type { AppSection } from '../types'
 export const SECTION_TO_PATH: Record<AppSection, string> = {
   clientes: '/clientes',
   lecturas: '/lecturas',
+  lecturas_pendientes: '/lecturas-pendientes',
   tabla: '/historial',
   dashboard: '/dashboard',
   admin_dashboard: '/admin-dashboard',

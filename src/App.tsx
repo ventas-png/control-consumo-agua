@@ -45,6 +45,7 @@ import { APP_ROUTES, renderAppRoute, type AppRoutesCtx } from './components/app/
 import { MfaGate } from './components/auth/MfaGate'
 import { necesitaAsistentePrimerProyecto } from './domain/empresa/usuarios'
 import { localStorageRutaEnCurso, leerRutaEnCurso, iniciarRutaEnCurso } from './lib/rutaEnCurso'
+import { esRutaDePendientes } from './lib/lecturasOmitidasReglas'
 
 // F3.13: ComponentShowcase dev route (/dev/components). `lazy()` va a nivel de
 // módulo, no dentro del render: llamarlo en cada render crea un TIPO de componente
@@ -252,7 +253,11 @@ function AppShell() {
   const rutaEnCursoStore = useMemo(() => localStorageRutaEnCurso(), [])
   const userIdRuta = currentUser?.user_id
   const onEjecutarRuta = useCallback((ruta: Ruta) => {
-    if (userIdRuta) iniciarRutaEnCurso(rutaEnCursoStore, ruta.id, userIdRuta, Date.now())
+    // La ruta «de pendientes» no está en la base: se guarda su copia para
+    // poder retomarla tras una recarga.
+    if (userIdRuta) {
+      iniciarRutaEnCurso(rutaEnCursoStore, ruta.id, userIdRuta, Date.now(), esRutaDePendientes(ruta) ? ruta : undefined)
+    }
     setRutaActivaParaLecturas(ruta)
     navigate(sectionToPath('lecturas'))
   }, [navigate, rutaEnCursoStore, userIdRuta])
@@ -264,7 +269,7 @@ function AppShell() {
     if (!userIdRuta || rutaActivaParaLecturas) return
     const enCurso = leerRutaEnCurso(rutaEnCursoStore, Date.now())
     if (!enCurso || enCurso.userId !== userIdRuta) return
-    const ruta = agua.rutas.find((r: Ruta) => r.id === enCurso.rutaId)
+    const ruta = agua.rutas.find((r: Ruta) => r.id === enCurso.rutaId) ?? enCurso.ruta
     if (!ruta) return
     const esRecurrente = !!ruta.frecuencia && ruta.frecuencia !== 'unica'
     if (ruta.completada && !esRecurrente) return

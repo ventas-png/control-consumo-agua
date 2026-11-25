@@ -266,6 +266,7 @@ export const MONEDAS = [
 export type AppSection =
   | 'clientes'
   | 'lecturas'
+  | 'lecturas_pendientes'
   | 'tabla'
   | 'dashboard'
   | 'admin_dashboard'

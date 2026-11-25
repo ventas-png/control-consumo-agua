@@ -24,6 +24,15 @@ import {
   limpiarRutaEnCurso,
   indiceDeReanudacion,
 } from '../../lib/rutaEnCurso'
+import {
+  omitirLectura,
+  subirFotoOmision,
+  borrarFotoOmision,
+  esRutaDePendientes,
+} from '../../domain/agua/lecturasOmitidas'
+import { queryClient } from '../../domain/queryClient'
+import { aguaKeys } from '../../domain/agua/keys'
+import { SaltarParadaModal, type DatosSalto } from './SaltarParadaModal'
 import { APP_CONFIG } from '../../lib/config'
 import { watchLocation } from '../../lib/nativeGeo'
 import { isNative } from '../../lib/platform'
@@ -92,6 +101,8 @@ export function LecturasSection({
   const [pendientes, setPendientes] = useState(() => leerPendientes(outbox))
   const [sincronizando, setSincronizando] = useState(false)
   const [showCargaMasiva, setShowCargaMasiva] = useState(false)
+  // «No se pudo leer esta parada»: abre el modal de motivo + evidencia.
+  const [saltando, setSaltando] = useState(false)
 
   // En modo ruta, las PARADAS según el tipo de ruta. En una ruta por
   // contadores cada parada lleva SU contador: se arma en el mismo paso que la
@@ -542,6 +553,8 @@ export function LecturasSection({
 
     const nuevoRegistro = data
     onRegistroAdded(nuevoRegistro)
+    // Si el contador tenía una lectura pendiente, el servidor ya la resolvió.
+    void queryClient.invalidateQueries({ queryKey: aguaKeys.lecturasOmitidas() })
 
     // La lectura YA entró: se anota antes del diálogo de WhatsApp. Abrir
     // WhatsApp saca al navegador de primer plano y el sistema puede recargar la
@@ -625,6 +638,11 @@ export function LecturasSection({
     }
 
     // Sin pendientes (o el operador eligió saltar) → avanzar al siguiente en la ruta
+    await avanzarParada(nuevosLeidos)
+  }
+
+  /** Pasa a la parada siguiente de la ruta, o la cierra si era la última. */
+  async function avanzarParada(nuevosLeidos: Set<string>) {
     const nextIndex = rutaIndex + 1
     if (nextIndex < unidadesOrdenadas.length) {
       guardarProgreso(nextIndex, nuevosLeidos)
@@ -642,10 +660,14 @@ export function LecturasSection({
 
   /** Cierra la ruta: la marca completada (o su ocurrencia) y limpia la pantalla. */
   async function finalizarRuta() {
+    const dePendientes = esRutaDePendientes(rutaActiva)
     if (rutaActiva) {
       limpiarRutaEnCurso(progresoStore)
       const esRecurrente = !!rutaActiva.frecuencia && rutaActiva.frecuencia !== 'unica'
-      if (esRecurrente) {
+      // La ruta de pendientes vive sólo en memoria: no hay nada que marcar.
+      if (dePendientes) {
+        // nada
+      } else if (esRecurrente) {
         await completeRelevantOcurrencia(rutaActiva.id)
       } else {
         await markRutaCompletada(rutaActiva.id)
@@ -655,11 +677,69 @@ export function LecturasSection({
     } else {
       setRutaModoManual(false)
     }
-    notify({ variant: 'success', title: 'Ruta Finalizada', text: '¡Has completado todas las lecturas de la ruta!' })
+    notify(dePendientes
+      ? { variant: 'success', title: 'Pendientes recorridas', text: 'Terminaste las lecturas pendientes de esta vuelta.' }
+      : { variant: 'success', title: 'Ruta Finalizada', text: '¡Has completado todas las lecturas de la ruta!' })
     limpiarFormulario()
     setSelectedUnidadId('')
     setRutaIndex(0)
     setContadoresLeidos(new Set())
+  }
+
+  /**
+   * Contadores que quedan sin leer si se salta la parada actual: en una ruta
+   * por contadores, el de la parada; si no, los activos de la unidad que aún
+   * no se leyeron en esta vuelta.
+   */
+  function contadoresPorSaltar(): Contador[] {
+    const cid = contadorDeParada(rutaIndex)
+    if (cid) return contadores.filter(c => c.id === cid)
+    return contadoresDeUnidad.filter(c => !contadoresLeidos.has(c.id))
+  }
+
+  async function handleSaltar(datos: DatosSalto): Promise<boolean> {
+    if (!unidadSeleccionada) return false
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      notify({ variant: 'warning', title: 'Sin conexión', text: 'Para saltar una parada hace falta señal: el motivo y la foto se guardan en el servidor. Probá de nuevo cuando tengas conexión.' })
+      return false
+    }
+    const saltados = contadoresPorSaltar()
+    let fotoPath: string | null = null
+    if (datos.foto) {
+      const subida = await subirFotoOmision(unidadSeleccionada.project_id, datos.foto)
+      if (subida.error || !subida.path) {
+        notify({ variant: 'error', title: 'No se pudo subir la foto', text: subida.error ?? 'Intente de nuevo.' })
+        return false
+      }
+      fotoPath = subida.path
+    }
+    const { error } = await omitirLectura({
+      unidadId: unidadSeleccionada.id,
+      contadorIds: saltados.map(c => c.id),
+      // La ruta de pendientes no está en la base: la omisión queda sin ruta.
+      rutaId: rutaActiva && !esRutaDePendientes(rutaActiva) ? rutaActiva.id : null,
+      motivo: datos.motivo,
+      detalle: datos.detalle || null,
+      fotoPath,
+      gps,
+    })
+    if (error) {
+      if (fotoPath) void borrarFotoOmision(fotoPath)
+      notify({ variant: 'error', title: 'No se pudo registrar', text: error })
+      return false
+    }
+    void queryClient.invalidateQueries({ queryKey: aguaKeys.lecturasOmitidas() })
+    setSaltando(false)
+    notify({ variant: 'info', title: 'Parada saltada', text: 'Quedó en «Lecturas pendientes» para tomarla después.', duration: 2600 })
+
+    // Los contadores saltados cuentan como atendidos en esta vuelta: si la app
+    // se recarga, la ruta no vuelve a esta parada.
+    const nuevosLeidos = new Set(contadoresLeidos)
+    for (const c of saltados) nuevosLeidos.add(c.id)
+    setContadoresLeidos(nuevosLeidos)
+    guardarProgreso(rutaIndex, nuevosLeidos)
+    await avanzarParada(nuevosLeidos)
+    return true
   }
 
   function toggleModoManual() {
@@ -695,6 +775,19 @@ export function LecturasSection({
   const labelStyle: CSSProperties = { fontSize: '14px', fontWeight: 600, color: 'var(--at-ink-2)', marginBottom: '6px', display: 'block' }
 
   const consumoInvalido = validacion !== null && !validacion.valid
+
+  // Sólo en modo ruta: fuera de ella no hay «parada» que saltar.
+  const botonSaltar = canEdit && enModoRuta && unidadSeleccionada ? (
+    <button
+      type="button"
+      onClick={() => setSaltando(true)}
+      disabled={saving}
+      title="No se pudo tomar la lectura: registrar el motivo y la foto, y pasar a la siguiente parada"
+      style={{ padding: '12px 20px', background: 'var(--at-surface)', color: 'var(--at-warning-strong)', border: '2px solid var(--at-warning)', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
+    >
+      ⏭️ Saltar unidad
+    </button>
+  ) : null
 
   const bannerRuta = rutaActiva
     ? {
@@ -810,10 +903,19 @@ export function LecturasSection({
               )}
             </div>
 
+            {/* En ruta: la parada se puede saltar en cuanto se llega, sin
+                tener que elegir antes un contador. */}
+            {botonSaltar && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '-8px', marginBottom: '20px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--at-ink-3)' }}>¿No se puede leer esta unidad?</span>
+                {botonSaltar}
+              </div>
+            )}
+
             {/* Selector de contador */}
             {contadoresDeUnidad.length === 0 ? (
-              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid #fde047', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', color: 'var(--at-warning-strong)', fontWeight: 600, fontSize: '14px' }}>
-                Esta unidad no tiene contadores activos asignados.
+              <div style={{ background: 'var(--at-warning-tint)', border: '1px solid #fde047', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', color: 'var(--at-warning-strong)', fontWeight: 600, fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <span>Esta unidad no tiene contadores activos asignados.</span>
               </div>
             ) : (
               <div style={{ marginBottom: '20px' }}>
@@ -1033,7 +1135,7 @@ export function LecturasSection({
                 </div>
 
                 {canEdit && (
-                  <div style={{ display: 'flex', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                     <button onClick={handleGuardar} disabled={saving || tarifaExpirada || sinTarifa || resetIncompleto} style={{ padding: '12px 24px', background: (saving || tarifaExpirada || sinTarifa || resetIncompleto) ? 'var(--at-ink-3)' : 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: (saving || tarifaExpirada || sinTarifa || resetIncompleto) ? 'not-allowed' : 'pointer' }}>
                       {saving ? 'Guardando...' : enModoRuta ? `💾 Guardar y Avanzar (${rutaIndex + 1}/${unidadesOrdenadas.length})` : '💾 Guardar Lectura'}
                     </button>
@@ -1047,6 +1149,19 @@ export function LecturasSection({
           </>
         )}
       </div>
+      {saltando && unidadSeleccionada && (() => {
+        const porSaltar = contadoresPorSaltar()
+        return (
+          <SaltarParadaModal
+            unidadNombre={unidadSeleccionada.nombre + (clienteDeUnidad ? ` — ${clienteDeUnidad.nombre}` : '')}
+            contadoresTexto={porSaltar.length
+              ? `${porSaltar.length === 1 ? 'Contador' : 'Contadores'} ${porSaltar.map(c => c.numero_serie).join(', ')}`
+              : null}
+            onCancelar={() => setSaltando(false)}
+            onConfirmar={handleSaltar}
+          />
+        )
+      })()}
       {showCargaMasiva && (
         <Suspense fallback={null}>
           <CargaMasivaLecturasModal
