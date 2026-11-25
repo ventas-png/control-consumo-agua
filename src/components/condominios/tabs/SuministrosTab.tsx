@@ -15,9 +15,9 @@ import { tint } from '../../shared/statusTone'
 import { EditModal } from '../../shared/EditModal'
 import { SecureImage } from '../../shared/SecureImage'
 import { removeCondominiosMedia } from '../../../domain/shared/storage'
-import { FotoSuministroModal } from './suministros/FotoSuministroModal'
+import { FotosSuministroModal } from './suministros/FotosSuministroModal'
 import {
-  UNIDADES_RENDIMIENTO, consumoObservado, describirRendimiento, fmtRendimiento, rendimientoSuministro,
+  UNIDADES_RENDIMIENTO, consumoObservado, describirRendimiento, fmtRendimiento, fotosDeSuministro, rendimientoSuministro,
 } from '../../../lib/suministros'
 
 interface Props {
@@ -64,7 +64,7 @@ interface FormSuministro {
   costo_unitario: string
   rendimiento: string
   rendimiento_unidad: string
-  foto_url: string
+  fotos: string[]
   notas: string
 }
 
@@ -78,7 +78,7 @@ function movFormVacio() {
 
 const FORM_VACIO: FormSuministro = {
   nombre: '', categoria: 'limpieza', unidad_medida: 'unidad', stock_actual: '0', stock_minimo: '0',
-  ubicacion: '', proveedor_id: '', proveedor: '', costo_unitario: '', rendimiento: '', rendimiento_unidad: '', foto_url: '', notas: '',
+  ubicacion: '', proveedor_id: '', proveedor: '', costo_unitario: '', rendimiento: '', rendimiento_unidad: '', fotos: [], notas: '',
 }
 
 /** La ficha tal como la edita la persona (el stock no: lo mueven los movimientos). */
@@ -90,7 +90,7 @@ function formDesde(s: SuministroCondominio): FormSuministro {
     costo_unitario: s.costo_unitario != null ? String(s.costo_unitario) : '',
     rendimiento: s.rendimiento != null ? String(s.rendimiento) : '',
     rendimiento_unidad: s.rendimiento_unidad ?? '',
-    foto_url: s.foto_url ?? '',
+    fotos: fotosDeSuministro(s),
     notas: s.notas ?? '',
   }
 }
@@ -106,7 +106,7 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   const [filtro, setFiltro] = useState<CategoriaSupministro | ''>('')
   const [soloAlertas, setSoloAlertas] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  /** Qué ventana de foto está abierta: la de la ficha (guarda ya) o la del formulario (guarda con la ficha). */
+  /** Qué ventana de fotos está abierta: la de la ficha (guarda ya) o la del formulario (guarda con la ficha). */
   const [fotoAbierta, setFotoAbierta] = useState<'detalle' | 'form' | null>(null)
 
   const [form, setForm] = useState<FormSuministro>(FORM_VACIO)
@@ -132,17 +132,20 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
     .filter(p => proveedorHabilitadoEn(p, asignaciones, proyectoId, hoyLocalISO()))
     .map(p => ({ id: p.id, nombre: p.nombre }))
 
-  /** La foto que la fila en edición tiene guardada (en «nuevo» no hay fila). */
-  const fotoGuardada = vista === 'editar' ? selected?.foto_url ?? null : null
+  /** Las fotos que la fila en edición tiene guardadas (en «nuevo» no hay fila). */
+  const fotosGuardadas = vista === 'editar' && selected ? fotosDeSuministro(selected) : []
+  /** Las del formulario que ninguna fila nombra: subidas en esta edición y no guardadas. */
+  const pendientes = (fotos: readonly string[]) => fotos.filter(f => !fotosGuardadas.includes(f))
 
   /**
    * Una foto subida en el formulario que no llegó a guardarse no la referencia
-   * ninguna fila: al salir sin guardar se borra del bucket. La guardada no se
-   * toca: la fila todavía apunta a ella.
+   * ninguna fila: al salir sin guardar se borra del bucket. Las guardadas no se
+   * tocan: la fila todavía apunta a ellas.
    */
   function descartarFotoPendiente() {
     if (vista !== 'nuevo' && vista !== 'editar') return
-    if (form.foto_url && form.foto_url !== fotoGuardada) void removeCondominiosMedia([form.foto_url])
+    const fuera = pendientes(form.fotos)
+    if (fuera.length > 0) void removeCondominiosMedia(fuera)
   }
 
   function seleccionar(id: string) {
@@ -152,8 +155,8 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
   }
 
   /**
-   * Cerrar la ventana de la ficha. Los formularios (editar, movimiento) y la
-   * foto cuelgan de la ficha, así que se cierran con ella y lo tecleado se
+   * Cerrar la ventana de la ficha. Los formularios (editar, movimiento) y las
+   * fotos cuelgan de la ficha, así que se cierran con ella y lo tecleado se
    * descarta; una foto subida y no guardada se borra del bucket.
    */
   function cerrarDetalle() {
@@ -171,19 +174,24 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
     setVista('lista')
   }
 
-  /** La foto elegida en la ventana viaja con la ficha; la pendiente que reemplaza ya no sirve. */
-  function elegirFotoForm(foto: string | null) {
-    if (form.foto_url && form.foto_url !== foto && form.foto_url !== fotoGuardada) void removeCondominiosMedia([form.foto_url])
-    setForm(p => ({ ...p, foto_url: foto ?? '' }))
+  /** Las fotos elegidas en la ventana viajan con la ficha; las pendientes que quedaron fuera ya no sirven. */
+  function elegirFotosForm(fotos: string[]) {
+    const fuera = pendientes(form.fotos).filter(f => !fotos.includes(f))
+    if (fuera.length > 0) void removeCondominiosMedia(fuera)
+    setForm(p => ({ ...p, fotos }))
   }
 
-  /** Desde la ficha la foto se guarda en el acto, sin pasar por el formulario. */
-  async function guardarFoto(s: SuministroCondominio, foto: string | null): Promise<boolean> {
-    const { error } = await updateCondominioRow('suministros_condominio', s.id, { foto_url: foto })
+  /**
+   * Desde la ficha las fotos se guardan en el acto, sin pasar por el
+   * formulario. `foto_url` (legado) queda en null: ya viaja dentro de `fotos`.
+   */
+  async function guardarFotos(s: SuministroCondominio, fotos: string[]): Promise<boolean> {
+    const { error } = await updateCondominioRow('suministros_condominio', s.id, { fotos, foto_url: null })
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
-    // La fila ya no apunta a la anterior: ahora sí se puede borrar.
-    if (s.foto_url && s.foto_url !== foto) void removeCondominiosMedia([s.foto_url])
-    notify({ variant: 'success', title: foto ? 'Foto guardada' : 'Foto quitada', text: s.nombre })
+    // La fila ya no apunta a las quitadas: ahora sí se pueden borrar.
+    const quitadas = fotosDeSuministro(s).filter(f => !fotos.includes(f))
+    if (quitadas.length > 0) void removeCondominiosMedia(quitadas)
+    notify({ variant: 'success', title: 'Fotos guardadas', text: s.nombre })
     onRefresh()
     return true
   }
@@ -231,7 +239,9 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         costo_unitario: form.costo_unitario ? parseFloat(form.costo_unitario) : null,
         rendimiento,
         rendimiento_unidad: rendimiento != null ? (form.rendimiento_unidad.trim() || null) : null,
-        foto_url: form.foto_url || null,
+        fotos: form.fotos,
+        // Legado: la foto de antes ya viaja dentro de `fotos`.
+        foto_url: null,
         notas: form.notas.trim() || null,
       },
     }
@@ -250,8 +260,9 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
         })
     setSaving(false)
     if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return }
-    // Se reemplazó o se quitó la foto: la fila ya no apunta a la anterior.
-    if (fotoGuardada && fotoGuardada !== r.ficha.foto_url) void removeCondominiosMedia([fotoGuardada])
+    // Fotos quitadas en la edición: la fila ya no apunta a ellas.
+    const quitadas = fotosGuardadas.filter(f => !form.fotos.includes(f))
+    if (quitadas.length > 0) void removeCondominiosMedia(quitadas)
     if (vista === 'editar') notify({ variant: 'success', title: 'Suministro actualizado', text: r.ficha.nombre as string })
     setForm(FORM_VACIO)
     setVista('lista')
@@ -416,16 +427,25 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
           }
         >
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 16 }}>
-            {(selected.foto_url || canEdit) && (
-              <button type="button" onClick={() => setFotoAbierta('detalle')}
-                aria-label={selected.foto_url ? `Ver foto de ${selected.nombre}` : `Agregar foto de ${selected.nombre}`}
-                title={selected.foto_url ? 'Ver foto' : 'Agregar foto'}
-                style={{ width: 76, height: 76, flexShrink: 0, padding: 0, overflow: 'hidden', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: selected.foto_url ? '1px solid var(--at-line)' : '2px dashed var(--at-line-strong)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                {selected.foto_url
-                  ? <SecureImage src={selected.foto_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  : <><span aria-hidden="true" style={{ fontSize: 22 }}>📷</span><span style={{ fontSize: 10 }}>Agregar foto</span></>}
-              </button>
-            )}
+            {(() => {
+              const fotos = fotosDeSuministro(selected)
+              if (fotos.length === 0 && !canEdit) return null
+              return (
+                <button type="button" onClick={() => setFotoAbierta('detalle')}
+                  aria-label={fotos.length > 0 ? `Ver fotos de ${selected.nombre} (${fotos.length})` : `Agregar fotos de ${selected.nombre}`}
+                  title={fotos.length > 0 ? 'Ver fotos' : 'Agregar fotos'}
+                  style={{ position: 'relative', width: 76, height: 76, flexShrink: 0, padding: 0, overflow: 'hidden', borderRadius: 10, cursor: 'pointer', background: 'var(--at-surface-2)', color: 'var(--at-ink-3)', border: fotos.length > 0 ? '1px solid var(--at-line)' : '2px dashed var(--at-line-strong)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                  {fotos.length > 0
+                    ? <SecureImage src={fotos[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <><span aria-hidden="true" style={{ fontSize: 22 }}>📷</span><span style={{ fontSize: 10 }}>Agregar fotos</span></>}
+                  {fotos.length > 1 && (
+                    <span aria-hidden="true" style={{ position: 'absolute', right: 4, bottom: 4, padding: '1px 6px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', color: 'white', fontSize: 11, fontWeight: 700 }}>
+                      +{fotos.length - 1}
+                    </span>
+                  )}
+                </button>
+              )
+            })()}
             <div style={{ minWidth: 0 }}>
               {rendimiento && (
                 <div style={{ fontSize: 13, color: 'var(--at-ink-2)' }}>
@@ -605,18 +625,18 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
               </div>
             </div>
             <div style={{ gridColumn: 'span 3' }}>
-              <div style={lbl}>Foto</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {form.foto_url && (
-                  <SecureImage src={form.foto_url} alt={`Foto de ${form.nombre || 'el insumo'}`}
+              <div style={lbl}>Fotos{form.fotos.length > 0 ? ` (${form.fotos.length})` : ''}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {form.fotos.map((f, i) => (
+                  <SecureImage key={f} src={f} alt={`Foto ${i + 1} de ${form.nombre || 'el insumo'}`}
                     style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--at-line)', display: 'block' }} />
-                )}
+                ))}
                 <button type="button" onClick={() => setFotoAbierta('form')}
                   style={{ padding: '7px 14px', background: 'var(--at-surface)', color: 'var(--at-ink)', border: '1px solid var(--at-line-strong)', borderRadius: 8, cursor: 'pointer', fontSize: 13 }}>
-                  📷 {form.foto_url ? 'Cambiar foto' : 'Agregar foto'}
+                  📷 {form.fotos.length > 0 ? 'Cambiar fotos' : 'Agregar fotos'}
                 </button>
-                {(form.foto_url || null) !== fotoGuardada && (
-                  <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Se guarda con la ficha</span>
+                {(form.fotos.length !== fotosGuardadas.length || form.fotos.some((f, i) => f !== fotosGuardadas[i])) && (
+                  <span style={{ fontSize: 11, color: 'var(--at-ink-3)' }}>Se guardan con la ficha</span>
                 )}
               </div>
             </div>
@@ -680,12 +700,12 @@ export default function SuministrosTab({ suministros, movimientos, proyectoId, c
       )}
 
       {fotoAbierta === 'detalle' && selected && (
-        <FotoSuministroModal nombre={selected.nombre} valor={selected.foto_url ?? null} editable={canEdit}
-          onGuardar={foto => guardarFoto(selected, foto)} onClose={() => setFotoAbierta(null)} />
+        <FotosSuministroModal nombre={selected.nombre} valores={fotosDeSuministro(selected)} editable={canEdit}
+          onGuardar={fotos => guardarFotos(selected, fotos)} onClose={() => setFotoAbierta(null)} />
       )}
       {fotoAbierta === 'form' && (
-        <FotoSuministroModal nombre={form.nombre.trim() || 'Nuevo suministro'} valor={form.foto_url || null} editable
-          accion="Usar esta foto" onGuardar={foto => { elegirFotoForm(foto); return true }} onClose={() => setFotoAbierta(null)} />
+        <FotosSuministroModal nombre={form.nombre.trim() || 'Nuevo suministro'} valores={form.fotos} editable
+          accion="Usar estas fotos" onGuardar={fotos => { elegirFotosForm(fotos); return true }} onClose={() => setFotoAbierta(null)} />
       )}
 
       {showImportModal && (

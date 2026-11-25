@@ -105,3 +105,18 @@ export function consumoObservado(
     diasCobertura: porDia > 0 ? Math.floor(stockActual / porDia) : null,
   }
 }
+
+// ── Fotos (20261216000300) ───────────────────────────────────────────────────
+
+/** Tope de la base (`suministros_condominio_fotos_max`) y del uploader. */
+export const MAX_FOTOS_SUMINISTRO = 6
+
+/**
+ * Todas las fotos del insumo: la única del esquema viejo (`foto_url`), si la
+ * hay y no está ya en la lista, y después las nuevas. Al guardar, la app pasa
+ * este resultado a `fotos` y deja `foto_url` en null.
+ */
+export function fotosDeSuministro(s: Pick<SuministroCondominio, 'foto_url' | 'fotos'>): string[] {
+  const fotos = s.fotos ?? []
+  return s.foto_url && !fotos.includes(s.foto_url) ? [s.foto_url, ...fotos] : fotos
+}
