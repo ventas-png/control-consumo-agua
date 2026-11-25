@@ -37,6 +37,8 @@ export interface RutasCtx {
   proyectos: Proyecto[]
   canEdit: boolean
   canDelete: boolean
+  /** «Recordar» llama a route-reminders, que solo acepta admin/company_owner/super_admin. */
+  canRecordar: boolean
   onEjecutarRuta: (ruta: Ruta) => void
 
   // ── Estado compartido ──
