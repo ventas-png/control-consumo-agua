@@ -2,7 +2,7 @@
 -- Sandbox de lecturas omitidas: andamiaje sobre el que se aplica la migración
 -- ════════════════════════════════════════════════════════════════════════════
 -- QUÉ ES. La base desechable sobre la que el runner aplica la migración REAL
--- 20261222000000_agua_lecturas_omitidas.sql (el archivo entero, sin copiar
+-- 20261224000000_agua_lecturas_omitidas.sql (el archivo entero, sin copiar
 -- SQL) y después corre los escenarios como cada usuario.
 --
 -- LO QUE NO ES. No reproduce GoTrue ni el resto del esquema: las tablas que la

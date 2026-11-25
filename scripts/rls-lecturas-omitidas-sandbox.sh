@@ -11,7 +11,7 @@
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MIGRACION="$RAIZ/supabase/migrations/20261222000000_agua_lecturas_omitidas.sql"
+MIGRACION="$RAIZ/supabase/migrations/20261224000000_agua_lecturas_omitidas.sql"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 [[ -f "$MIGRACION" ]] || { echo "✗ Falta la migración $MIGRACION" >&2; exit 1; }
@@ -39,7 +39,7 @@ aplicar() { "${PSQL[@]}" -q -v ON_ERROR_STOP=1 -f "$1" >/dev/null; }
 
 echo "→ Andamiaje"
 aplicar "$RAIZ/scripts/rls-lecturas-omitidas-sandbox.sql"
-echo "→ 20261222000000 · lecturas omitidas"
+echo "→ 20261224000000 · lecturas omitidas"
 aplicar "$MIGRACION"
 echo "→ Fixtures"
 aplicar "$RAIZ/scripts/rls-lecturas-omitidas-datos.sql"

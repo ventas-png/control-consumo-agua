@@ -1,6 +1,6 @@
 // Lecturas omitidas: paradas de una ruta que el lecturista no pudo leer
 // (contador tapado por un carro, casa cerrada, perro suelto…), con su motivo y
-// foto de evidencia. Migración 20261222000000.
+// foto de evidencia. Migración 20261224000000.
 //
 // La tabla sólo se escribe por dos RPC (`omitir_lectura` y
 // `descartar_lectura_omitida`); el servidor resuelve empresa y proyecto desde
