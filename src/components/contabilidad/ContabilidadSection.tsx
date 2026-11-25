@@ -20,6 +20,7 @@ import { ComprasTab } from './ComprasTab'
 import { PresupuestoTab } from './PresupuestoTab'
 import { BancosTab } from './BancosTab'
 import { EstadosFinancierosTab } from './EstadosFinancierosTab'
+import { PuestaEnMarchaPanel } from './PuestaEnMarchaPanel'
 
 type SubTab = 'polizas' | 'pendientes' | 'ajustes' | 'estadocuenta' | 'balanza' | 'eeff' | 'bancos' | 'compras' | 'cxp' | 'proveedores' | 'presupuesto' | 'catalogo' | 'reglas' | 'tiposcargo' | 'auxiliares' | 'configuracion'
 
@@ -148,6 +149,10 @@ export function ContabilidadSection() {
           </select>
         </label>
       </div>
+
+      {/* Qué le falta a ESTA contabilidad para operar; desaparece cuando está completa. `key` por ledger, como las
+          pestañas: «ocultar pasos» de una contabilidad no se arrastra a otra. */}
+      <PuestaEnMarchaPanel key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} onIrA={setTab} />
 
       {/* Sub-menú con el mismo patrón que Condominios: una sola fila con scroll
           horizontal. Con `flex-wrap` estas 9 pestañas ocupaban cuatro líneas en
