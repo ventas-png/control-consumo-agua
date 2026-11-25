@@ -64,8 +64,8 @@ export function RutasSection({
   onRutaUpdated,
   onRutaDeleted,
   onEjecutarRuta,
-  canCreate: _canCreate = true,
-  canEdit: _canEdit = true,
+  canCreate: canCreateProp = true,
+  canEdit: canEditProp = true,
   canDelete: canDeleteProp = true,
 }: Props) {
   const [editando, setEditando] = useState<Ruta | null>(null)
@@ -102,9 +102,21 @@ export function RutasSection({
     } catch { /* sin almacenamiento: el filtro sólo dura mientras la pantalla esté abierta */ }
   }
 
-  const canEdit = userRole !== 'viewer' && userRole !== 'operator'
-  // Eliminar conserva la condición de rol y además exige el permiso granular (RBAC)
-  const canDelete = canEdit && canDeleteProp
+  // Crear y editar siguen el permiso RBAC del módulo (agua.rutas.create/edit),
+  // no el rol de plataforma: el «Admin Agua» se crea con rol base `operator`
+  // (EmpresaUsuariosSection) y recibe sus permisos por user_roles, así que
+  // excluir a `operator` le ocultaba «+ Nueva Ruta» aunque tuviera el permiso.
+  // La base lo admite: rutas_insert/rutas_update solo acotan por empresa.
+  const canCreate = canCreateProp && userRole !== 'viewer'
+  const canEdit = canEditProp && userRole !== 'viewer'
+  // Eliminar y «Recordar» siguen además atados al rol de plataforma porque así
+  // lo exige el servidor: la policy rutas_delete pide app_users.role admin o
+  // company_owner (un DELETE rechazado por RLS no da error, la tarjeta
+  // desaparecería sin borrarse) y la función route-reminders responde 403 a
+  // cualquier otro rol.
+  const esAdministrador = userRole === 'admin' || userRole === 'company_owner' || userRole === 'super_admin'
+  const canDelete = canDeleteProp && esAdministrador
+  const canRecordar = canEdit && esAdministrador
 
   // Los operadores asignables dependen del PROYECTO de la ruta, no de la
   // empresa: quien no tiene acceso al condominio no puede leer sus contadores
@@ -421,7 +433,7 @@ export function RutasSection({
   const hoy = hoyLocalISO()
 
   const ctx: RutasCtx = {
-    clientes, contadores, unidades, proyectos, canEdit, canDelete, onEjecutarRuta,
+    clientes, contadores, unidades, proyectos, canEdit, canDelete, canRecordar, onEjecutarRuta,
     editando, form, setForm, tipoRuta, setTipoRuta,
     clientesEnRuta, contadoresEnRuta, setContadoresEnRuta,
     unidadesEnRuta, setUnidadesEnRuta,
@@ -459,7 +471,7 @@ export function RutasSection({
               ))}
             </select>
           )}
-          {canEdit && (
+          {canCreate && (
             <button
               onClick={abrirCrear}
               style={{ padding: '10px 20px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
