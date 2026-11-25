@@ -9,7 +9,7 @@ import { DataTable, type DataTableColumn, Icon, PhotoLightbox } from '../shared'
 import { UsuarioChip } from '../shared/UsuarioChip'
 import { EditModal } from '../shared/EditModal'
 import { Button } from '../shared/Button'
-import { formatDate, formatCurrency, formatNumber } from '../../lib/format'
+import { formatDate, formatCurrency, formatNumber, hoyLocalISO } from '../../lib/format'
 import {
   registroCoincide,
   numeroContadorDeRegistro,
@@ -267,6 +267,33 @@ export function HistorialSection({
     notify({ variant: 'success', title: 'Lectura eliminada', duration: 1500 })
   }, [onRegistroDeleted])
 
+  // Excel con lo que la tabla muestra ahora: las filas filtradas (todas las
+  // páginas) y una hoja de resumen con los filtros y los totales.
+  const [exportandoExcel, setExportandoExcel] = useState(false)
+  async function descargarExcel() {
+    if (exportandoExcel || filtrados.length === 0) return
+    setExportandoExcel(true)
+    try {
+      const filtros: HistorialFiltros = {
+        texto: filtroTexto, estado: filtroEstado, proyecto: filtroProyecto,
+        unidad: filtroUnidad, tipoAgua: filtroTipoAgua,
+        fechaInicio: filtroFechaInicio, fechaFin: filtroFechaFin,
+      }
+      const [{ writeXlsx }, { hojasExcelHistorial, nombreArchivoHistorial }] = await Promise.all([
+        import('../../lib/xlsx'),
+        import('../../lib/historialExcel'),
+      ])
+      const hojas = hojasExcelHistorial(filtrados, filtros, {
+        contadoresById, unidades, proyectos, moneda, totalDe: getTotal, tiposAgua: TIPO_AGUA_LABELS,
+      })
+      await writeXlsx(nombreArchivoHistorial(filtros, proyectos, hoyLocalISO()), hojas)
+    } catch (err) {
+      notify({ variant: 'error', title: 'No se pudo generar el Excel', text: err instanceof Error ? err.message : 'Intente de nuevo.' })
+    } finally {
+      setExportandoExcel(false)
+    }
+  }
+
   function resetFiltros() {
     setFiltroTexto(''); setFiltroEstado(''); setFiltroProyecto('')
     setFiltroUnidad(''); setFiltroTipoAgua('')
@@ -440,6 +467,15 @@ export function HistorialSection({
             <button onClick={() => setViewMode('table')} aria-label="Vista de tabla" aria-pressed={viewMode === 'table'} title="Vista de tabla" style={viewBtnStyle(viewMode === 'table')}>📋</button>
             <button onClick={() => setViewMode('cards')} aria-label="Vista de tarjetas" aria-pressed={viewMode === 'cards'} title="Vista de tarjetas" style={viewBtnStyle(viewMode === 'cards')}>🎴</button>
           </div>
+          <button
+            type="button"
+            onClick={() => void descargarExcel()}
+            disabled={exportandoExcel || filtrados.length === 0}
+            title={filtrados.length === 0
+              ? 'No hay lecturas con estos filtros'
+              : `Descargar las ${filtrados.length} lecturas que se ven con estos filtros`}
+            style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: exportandoExcel ? 'wait' : filtrados.length === 0 ? 'not-allowed' : 'pointer', opacity: filtrados.length === 0 ? 0.6 : 1, fontSize: 14, whiteSpace: 'nowrap' }}
+          >{exportandoExcel ? 'Generando…' : '📊 Excel'}</button>
           <button
             onClick={async () => {
               const { exportarPDFGlobal } = await import('../../lib/pdf')
