@@ -54,6 +54,8 @@ export interface AsientoContable {
   publicado_at: string | null
   created_at: string
   updated_at: string
+  /** Por qué alguna línea en otra moneda no usa la tasa mensual (20261010000000). */
+  tipo_cambio_motivo?: string | null
 }
 
 export interface AsientoLinea {

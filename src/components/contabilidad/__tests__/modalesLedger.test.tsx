@@ -41,7 +41,7 @@ vi.mock('../../../domain/contabilidad/tiposCambio', async (orig) => ({
   useMonedaEmpresaQuery: () => ({ data: 'GTQ' }),
 }))
 vi.mock('../../../domain/contabilidad/mutations', () => ({
-  useCrearAsientoBorradorMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useGuardarPolizaManualMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   usePublicarAsientoMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 

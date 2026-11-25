@@ -866,6 +866,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55701
         run: supabase/tests/conta_revaluar_cierre_rbac/run.sh
+      # 20261222000000: conta_poliza_manual_guardar. La póliza manual (cabecera,
+      # líneas y publicación) en UNA transacción, y el borrador editable. Sobre
+      # la cadena entera: atomicidad (seis rechazos no dejan cabecera ni línea;
+      # una edición rechazada deja el borrador intacto), no edita lo publicado,
+      # lo automático, lo ajeno ni lo de otro ledger, cada acción con SU
+      # permiso, proyecto sin alcance fuera, ACL e idempotencia.
+      - name: Contabilidad — póliza manual en una transacción y borrador editable
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55702
+        run: supabase/tests/conta_poliza_manual/run.sh
       # 20261029000100 + 20261030000000: purgar_empresa, la purga atómica del
       # edge delete-company, y su política de retención. Todo o nada con fallos
       # inyectados en cada punto; cada categoría de retención detiene la purga

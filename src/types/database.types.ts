@@ -26448,6 +26448,19 @@ export type Database = {
         Args: { p_periodo: string; p_project_id: string }
         Returns: boolean
       }
+      conta_poliza_manual_guardar: {
+        Args: {
+          p_asiento_id: string | null
+          p_project_id: string | null
+          p_fecha: string
+          p_tipo: string
+          p_concepto: string
+          p_tipo_cambio_motivo: string | null
+          p_lineas: Json
+          p_publicar?: boolean
+        }
+        Returns: Database["public"]["Tables"]["conta_asientos"]["Row"]
+      }
       conta_publicar_asiento: {
         Args: { p_asiento_id: string }
         Returns: {
