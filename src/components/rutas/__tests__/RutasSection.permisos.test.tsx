@@ -1,9 +1,9 @@
 // Botones de Rutas según permisos. El «Admin Agua» se crea con rol de
 // plataforma `operator` y recibe agua.* por RBAC (EmpresaUsuariosSection):
 // la sección antes excluía a `operator` por rol y le ocultaba «+ Nueva Ruta»
-// aunque tuviera agua.rutas.create. Crear/editar siguen el permiso; eliminar y
-// «Recordar» siguen además atados a admin/company_owner/super_admin porque así
-// lo exigen la policy rutas_delete y la función route-reminders.
+// aunque tuviera agua.rutas.create. Cada botón sigue su permiso, el mismo que
+// aplica el servidor: las policies de `rutas` (20261221000000) para crear,
+// editar y eliminar, y route-reminders (agua.rutas.edit) para «Recordar».
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import type { Cliente, Contador, Proyecto, Ruta, Unidad, UserRole } from '../../../types'
@@ -49,31 +49,37 @@ const boton = (nombre: string | RegExp) => screen.queryByRole('button', { name: 
 afterEach(cleanup)
 
 describe('RutasSection — permisos', () => {
-  it('Admin Agua (rol base operator con agua.rutas.*) ve «+ Nueva Ruta» y «Editar»', () => {
+  it('Admin Agua (rol base operator con agua.rutas.*) ve todos los botones', () => {
     renderRutas('operator')
     expect(boton('+ Nueva Ruta')).not.toBeNull()
     expect(boton('Editar')).not.toBeNull()
+    expect(boton(/Recordar/)).not.toBeNull()
+    expect(boton('Eliminar')).not.toBeNull()
     expect(boton('▶ Ejecutar')).not.toBeNull()
   })
 
-  it('a un operator no le ofrece Eliminar ni Recordar: el servidor se los rechaza', () => {
-    renderRutas('operator')
-    expect(boton('Eliminar')).toBeNull()
-    expect(boton(/Recordar/)).toBeNull()
-  })
-
-  it('sin agua.rutas.create no hay «+ Nueva Ruta»; sin agua.rutas.edit no hay «Editar»', () => {
+  it('sin agua.rutas.create no hay «+ Nueva Ruta»; sin agua.rutas.edit no hay «Editar» ni «Recordar»', () => {
     renderRutas('operator', { canCreate: false, canEdit: false })
     expect(boton('+ Nueva Ruta')).toBeNull()
     expect(boton('Editar')).toBeNull()
+    expect(boton(/Recordar/)).toBeNull()
+    expect(boton('Eliminar')).not.toBeNull()
     expect(boton('▶ Ejecutar')).not.toBeNull()
   })
 
-  it('el visor no crea ni edita aunque el permiso venga marcado', () => {
+  it('sin agua.rutas.delete no hay «Eliminar», aunque pueda editar', () => {
+    renderRutas('operator', { canDelete: false })
+    expect(boton('Eliminar')).toBeNull()
+    expect(boton('Editar')).not.toBeNull()
+  })
+
+  it('el visor no crea, edita, recuerda ni elimina aunque el permiso venga marcado', () => {
     renderRutas('viewer')
     expect(boton('+ Nueva Ruta')).toBeNull()
     expect(boton('Editar')).toBeNull()
+    expect(boton(/Recordar/)).toBeNull()
     expect(boton('Eliminar')).toBeNull()
+    expect(boton('▶ Ejecutar')).not.toBeNull()
   })
 
   it('admin y dueño conservan todos los botones', () => {
@@ -85,10 +91,5 @@ describe('RutasSection — permisos', () => {
       expect(boton('Eliminar')).not.toBeNull()
       cleanup()
     }
-  })
-
-  it('Eliminar exige además agua.rutas.delete', () => {
-    renderRutas('admin', { canDelete: false })
-    expect(boton('Eliminar')).toBeNull()
   })
 })
