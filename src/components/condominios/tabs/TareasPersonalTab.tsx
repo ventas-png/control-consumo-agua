@@ -12,7 +12,7 @@ import {
 import { fetchHerramientasDePlantillas, fetchInsumosDeTareas } from '../../../domain/condominios/tabQueries'
 import { evidenciaSuficiente, esErrorDeEvidencia } from '../../../domain/condominios/evidencia'
 import {
-  paradasDelTurno, preparacionDelTurno, puntajeCierre, siguientePendiente, tareaOpcional,
+  estadoVisibleDelTurno, paradasDelTurno, preparacionDelTurno, puntajeCierre, siguientePendiente, tareaOpcional,
 } from '../../../domain/condominios/ejecucionGuiada'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { EditModal } from '../../shared/EditModal'
@@ -885,8 +885,9 @@ export function TareasPersonalTab({
           {bloquesVisibles.map(fila => {
             const bloque = estadoBloqueLocal[fila.id] ? { ...fila, estado: estadoBloqueLocal[fila.id] } : fila
             const tc = TURNO_CONFIG[bloque.turno]
-            const ec = ESTADO_BLOQUE[bloque.estado]
             const ts = tareasDeBloque(bloque.id)
+            // Cerrado con obligatorias sin hacer se lee «Incompleto», no «Completado» (la base sólo guarda completado).
+            const ec = ESTADO_BLOQUE[estadoVisibleDelTurno(bloque.estado, ts)]
             // Misma cuenta que el cierre: la opcional sin hacer no está en el total.
             const { puntaje: progreso, hechas: completadas, cuentan } = puntajeCierre(ts)
             const isOpen = bloqueAbierto === bloque.id
