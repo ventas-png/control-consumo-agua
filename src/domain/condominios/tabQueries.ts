@@ -806,7 +806,7 @@ export async function fetchInsumosDeTareas(
  * antes de iniciarlo. A diferencia de los insumos, no hay plan congelado por
  * tarea: es la receta vigente de cada actividad (`plantilla_tarea_herramientas`).
  *
- * Por la RPC `herramientas_del_turno` (20261231000000) y no con el embed
+ * Por la RPC `herramientas_del_turno` (20261230000500) y no con el embed
  * `equipos_comunes(nombre, estado)`: la RLS de Equipos y la de Inventario exigen
  * su propio tab, y a quien sólo tiene Limpieza (o «Mis tareas») el embed le
  * llegaba en NULL —«Herramienta · Obligatoria» sin saber cuál llevar—. La RPC

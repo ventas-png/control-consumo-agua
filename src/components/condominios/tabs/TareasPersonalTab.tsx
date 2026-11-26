@@ -209,7 +209,7 @@ export function TareasPersonalTab({
     setHerramientasPrep({ bloqueId, lista: null, error: null })
     // Por la RPC del turno y no con el embed del catálogo: a quien sólo tiene
     // Limpieza la RLS de Equipos le dejaba la herramienta sin nombre
-    // (20261231000000). Un turno sin actividades no pide nada: no se consulta.
+    // (20261230000500). Un turno sin actividades no pide nada: no se consulta.
     const { herramientas, error } = tareasDeBloque(bloqueId).some(t => t.plantilla_id)
       ? await fetchHerramientasDelTurno(bloqueId)
       : { herramientas: [], error: null }

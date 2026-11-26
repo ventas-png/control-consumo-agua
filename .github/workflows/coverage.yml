@@ -935,7 +935,7 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55704
         run: supabase/tests/limpieza_opcional/run.sh
-      # 20261231000000: herramientas_del_turno, la RPC SECURITY DEFINER con la
+      # 20261230000500: herramientas_del_turno, la RPC SECURITY DEFINER con la
       # que «Antes de iniciar el turno» lee nombre y estado de las herramientas
       # sin que quien sólo tiene Limpieza necesite el tab de Equipos o de
       # Inventario. Cadena completa, huella del auditor (2 grupos exactos):

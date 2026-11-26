@@ -1,5 +1,5 @@
 -- ============================================================================
--- PADRÓN DE LA SUITE «herramientas_turno» (20261231000000)
+-- PADRÓN DE LA SUITE «herramientas_turno» (20261230000500)
 --
 -- Se carga sobre la cadena REAL de migraciones: lo que se prueba es la RPC
 -- contra las tablas, triggers y policies que de verdad tiene el repositorio

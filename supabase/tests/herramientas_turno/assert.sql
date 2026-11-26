@@ -1,5 +1,5 @@
 -- ============================================================================
--- INVARIANTES de 20261231000000 (herramientas de un turno con su nombre).
+-- INVARIANTES de 20261230000500 (herramientas de un turno con su nombre).
 -- Corre sobre la cadena REAL + fixture.sql. Cada comprobación imprime
 -- «OK  …»; la primera que no se cumple aborta la corrida.
 --

@@ -68,7 +68,7 @@ describe('preparacionDelTurno', () => {
     t('4', 3, { plantilla_id: 'vidrios', estado: 'completada', instrucciones_seguridad: 'Arnés' }),
   ]
   // Escoba: equipo del catálogo (filas nuevas); Jalador: vínculo legado a Inventario. Ambos cuentan igual.
-  // La forma es la de la RPC herramientas_del_turno (20261231000000).
+  // La forma es la de la RPC herramientas_del_turno (20261230000500).
   const herramientas: HerramientaDelTurno[] = [
     { plantilla_tarea_id: 'barrer', equipo_id: 'escoba', inventario_id: null, nombre: 'Escoba', estado: 'operativo', cantidad: 1, obligatoria: false },
     { plantilla_tarea_id: 'vidrios', equipo_id: 'escoba', inventario_id: null, nombre: 'Escoba', estado: 'operativo', cantidad: 2, obligatoria: true },

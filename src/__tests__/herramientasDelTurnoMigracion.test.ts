@@ -1,4 +1,4 @@
-// Guardas estáticas de 20261231000000 (herramientas de un turno con su nombre:
+// Guardas estáticas de 20261230000500 (herramientas de un turno con su nombre:
 // RPC herramientas_del_turno).
 //
 // La prueba que importa es la ejecutable —supabase/tests/herramientas_turno/
@@ -19,7 +19,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
-const MIG = '20261231000000_herramientas_del_turno.sql'
+const MIG = '20261230000500_herramientas_del_turno.sql'
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
 const soloCodigo = (sql: string) => sql.replace(/--[^\n]*/g, '')
@@ -29,7 +29,7 @@ const m = sql.match(/CREATE OR REPLACE FUNCTION public\.herramientas_del_turno\(
 if (!m) throw new Error('no se encontró herramientas_del_turno')
 const [, cabecera, cuerpo] = m
 
-describe('20261231000000 · proyecta lo mínimo del catálogo', () => {
+describe('20261230000500 · proyecta lo mínimo del catálogo', () => {
   it('devuelve exactamente actividad, recurso, cantidad, obligatoria, nombre y estado', () => {
     const columnas = cabecera.match(/RETURNS TABLE \(([\s\S]*?)\)\s*LANGUAGE/i)![1]
       .split(',').map(c => c.trim().split(/\s+/)[0])
@@ -54,7 +54,7 @@ describe('20261231000000 · proyecta lo mínimo del catálogo', () => {
   })
 })
 
-describe('20261231000000 · quién la invoca', () => {
+describe('20261230000500 · quién la invoca', () => {
   it('SECURITY DEFINER, STABLE y search_path vacío', () => {
     expect(cabecera).toMatch(/STABLE\s+SECURITY DEFINER\s+SET search_path = ''/)
   })
@@ -89,7 +89,7 @@ describe('20261231000000 · quién la invoca', () => {
   })
 })
 
-describe('20261231000000 · la pantalla', () => {
+describe('20261230000500 · la pantalla', () => {
   const codigo = (f: string) => readFileSync(resolve(f), 'utf8').replace(/^\s*(\/\/|\*).*$/gm, '')
 
   it('la preparación pide las herramientas a la RPC del turno', () => {
@@ -120,7 +120,7 @@ describe('20261231000000 · la pantalla', () => {
   })
 })
 
-describe('20261231000000 · el sandbox sigue en CI', () => {
+describe('20261230000500 · el sandbox sigue en CI', () => {
   it('coverage.yml corre supabase/tests/herramientas_turno/run.sh', () => {
     const ci = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')
     expect(ci).toMatch(/run: supabase\/tests\/herramientas_turno\/run\.sh/)

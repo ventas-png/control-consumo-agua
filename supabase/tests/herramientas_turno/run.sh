@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20261231000000 (herramientas de un turno con su
+# Verificación EJECUTABLE de 20261230000500 (herramientas de un turno con su
 # nombre, para quien lo ejecuta: RPC herramientas_del_turno).
 #
 # POR QUÉ EXISTE
@@ -34,7 +34,7 @@ trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_CO
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-MIGRACION=20261231000000_herramientas_del_turno
+MIGRACION=20261230000500_herramientas_del_turno
 VERSION=${MIGRACION%%_*}
 NUESTRA="$MIGS/$MIGRACION.sql"
 HUELLA="$RAIZ/scripts/schema-drift/fingerprint.sql"

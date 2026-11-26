@@ -1,5 +1,5 @@
 // «Antes de iniciar el turno» desde la Ruta del día, para un rol con SÓLO
-// Limpieza (ver/editar): ve el nombre de cada herramienta (20261231000000).
+// Limpieza (ver/editar): ve el nombre de cada herramienta (20261230000500).
 //
 // El reporte: a ese rol la lista le salía «Herramienta · Obligatoria» sin
 // saber cuál llevar. La pantalla leía plantilla_tarea_herramientas con el embed

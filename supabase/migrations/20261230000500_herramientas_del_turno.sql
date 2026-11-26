@@ -122,7 +122,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.herramientas_del_turno(uuid) IS
-  'Herramientas de las actividades de las tareas de un turno, con nombre y estado del equipo (o del artículo de Inventario legado), para «Antes de iniciar el turno». SECURITY DEFINER: quien ejecuta o programa el turno no necesita el tab de Equipos ni el de Inventario para saber qué llevar. Proyección mínima; exige empresa, tareas_personal/turnos/revision_tareas/prog_limpieza y acceso al condominio del turno (20261231000000).';
+  'Herramientas de las actividades de las tareas de un turno, con nombre y estado del equipo (o del artículo de Inventario legado), para «Antes de iniciar el turno». SECURITY DEFINER: quien ejecuta o programa el turno no necesita el tab de Equipos ni el de Inventario para saber qué llevar. Proyección mínima; exige empresa, tareas_personal/turnos/revision_tareas/prog_limpieza y acceso al condominio del turno (20261230000500).';
 
 REVOKE EXECUTE ON FUNCTION public.herramientas_del_turno(uuid) FROM PUBLIC, anon;
 GRANT  EXECUTE ON FUNCTION public.herramientas_del_turno(uuid) TO authenticated, service_role;

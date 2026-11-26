@@ -95,7 +95,7 @@ export interface PlantillaTareaHerramienta {
 
 /**
  * Herramienta de una actividad del turno, como la devuelve la RPC
- * `herramientas_del_turno` (20261231000000) para «Antes de iniciar el turno».
+ * `herramientas_del_turno` (20261230000500) para «Antes de iniciar el turno».
  * El nombre y el estado vienen del equipo o, en las filas legadas, del artículo
  * de Inventario, sin que quien ejecuta necesite el tab de Equipos ni el de
  * Inventario (la RLS de esos catálogos dejaba el embed en NULL).

@@ -29,7 +29,7 @@ y el botón parecía no hacer nada.
 
 ![Antes de iniciar](capturas/ejecucion_guiada/10-preparacion.png)
 
-### El nombre de las herramientas, sin el tab de Equipos (20261231000000)
+### El nombre de las herramientas, sin el tab de Equipos (20261230000500)
 
 Las herramientas se leían de `plantilla_tarea_herramientas` con el catálogo embebido (`equipos_comunes(nombre, estado)`
 y, para los vínculos anteriores a 20261122000000, `inventario_condominio(nombre, estado)`). La RLS de esos catálogos
