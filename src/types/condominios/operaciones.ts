@@ -93,6 +93,26 @@ export interface PlantillaTareaHerramienta {
   equipo_estado?: string
 }
 
+/**
+ * Herramienta de una actividad del turno, como la devuelve la RPC
+ * `herramientas_del_turno` (20261230000500) para «Antes de iniciar el turno».
+ * El nombre y el estado vienen del equipo o, en las filas legadas, del artículo
+ * de Inventario, sin que quien ejecuta necesite el tab de Equipos ni el de
+ * Inventario (la RLS de esos catálogos dejaba el embed en NULL).
+ */
+export interface HerramientaDelTurno {
+  plantilla_tarea_id: string
+  /** Equipo del catálogo operativo (equipos_comunes). */
+  equipo_id: string | null
+  /** LEGADO: artículo de inventario_condominio. */
+  inventario_id: string | null
+  cantidad: number
+  obligatoria: boolean
+  /** null sólo si el recurso ya no existe (sus FK son RESTRICT: no debería pasar). */
+  nombre: string | null
+  estado: string | null
+}
+
 // ── Carga masiva de actividades y recursos en bloque (20261031000200) ────────
 
 /** Fila evaluada por el servidor (`plantillas_import_evaluar`). */

@@ -11,6 +11,7 @@
 import { reportDegradedQuery } from '../queryFetch'
 import { db, supabase } from '../../lib/supabase'
 import type {
+  HerramientaDelTurno,
   HorasPersonal,
   PlantillaTareaHerramienta,
   PlantillaTareaSuministro,
@@ -801,34 +802,24 @@ export async function fetchInsumosDeTareas(
 }
 
 /**
- * Herramientas y equipo de las plantillas de un turno, para la preparación
+ * Herramientas y equipo de las actividades de un turno, para la preparación
  * antes de iniciarlo. A diferencia de los insumos, no hay plan congelado por
- * tarea: se lee la receta vigente de cada plantilla (`plantilla_tarea_herramientas`,
- * 20260904000300), cuya RLS ya admite a quien ejecuta (tareas_personal) y a
- * quien programa la limpieza (prog_limpieza).
+ * tarea: es la receta vigente de cada actividad (`plantilla_tarea_herramientas`).
+ *
+ * Por la RPC `herramientas_del_turno` (20261230000500) y no con el embed
+ * `equipos_comunes(nombre, estado)`: la RLS de Equipos y la de Inventario exigen
+ * su propio tab, y a quien sólo tiene Limpieza (o «Mis tareas») el embed le
+ * llegaba en NULL —«Herramienta · Obligatoria» sin saber cuál llevar—. La RPC
+ * devuelve sólo nombre y estado, de las actividades de ESE turno.
  *
  * El error se devuelve: «no pude leer las herramientas» no es «no hace falta
  * ninguna», y la preparación lo dice.
  */
-export async function fetchHerramientasDePlantillas(
-  plantillaIds: string[],
-): Promise<{ herramientas: PlantillaTareaHerramienta[]; error: { message: string } | null }> {
-  if (plantillaIds.length === 0) return { herramientas: [], error: null }
+export async function fetchHerramientasDelTurno(
+  bloqueId: string,
+): Promise<{ herramientas: HerramientaDelTurno[]; error: { message: string } | null }> {
+  const { data, error } = await db.rpc('herramientas_del_turno', { p_bloque_id: bloqueId })
 
-  const { data, error } = await db
-    .from('plantilla_tarea_herramientas')
-    .select('*, inventario_condominio(nombre, estado), equipos_comunes(nombre, estado)')
-    .in('plantilla_tarea_id', plantillaIds)
-
-  reportDegradedQuery('condominios.fetchHerramientasDePlantillas', error)
-  const herramientas: PlantillaTareaHerramienta[] = (data ?? []).map(
-    ({ inventario_condominio: h, equipos_comunes: e, ...resto }) => ({
-      ...resto,
-      inventario_nombre: h?.nombre,
-      inventario_estado: h?.estado,
-      equipo_nombre: e?.nombre,
-      equipo_estado: e?.estado,
-    }),
-  )
-  return { herramientas, error: error ? { message: error.message } : null }
+  reportDegradedQuery('condominios.fetchHerramientasDelTurno', error)
+  return { herramientas: data ?? [], error: error ? { message: error.message } : null }
 }

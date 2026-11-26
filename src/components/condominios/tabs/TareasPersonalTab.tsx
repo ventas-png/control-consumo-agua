@@ -9,7 +9,7 @@ import {
   deleteCondominioRow,
   cerrarTareaYConsumir,
 } from '../../../domain/condominios/tabMutations'
-import { fetchHerramientasDePlantillas, fetchInsumosDeTareas } from '../../../domain/condominios/tabQueries'
+import { fetchHerramientasDelTurno, fetchInsumosDeTareas } from '../../../domain/condominios/tabQueries'
 import { evidenciaSuficiente, esErrorDeEvidencia } from '../../../domain/condominios/evidencia'
 import {
   estadoVisibleDelTurno, paradasDelTurno, preparacionDelTurno, puntajeCierre, siguientePendiente, tareaOpcional,
@@ -23,7 +23,7 @@ import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
   PersonalCondominio, AreaCondominio, TareaBloqueSuministro,
   EstadoBloqueTurno, TurnoTipo, EstadoTareaBloque,
-  CargoCatalogo, PlantillaTareaHerramienta,
+  CargoCatalogo, HerramientaDelTurno,
 } from '../../../types'
 import { etiquetaCargo } from '../../../domain/condominios/rrhhCatalogos'
 
@@ -202,7 +202,7 @@ export function TareasPersonalTab({
   // cuando la persona confirma que lo tiene.
   const [preparandoDe, setPreparandoDe] = useState<string | null>(null)
   const [herramientasPrep, setHerramientasPrep] = useState<
-    { bloqueId: string; lista: PlantillaTareaHerramienta[] | null; error: string | null } | null
+    { bloqueId: string; lista: HerramientaDelTurno[] | null; error: string | null } | null
   >(null)
   const [iniciando, setIniciando] = useState(false)
 
@@ -210,8 +210,12 @@ export function TareasPersonalTab({
     setBloqueAbierto(bloqueId)
     setPreparandoDe(bloqueId)
     setHerramientasPrep({ bloqueId, lista: null, error: null })
-    const ids = [...new Set(tareasDeBloque(bloqueId).map(t => t.plantilla_id).filter((x): x is string => !!x))]
-    const { herramientas, error } = await fetchHerramientasDePlantillas(ids)
+    // Por la RPC del turno y no con el embed del catálogo: a quien sólo tiene
+    // Limpieza la RLS de Equipos le dejaba la herramienta sin nombre
+    // (20261230000500). Un turno sin actividades no pide nada: no se consulta.
+    const { herramientas, error } = tareasDeBloque(bloqueId).some(t => t.plantilla_id)
+      ? await fetchHerramientasDelTurno(bloqueId)
+      : { herramientas: [], error: null }
     setHerramientasPrep(h => (h?.bloqueId === bloqueId ? { bloqueId, lista: herramientas, error: error?.message ?? null } : h))
   }
 

@@ -935,6 +935,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55704
         run: supabase/tests/limpieza_opcional/run.sh
+      # 20261230000500: herramientas_del_turno, la RPC SECURITY DEFINER con la
+      # que «Antes de iniciar el turno» lee nombre y estado de las herramientas
+      # sin que quien sólo tiene Limpieza necesite el tab de Equipos o de
+      # Inventario. Cadena completa, huella del auditor (2 grupos exactos):
+      # quién lee (cuatro tabs, empresa, condominio), sólo lo del turno y de su
+      # condominio, el vínculo legado a Inventario y anon. Trece mutantes.
+      - name: Limpieza — herramientas del turno con su nombre
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55705
+        run: supabase/tests/herramientas_turno/run.sh
       # 20261029000100 + 20261030000000: purgar_empresa, la purga atómica del
       # edge delete-company, y su política de retención. Todo o nada con fallos
       # inyectados en cada punto; cada categoría de retención detiene la purga

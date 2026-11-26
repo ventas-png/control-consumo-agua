@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   deleteCondominioRow: vi.fn(async () => ({ error: null as RowError })),
   cerrarTareaYConsumir: vi.fn(async () => ({ data: { consumidos: 0, no_usados: 0, sin_stock: [] as unknown[] }, error: null as RowError })),
   fetchInsumosDeTareas: vi.fn(async () => ({ insumos: [] as unknown[], error: null })),
-  fetchHerramientasDePlantillas: vi.fn(async () => ({ herramientas: [] as unknown[], error: null as { message: string } | null })),
+  fetchHerramientasDelTurno: vi.fn(async () => ({ herramientas: [] as unknown[], error: null as { message: string } | null })),
   openPromptDialog: vi.fn(async () => null as Record<string, string> | null),
   confirm: vi.fn(async () => ({ isConfirmed: true })),
   notify: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({
   fetchInsumosDeTareas: mocks.fetchInsumosDeTareas,
-  fetchHerramientasDePlantillas: mocks.fetchHerramientasDePlantillas,
+  fetchHerramientasDelTurno: mocks.fetchHerramientasDelTurno,
 }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 vi.mock('../../../shared/PromptDialog', () => ({ openPromptDialog: mocks.openPromptDialog }))

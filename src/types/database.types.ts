@@ -26987,6 +26987,18 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: boolean
       }
+      herramientas_del_turno: {
+        Args: { p_bloque_id: string }
+        Returns: {
+          cantidad: number
+          equipo_id: string | null
+          estado: string | null
+          inventario_id: string | null
+          nombre: string | null
+          obligatoria: boolean
+          plantilla_tarea_id: string
+        }[]
+      }
       is_company_owner: { Args: never; Returns: boolean }
       is_conversation_assigned_to_me: {
         Args: { p_conversation_id: string }
