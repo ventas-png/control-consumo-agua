@@ -45,4 +45,18 @@ node scripts/demo-local/recorridos/r2_ruta.mjs        # Ana ejecuta su ruta y la
 node scripts/demo-local/recorridos/r3_supervisor.mjs  # indicadores, marcar novedad atendida, lo cerrado o pasado ya no se toca
 ```
 
+## Contabilidad (`semilla-contabilidad.sql`)
+
+La contabilidad del «Condominio Demo» viene con catálogo básico más cuentas de banco, fondo de reserva, caja chica,
+equipo y gastos; 8 casas con su responsable de pago; tipos de cargo; las cuotas del mes con 4 cobros verificados; una
+cuenta bancaria con 3 movimientos de extracto; una caja chica con 3 vales y 2 activos fijos. Lo que el manual enseña a
+**hacer** no viene hecho: lo hace el recorrido, con clics.
+
+```bash
+node scripts/demo-local/recorridos/r5_contabilidad.mjs   # saldos por residente, antigüedad, bancos, fondo de reserva, caja chica, depreciación
+SOLO=bancos node scripts/demo-local/recorridos/r5_contabilidad.mjs   # un solo tramo: saldos, antiguedad, bancos, fondo, caja, depreciacion, libros
+```
+
+Cada tramo escribe en la base: para repetirlo hay que empezar de cero.
+
 Para empezar de cero: `detener.sh`, borrar `/tmp/demo-pgdata` y volver a `levantar.sh`.

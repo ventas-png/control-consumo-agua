@@ -32,7 +32,9 @@ if [ ! -x "$AQUI/bin/postgrest" ]; then
   mkdir -p "$AQUI/bin"; TMP=$(mktemp -d)
   curl -sSL --max-time 300 "https://mirror.gcr.io/v2/postgrest/postgrest/blobs/$CAPA" -o "$TMP/capa.tgz"
   [ "sha256:$(sha256sum "$TMP/capa.tgz" | cut -c1-64)" = "$CAPA" ] || { echo "❌ la capa de PostgREST no coincide con su sha256"; exit 1; }
-  tar -xzf "$TMP/capa.tgz" -C "$TMP" bin/postgrest && mv "$TMP/bin/postgrest" "$AQUI/bin/postgrest"; rm -rf "$TMP"
+  # La capa guarda el binario como «./bin/postgrest»; algunos tar no lo encuentran sin el «./».
+  { tar -xzf "$TMP/capa.tgz" -C "$TMP" ./bin/postgrest 2>/dev/null || tar -xzf "$TMP/capa.tgz" -C "$TMP" bin/postgrest; } \
+    && mv "$TMP/bin/postgrest" "$AQUI/bin/postgrest"; rm -rf "$TMP"
 fi
 echo "OK  $("$AQUI/bin/postgrest" --version)"
 
@@ -62,6 +64,12 @@ if [ "$(psql -d demo -Atc "SELECT count(*) FROM public.companies WHERE nombre = 
   umask 077; printf 'admin@demo.local\nsupervisor@demo.local\nana@demo.local\ncreador@demo.local\nclave: %s\n' "$CLAVE" > "$AQUI/.credenciales"
   psql -X -q -d demo -v clave="$CLAVE" -f "$AQUI/semilla.sql" >/dev/null
   echo "OK  empresa demo sembrada (clave en scripts/demo-local/.credenciales)"
+fi
+
+# Datos contables de la demo (una sola vez): catálogo, casas, cuotas y cobros, banco, caja chica y activos.
+if [ "$(psql -d demo -Atc "SELECT count(*) FROM public.conta_cuentas")" = "0" ]; then
+  psql -X -q -d demo -f "$AQUI/semilla-contabilidad.sql" >/dev/null
+  echo "OK  contabilidad demo sembrada"
 fi
 
 # ── 4. Secretos locales y arranque de servicios ─────────────────────────────────
