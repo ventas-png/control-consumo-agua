@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { EditModal } from '../shared'
 import { notify } from '../shared/Dialog'
 import { useCuentasEspecialesQuery, useCuentasQuery } from '../../domain/contabilidad/queries'
-import { useCrearAsientoBorradorMutation, usePublicarAsientoMutation } from '../../domain/contabilidad/mutations'
+import { useGuardarPolizaManualMutation } from '../../domain/contabilidad/mutations'
 import { convertirMontoBase, round2, type AsientoLineaFormInput } from '../../domain/contabilidad/schemas'
 import { formatCurrency, hoyLocalISO } from '../../lib/format'
 import { MSG_CONFIG_CONTABLE_INCOMPLETA } from '../../types/contabilidad'
@@ -38,8 +38,9 @@ export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose 
   // las cuentas de la empresa y armaba el asiento contra ellas.
   const { data: cuentas = [] } = useCuentasQuery(companyId, projectId)
   const { data: especiales = [] } = useCuentasEspecialesQuery(companyId, projectId)
-  const crear = useCrearAsientoBorradorMutation(companyId)
-  const publicar = usePublicarAsientoMutation()
+  // Una sola transacción: si la publicación se rechaza (ya hay apertura, ejercicio cerrado, tasa sin motivo) no
+  // queda un borrador de apertura huérfano en Pólizas.
+  const guardarPoliza = useGuardarPolizaManualMutation(companyId)
 
   const [fecha, setFecha] = useState(hoyLocalISO())
   const [saldos, setSaldos] = useState<Record<string, { monto: string; tipo_cambio: string }>>({})
@@ -138,15 +139,14 @@ export function AperturaSaldosModal({ companyId, projectId, monedaBase, onClose 
 
     setGuardando(true)
     try {
-      const asiento = await crear.mutateAsync({
+      await guardarPoliza.mutateAsync({
         fecha,
         tipo: 'apertura',
         concepto: 'Asiento de apertura — saldos iniciales',
         project_id: projectId,
         lineas,
-        moneda_base: monedaBase,
+        publicar: true,
       })
-      await publicar.mutateAsync(asiento.id)
       notify({ variant: 'success', title: 'Apertura registrada', text: 'Los saldos iniciales quedaron publicados.' })
       onClose()
     } catch (e) {

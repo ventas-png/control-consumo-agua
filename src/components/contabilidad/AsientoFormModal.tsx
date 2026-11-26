@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { EditModal } from '../shared'
 import { notify } from '../shared/Dialog'
 import { useCuentasQuery } from '../../domain/contabilidad/queries'
-import { useCrearAsientoBorradorMutation, usePublicarAsientoMutation } from '../../domain/contabilidad/mutations'
+import { useGuardarPolizaManualMutation } from '../../domain/contabilidad/mutations'
 import {
   asientoFormSchema,
   convertirMontoBase,
@@ -11,7 +11,7 @@ import {
 } from '../../domain/contabilidad/schemas'
 import { useMonedaEmpresaQuery, useTiposCambioMensualQuery, tasaMensualEntre } from '../../domain/contabilidad/tiposCambio'
 import { formatCurrency, hoyLocalISO } from '../../lib/format'
-import { TIPO_ASIENTO_LABELS, type TipoAsiento } from '../../types/contabilidad'
+import { TIPO_ASIENTO_LABELS, type AsientoConLineas, type TipoAsiento } from '../../types/contabilidad'
 import { Campo, btnPrimario, btnSecundario, btnLink, input } from './ui'
 
 interface Props {
@@ -19,6 +19,11 @@ interface Props {
   /** Ledger activo: null = contabilidad de la empresa. */
   projectId: string | null
   monedaBase: string
+  /**
+   * Borrador manual a EDITAR. Con él el formulario abre con sus datos y guardar
+   * lo reemplaza (mismo id) en vez de crear otra póliza.
+   */
+  borrador?: AsientoConLineas | null
   onClose: () => void
 }
 
@@ -34,21 +39,46 @@ interface LineaForm {
 
 const LINEA_VACIA: LineaForm = { cuenta_id: '', descripcion: '', lado: 'debe', monto: '', tipo_cambio: '' }
 
-export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: Props) {
+/**
+ * Las líneas guardadas de un borrador, como las captura el formulario: el monto
+ * es el de ORIGEN cuando la línea es en otra moneda (y su tasa va escrita, para
+ * que editar no la cambie por la mensual de hoy); si no, el de la moneda base.
+ */
+function lineasDeBorrador(b: AsientoConLineas): LineaForm[] {
+  return [...b.conta_asiento_lineas]
+    .sort((x, y) => x.orden - y.orden)
+    .map((l) => {
+      const esFx = l.moneda_origen != null && l.monto_origen != null
+      const base = l.debe > 0 ? l.debe : l.haber
+      return {
+        cuenta_id: l.cuenta_id,
+        descripcion: l.descripcion ?? '',
+        lado: l.haber > 0 ? 'haber' : 'debe',
+        monto: String(esFx ? l.monto_origen : base),
+        tipo_cambio: esFx && l.tipo_cambio != null ? String(l.tipo_cambio) : '',
+      }
+    })
+}
+
+export function AsientoFormModal({ companyId, projectId, monedaBase, borrador = null, onClose }: Props) {
   // El catálogo es el DEL LEDGER activo. Sin `projectId` la query cae al de la
   // empresa (`project_id IS NULL`), así que una póliza del proyecto se armaba
   // con cuentas de la empresa y moría al publicar ("cuentas de otra
   // contabilidad"), dejando el borrador cruzado atrás.
   const { data: cuentas = [] } = useCuentasQuery(companyId, projectId)
-  const crear = useCrearAsientoBorradorMutation(companyId)
-  const publicar = usePublicarAsientoMutation()
+  // Cabecera, líneas y publicación viajan en UNA llamada (conta_poliza_manual_guardar): si publicar se rechaza no
+  // queda un borrador a medias, así que reintentar desde este mismo formulario ya no crea otra póliza.
+  const guardarPoliza = useGuardarPolizaManualMutation(companyId)
 
-  const [fecha, setFecha] = useState(hoyLocalISO())
-  const [tipo, setTipo] = useState<TipoAsiento>('diario')
-  const [concepto, setConcepto] = useState('')
-  const [lineas, setLineas] = useState<LineaForm[]>([{ ...LINEA_VACIA }, { ...LINEA_VACIA, lado: 'haber' }])
+  const [fecha, setFecha] = useState(borrador?.fecha ?? hoyLocalISO())
+  const [tipo, setTipo] = useState<TipoAsiento>(borrador?.tipo ?? 'diario')
+  const [concepto, setConcepto] = useState(borrador?.concepto ?? '')
+  const [lineas, setLineas] = useState<LineaForm[]>(() => {
+    const previas = borrador ? lineasDeBorrador(borrador) : []
+    return previas.length >= 2 ? previas : [{ ...LINEA_VACIA }, { ...LINEA_VACIA, lado: 'haber' }]
+  })
   const [guardando, setGuardando] = useState(false)
-  const [motivoTasa, setMotivoTasa] = useState('')
+  const [motivoTasa, setMotivoTasa] = useState(borrador?.tipo_cambio_motivo ?? '')
   // Decisión B1: la tasa mensual de la fecha se PROPONE; usar otra exige motivo.
   const { data: tasasMensuales = [] } = useTiposCambioMensualQuery(companyId)
   const { data: monedaEmpresa } = useMonedaEmpresaQuery(companyId)
@@ -139,12 +169,11 @@ export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: 
     }
     setGuardando(true)
     try {
-      const asiento = await crear.mutateAsync({ ...parsed.data, moneda_base: monedaBase })
+      await guardarPoliza.mutateAsync({ ...parsed.data, asiento_id: borrador?.id ?? null, publicar: publicarDespues })
       if (publicarDespues) {
-        await publicar.mutateAsync(asiento.id)
-        notify({ variant: 'success', title: 'Publicada', text: 'Póliza creada y publicada.' })
+        notify({ variant: 'success', title: 'Publicada', text: borrador ? 'Borrador actualizado y publicado.' : 'Póliza creada y publicada.' })
       } else {
-        notify({ variant: 'success', title: 'Guardada', text: 'Póliza guardada como borrador.' })
+        notify({ variant: 'success', title: 'Guardada', text: borrador ? 'Borrador actualizado.' : 'Póliza guardada como borrador.' })
       }
       onClose()
     } catch (e) {
@@ -156,7 +185,7 @@ export function AsientoFormModal({ companyId, projectId, monedaBase, onClose }: 
 
   return (
     <EditModal
-      title="Nueva póliza"
+      title={borrador ? 'Editar póliza (borrador)' : 'Nueva póliza'}
       subtitle={`Moneda base ${monedaBase} · las cuentas en otra moneda piden monto origen y tipo de cambio`}
       onClose={onClose}
       size="lg"

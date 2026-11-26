@@ -26,8 +26,8 @@ export const PORTAL_TABS: PortalTabDef[] = [
   { id: 'paquetes',      label: 'Paquetería',      icon: '📦', descripcion: 'Paquetes que esperan en portería y lo que dejó para un tercero. Apagada, tampoco sale el aviso de paquetes al entrar.' },
   { id: 'correspondencia', label: 'Correspondencia', icon: '📬', descripcion: 'Cartas y documentos que llegaron a la unidad.' },
   { id: 'anuncios',      label: 'Anuncios',        icon: '📢', descripcion: 'Avisos de la administración y comunicados dirigidos a su unidad.' },
-  { id: 'asambleas',     label: 'Asambleas',       icon: '🏛️', descripcion: 'Asambleas del condominio y voto por su unidad.' },
-  { id: 'transparencia', label: 'Transparencia',   icon: '📊', descripcion: 'Presupuesto, gastos por categoría y fondo de reserva.' },
+  { id: 'asambleas',     label: 'Asambleas',       icon: '🏛️', descripcion: 'Asambleas del condominio y voto por su unidad. Sólo aparece si el plan de la empresa incluye Asambleas digitales.' },
+  { id: 'transparencia', label: 'Transparencia',   icon: '📊', descripcion: 'Presupuesto, gastos por categoría y fondo de reserva. Sólo aparece si el plan de la empresa incluye Transparencia financiera.' },
   { id: 'rentas',        label: 'Rentas',          icon: '🏨', descripcion: 'Solicitar autorización para rentar la unidad.' },
   { id: 'mudanza',       label: 'Mudanzas',        icon: '🚛', descripcion: 'Solicitar autorización de mudanza (entrada o salida).' },
   { id: 'mascotas',      label: 'Mascotas',        icon: '🐾', descripcion: 'Registrar las mascotas de la unidad.' },
@@ -94,14 +94,52 @@ export function normalizarTabsOcultos(raw: unknown): PortalTab[] {
   return PORTAL_TABS_CONFIGURABLES.filter(id => pedidos.has(id))
 }
 
+// ── Pestañas que dependen del plan de la empresa (billing_plans.feature_codes) ──
+
 /**
- * Tabs del portal para el residente: las que su rol permite en la unidad y que
- * la empresa no apagó en ese condominio. 'mi_unidad' siempre está.
+ * Pestañas que sólo existen si el plan de la empresa del condominio incluye la
+ * función. Antes el portal las mostraba siempre y, dentro, un «mejore su plan»
+ * que el residente no puede atender (y que veía aunque la empresa SÍ tuviera la
+ * función: la lectura de funciones del plan va por la empresa del usuario, y el
+ * residente no tiene empresa). La base ya cierra el voto sin la función
+ * (candado de plan de asambleas); aquí sólo se deja de ofrecer.
+ */
+export const TAB_FUNCION_PLAN = {
+  asambleas: 'asambleas_digitales',
+  transparencia: 'transparencia_financiera',
+} as const satisfies Partial<Record<PortalTab, string>>
+
+export type FuncionPlanPortal = typeof TAB_FUNCION_PLAN[keyof typeof TAB_FUNCION_PLAN]
+
+/** Funciones de plan que el portal consulta (una lectura por empresa y función). */
+export const FUNCIONES_PLAN_PORTAL: readonly FuncionPlanPortal[] = Object.values(TAB_FUNCION_PLAN)
+
+/** Función de plan que exige la pestaña, o `null` si no depende del plan. */
+export function funcionPlanDeTab(id: PortalTab): FuncionPlanPortal | null {
+  return (TAB_FUNCION_PLAN as Partial<Record<PortalTab, FuncionPlanPortal>>)[id] ?? null
+}
+
+/**
+ * Tabs del portal para el residente: las que su rol permite en la unidad, que
+ * la empresa no apagó en ese condominio y —si se pasa `funcionesPlan`— cuya
+ * función incluye el plan de la empresa. 'mi_unidad' siempre está.
+ *
+ * `funcionesPlan` es lo que la empresa del condominio tiene en su plan. El
+ * portal SIEMPRE lo pasa (vacío mientras no se sabe: no se ofrece lo que quizá
+ * no está contratado). Sólo la vista previa de «Config. portal» lo omite: allí
+ * se muestran las pestañas por rol y configuración, y la descripción de cada una
+ * avisa cuáles dependen del plan.
  */
 export function tabsVisiblesPortal(
   rol: string | null | undefined,
   ocultos: readonly string[] | null | undefined,
+  funcionesPlan?: ReadonlySet<string> | readonly string[],
 ): PortalTab[] {
   const apagados = new Set(normalizarTabsOcultos(ocultos))
-  return tabsForRol(rol).filter(id => !apagados.has(id))
+  const plan = funcionesPlan === undefined ? null : new Set(funcionesPlan)
+  return tabsForRol(rol).filter(id => {
+    if (apagados.has(id)) return false
+    const funcion = funcionPlanDeTab(id)
+    return !funcion || !plan || plan.has(funcion)
+  })
 }

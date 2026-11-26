@@ -22,6 +22,7 @@ import type {
   ConfigTipoCargoInput,
   OrigenCargo,
   RespuestaReprocesoCargo,
+  RespuestaReprocesoOmitido,
 } from '../../types/contabilidad'
 import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './schemas'
 import type { CuentaExistenteRef, CuentaImportFila, CuentaOmitida } from './importCuentas'
@@ -334,40 +335,33 @@ export function useImportarCuentasMutation(companyId?: string) {
 
 // ── Pólizas ─────────────────────────────────────────────────────────────────
 
-/** Inserta cabecera + líneas como BORRADOR (la publicación es otra acción). */
-export function useCrearAsientoBorradorMutation(companyId?: string) {
+/**
+ * Guarda una póliza MANUAL en una sola transacción del servidor
+ * (`conta_poliza_manual_guardar`, 20261230000000): cabecera + líneas y, con
+ * `publicar`, la publicación. Si cualquier paso se rechaza no queda nada.
+ *
+ * Antes eran tres peticiones (cabecera, líneas, publicar): un rechazo al
+ * publicar dejaba el borrador guardado y cada reintento creaba otro.
+ *
+ * Con `asiento_id` REEMPLAZA un borrador existente (cabecera y líneas) en vez
+ * de crear otra póliza.
+ */
+export function useGuardarPolizaManualMutation(companyId?: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: AsientoFormInput & { moneda_base: string }) => {
+    mutationFn: async (input: AsientoFormInput & { asiento_id?: string | null; publicar: boolean }) => {
       if (!companyId) throw new Error('Falta companyId.')
-      const cab = await runQuery<AsientoContable[]>((signal) =>
+      const asiento = await runQuery<AsientoContable>((signal) =>
         supabase
-          .from('conta_asientos')
-          .insert({
-            company_id: companyId,
-            project_id: input.project_id,
-            fecha: input.fecha,
-            tipo: input.tipo,
-            concepto: input.concepto,
-            estado: 'borrador',
-            origen: 'manual',
-            moneda_base: input.moneda_base,
-            tipo_cambio_motivo: input.tipo_cambio_motivo || null,
-          })
-          .select()
-          .abortSignal(signal),
-      )
-      const asiento = cab?.[0]
-      if (!asiento) throw new Error('No se pudo crear la póliza.')
-      await runQuery((signal) =>
-        supabase
-          .from('conta_asiento_lineas')
-          .insert(
-            input.lineas.map((l, i) => ({
-              asiento_id: asiento.id,
-              company_id: companyId,
+          .rpc('conta_poliza_manual_guardar', {
+            p_asiento_id: input.asiento_id ?? null,
+            p_project_id: input.project_id ?? null,
+            p_fecha: input.fecha,
+            p_tipo: input.tipo,
+            p_concepto: input.concepto,
+            p_tipo_cambio_motivo: input.tipo_cambio_motivo || null,
+            p_lineas: input.lineas.map((l) => ({
               cuenta_id: l.cuenta_id,
-              orden: i + 1,
               descripcion: l.descripcion || null,
               debe: l.debe,
               haber: l.haber,
@@ -375,9 +369,11 @@ export function useCrearAsientoBorradorMutation(companyId?: string) {
               monto_origen: l.monto_origen ?? null,
               tipo_cambio: l.tipo_cambio ?? null,
             })),
-          )
+            p_publicar: input.publicar,
+          })
           .abortSignal(signal),
       )
+      if (!asiento) throw new Error('No se pudo guardar la póliza.')
       return asiento
     },
     onSuccess: () => {
@@ -667,6 +663,32 @@ export function useReprocesarCargoMutation(companyId?: string) {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: contabilidadKeys.cargosPendientesDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.estadoCuentaDeEmpresa(companyId) })
+      // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'balanza'] })
+    },
+  })
+}
+
+/**
+ * Reprocesa un documento sin póliza del camino general: el servidor repite la
+ * llamada al generador que guardó al omitirlo. Si la causa ya se corrigió,
+ * asienta y la fila sale de la bandeja; si no, vuelve con el motivo vigente.
+ */
+export function useReprocesarOmitidoMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string): Promise<RespuestaReprocesoOmitido> => {
+      const filas = await runQuery<RespuestaReprocesoOmitido[]>((signal) =>
+        supabase.rpc('conta_omitido_reprocesar', { p_id: id }).abortSignal(signal),
+      )
+      const fila = filas?.[0]
+      if (!fila) throw new Error('El servidor no devolvió resultado del reproceso.')
+      return fila
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.omitidosDeEmpresa(companyId) })
       void qc.invalidateQueries({ queryKey: contabilidadKeys.estadoCuentaDeEmpresa(companyId) })
       // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
       void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })

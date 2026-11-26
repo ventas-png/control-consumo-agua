@@ -12,12 +12,13 @@ import {
 import { fetchHerramientasDePlantillas, fetchInsumosDeTareas } from '../../../domain/condominios/tabQueries'
 import { evidenciaSuficiente, esErrorDeEvidencia } from '../../../domain/condominios/evidencia'
 import {
-  paradasDelTurno, preparacionDelTurno, siguientePendiente,
+  paradasDelTurno, preparacionDelTurno, puntajeCierre, siguientePendiente, tareaOpcional,
 } from '../../../domain/condominios/ejecucionGuiada'
 import { MultiImageUploader } from '../../shared/ImageUploader'
 import { EditModal } from '../../shared/EditModal'
 import { PreparacionTurno } from './turno/PreparacionTurno'
 import { EjecucionGuiada } from './turno/EjecucionGuiada'
+import { AYUDA_OPCIONAL, chipOpcional } from './turno/opcional'
 import type {
   BloqueTurno, TareaBloque, PlantillaTareaCargo,
   PersonalCondominio, AreaCondominio, TareaBloqueSuministro,
@@ -226,8 +227,8 @@ export function TareasPersonalTab({
     // Con lo ya guardado en esta sesión: la última tarea del paso a paso puede
     // no haber vuelto todavía en la recarga, y el puntaje saldría corto.
     const ts = tareasDeBloque(id).map(t => (estadoLocal[t.id] ? { ...t, estado: estadoLocal[t.id] } : t))
-    const completadas = ts.filter(t => t.estado === 'completada' || t.estado === 'con_observacion').length
-    const puntaje = ts.length > 0 ? Math.round((completadas / ts.length) * 100) : 0
+    // La opcional sin hacer no resta; hecha, suma (puntajeCierre).
+    const { puntaje } = puntajeCierre(ts)
     const { error } = await updateCondominioRow('bloques_turno', id, {
       estado, cerrado_en: new Date().toISOString(), puntaje_completitud: puntaje,
     })
@@ -235,6 +236,30 @@ export function TareasPersonalTab({
     if (error) { notify({ variant: 'error', title: 'No se pudo cerrar el turno', text: error.message }); return }
     setEstadoBloqueLocal(m => ({ ...m, [id]: estado }))
     onRefresh()
+  }
+
+  /**
+   * «✓ Cerrar turno», del encabezado o del resumen del paso a paso.
+   *
+   * Cerrar no tiene vuelta atrás desde la pantalla: lo que quede pendiente
+   * pasa a contar como atrasado en Limpieza y el puntaje sale con lo hecho.
+   * Por eso, si queda algo, se pregunta; si no, se cierra de un toque.
+   */
+  async function pedirCierre(id: string) {
+    // La opcional sin hacer no pasa a atrasadas ni baja el puntaje (20261226000100):
+    // no hay nada que advertir por ella.
+    const pendientes = tareasGuiadas(id).filter(t => t.estado === 'pendiente' && !tareaOpcional(t)).length
+    if (pendientes > 0) {
+      const r = await confirm({
+        title: '¿Cerrar el turno con tareas pendientes?',
+        text: pendientes === 1
+          ? 'Queda 1 tarea pendiente. Si cerrás el turno, pasará a atrasadas y no se puede reabrir desde aquí.'
+          : `Quedan ${pendientes} tareas pendientes. Si cerrás el turno, pasarán a atrasadas y no se puede reabrir desde aquí.`,
+        icon: 'warning', confirmText: 'Cerrar igual', cancelText: 'Seguir en el turno',
+      })
+      if (!r.isConfirmed) return
+    }
+    await cerrarBloque(id, 'completado')
   }
 
   /**
@@ -862,8 +887,8 @@ export function TareasPersonalTab({
             const tc = TURNO_CONFIG[bloque.turno]
             const ec = ESTADO_BLOQUE[bloque.estado]
             const ts = tareasDeBloque(bloque.id)
-            const completadas = ts.filter(t => t.estado === 'completada' || t.estado === 'con_observacion').length
-            const progreso = ts.length > 0 ? Math.round((completadas / ts.length) * 100) : 0
+            // Misma cuenta que el cierre: la opcional sin hacer no está en el total.
+            const { puntaje: progreso, hechas: completadas, cuentan } = puntajeCierre(ts)
             const isOpen = bloqueAbierto === bloque.id
             const empleado = personal.find(p => p.id === bloque.personal_id)
             const nombreEmpleado = empleado?.nombre ?? bloque.personal_nombre ?? 'Empleado'
@@ -910,7 +935,7 @@ export function TareasPersonalTab({
                         </button>
                       )}
                       {bloque.estado === 'en_curso' && (
-                        <button onClick={() => cerrarBloque(bloque.id, 'completado')} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        <button onClick={() => void pedirCierre(bloque.id)} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           ✓ Cerrar turno
                         </button>
                       )}
@@ -954,7 +979,7 @@ export function TareasPersonalTab({
                           onListo={t => void resolverYSeguir(bloque.id, t, 'completada')}
                           onObservacion={t => void resolverYSeguir(bloque.id, t, 'con_observacion')}
                           onOmitir={t => void omitirYSeguir(bloque.id, t)}
-                          onCerrarTurno={() => void cerrarBloque(bloque.id, 'completado')}
+                          onCerrarTurno={() => void pedirCierre(bloque.id)}
                           onVerLista={() => setVistaLista(v => ({ ...v, [bloque.id]: true }))}
                           panel={t => (tienePanel(t)
                             ? panelEjecucion(t, () => void resolverYSeguir(bloque.id, t, 'completada', motivoDe(t.id).trim()))
@@ -1000,6 +1025,7 @@ export function TareasPersonalTab({
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
                                   {areaNombre && <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>{areaIcono} {areaNombre}</span>}
                                   {t.duracion_estimada_min != null && <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>⏱ {t.duracion_estimada_min} min</span>}
+                                  {tareaOpcional(t) && <span title={AYUDA_OPCIONAL} style={chipOpcional}>Opcional</span>}
                                   {t.requiere_foto && <span style={{ fontSize: '11.5px', color: 'var(--at-accent-hover)' }}>📷 Requiere foto</span>}
                                   {t.requiere_comentario && <span style={{ fontSize: '11.5px', color: 'var(--at-accent-hover)' }}>💬 Requiere comentario</span>}
                                   {t.requiere_checklist && (t.checklist?.length ?? 0) > 0 && (
@@ -1120,7 +1146,7 @@ export function TareasPersonalTab({
                           {bloque.puntaje_completitud >= 80 ? '🏆 Excelente desempeño' : bloque.puntaje_completitud >= 50 ? '⚠️ Desempeño aceptable' : '❌ Turno incompleto'}
                         </div>
                         <div style={{ fontSize: '13px', color: 'var(--at-ink-2)', marginTop: '4px' }}>
-                          Completitud: {bloque.puntaje_completitud}% · {completadas}/{ts.length} tareas
+                          Completitud: {bloque.puntaje_completitud}% · {completadas}/{cuentan} tareas
                           {bloque.cerrado_en && ` · Cerrado a las ${new Date(bloque.cerrado_en).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}`}
                         </div>
                       </div>

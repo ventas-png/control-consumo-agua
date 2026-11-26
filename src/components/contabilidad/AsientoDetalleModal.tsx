@@ -4,23 +4,28 @@ import { confirm, notify } from '../shared/Dialog'
 import { useAsientoDetalleQuery } from '../../domain/contabilidad/queries'
 import { useAnularAsientoMutation, usePublicarAsientoMutation } from '../../domain/contabilidad/mutations'
 import { formatCurrency, formatDateShort, formatNumber } from '../../lib/format'
-import { TIPO_ASIENTO_LABELS } from '../../types/contabilidad'
+import { TIPO_ASIENTO_LABELS, type AsientoConLineas } from '../../types/contabilidad'
 import { btnPeligro, btnPrimario, btnSecundario, usePermisosContabilidad } from './ui'
 
 interface Props {
   asientoId: string
   monedaBase: string
   onClose: () => void
+  /**
+   * Si se pasa, un borrador MANUAL ofrece «Editar» (a quien tiene «Editar») y entrega la póliza con sus líneas.
+   * Lo pasa la pestaña Pólizas; desde Pendientes y Estado de cuenta el detalle es solo de consulta.
+   */
+  onEditar?: (asiento: AsientoConLineas) => void
 }
 
 const TONO_ESTADO = { borrador: 'warning', publicado: 'success', anulado: 'neutral' } as const
 
-export function AsientoDetalleModal({ asientoId, monedaBase, onClose }: Props) {
+export function AsientoDetalleModal({ asientoId, monedaBase, onClose, onEditar }: Props) {
   const { data: asiento, isLoading } = useAsientoDetalleQuery(asientoId)
   const publicar = usePublicarAsientoMutation()
   const anular = useAnularAsientoMutation()
   // Publicar y anular exigen «Cambiar estado» en el servidor: sin él los botones solo devolvían «no autorizado».
-  const { puedeCambiarEstado } = usePermisosContabilidad()
+  const { puedeCambiarEstado, puedeEditar } = usePermisosContabilidad()
 
   async function onPublicar() {
     try {
@@ -65,6 +70,12 @@ export function AsientoDetalleModal({ asientoId, monedaBase, onClose }: Props) {
               <button onClick={() => void onAnular()} disabled={anular.isPending} style={btnPeligro}>
                 Anular
               </button>
+            )}
+            {/* Solo borradores MANUALES de los tipos que el formulario captura: una automática se corrige en su
+                documento de origen, y la apertura tiene su propia ventana. */}
+            {onEditar && puedeEditar && asiento.estado === 'borrador' && asiento.origen === 'manual'
+              && (asiento.tipo === 'diario' || asiento.tipo === 'ingreso' || asiento.tipo === 'egreso') && (
+              <button onClick={() => onEditar(asiento)} style={btnSecundario}>Editar</button>
             )}
             {puedeCambiarEstado && asiento.estado === 'borrador' && (
               <button onClick={() => void onPublicar()} disabled={publicar.isPending} style={btnPrimario}>

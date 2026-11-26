@@ -874,6 +874,31 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55701
         run: supabase/tests/conta_revaluar_cierre_rbac/run.sh
+      # 20261230000000: conta_poliza_manual_guardar. La póliza manual (cabecera,
+      # líneas y publicación) en UNA transacción, y el borrador editable. Sobre
+      # la cadena entera: atomicidad (seis rechazos no dejan cabecera ni línea;
+      # una edición rechazada deja el borrador intacto), no edita lo publicado,
+      # lo automático, lo ajeno ni lo de otro ledger, cada acción con SU
+      # permiso, proyecto sin alcance fuera, ACL e idempotencia.
+      - name: Contabilidad — póliza manual en una transacción y borrador editable
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55781
+        run: supabase/tests/conta_poliza_manual/run.sh
+      # 20261230000100: conta_asientos_omitidos. Todo documento vigente que el
+      # generador no pudo asentar queda registrado con su motivo y con la
+      # llamada completa, y se reprocesa. Sobre TODA la cadena, también las
+      # migraciones posteriores: si una reescribe conta_generar_asiento y pisa
+      # la envoltura, esta suite falla. Un gasto real sin cuenta: no asienta,
+      # queda en la bandeja, se corrige y asienta; anular o borrar retira la
+      # omisión; lo asentado, lo duplicado, un ledger sin catálogo y las
+      # facturas de proveedor no dejan omisión; el rastro nunca rompe la
+      # operación; permisos, aislamiento y ACL.
+      - name: Contabilidad — todo documento sin póliza queda a la vista y se reprocesa
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55782
+        run: supabase/tests/conta_asientos_omitidos/run.sh
       # 20261221000000: en `rutas`, crear/editar/eliminar exigen agua.rutas.
       # create/edit/delete y el acceso al proyecto, y quien ejecuta la ruta
       # (asignado o con agua.lecturas.create) sólo puede darla por completada.
@@ -885,6 +910,31 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55702
         run: supabase/tests/rutas_escribir_por_permiso/run.sh
+      # 20261226000000: convergencia de drift. Las columnas de tareas_bloque del
+      # repositorio pasan a describir las que producción YA tiene (drift #826
+      # declarado desde 2026-09-01): foto_url, icono, created_at NOT NULL y
+      # orden sin NOT NULL. Lo que hay que probar es lo que un sandbox desde el
+      # repo no ve: que el escenario de producción dé su huella registrada, que
+      # sobre él la migración sea un no-op y que sobre el repo converja sin mover
+      # ningún otro grupo.
+      - name: Columnas de tareas_bloque — convergencia a la forma de producción
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55703
+        run: supabase/tests/tareas_bloque_columnas/run.sh
+      # 20261226000100: el paso opcional de una rutina de limpieza deja de contar
+      # como pendiente. tareas_bloque.obligatoria se copia del paso al asignar
+      # (calendario) y al materializar (por jornada); si dos pasos caen en la
+      # misma tarea, gana la exigencia en cualquier orden; el calendario cuenta
+      # como pendiente sólo lo obligatorio y separa el opcional sin hacer.
+      # Cadena completa, huella del auditor (4 grupos exactos) y nueve mutantes,
+      # que muerden también la versión viva si una migración posterior repite
+      # el texto.
+      - name: Limpieza — pasos opcionales de las rutinas
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55704
+        run: supabase/tests/limpieza_opcional/run.sh
       # 20261029000100 + 20261030000000: purgar_empresa, la purga atómica del
       # edge delete-company, y su política de retención. Todo o nada con fallos
       # inyectados en cada punto; cada categoría de retención detiene la purga
@@ -1200,6 +1250,18 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55568
         run: supabase/tests/rutinas_recorrido/run.sh
+
+      # 20261225000000: con CREAR y sin EDITAR, guardar el recorrido de la
+      # rutina recién creada moría en P0002 (el FOR UPDATE pedía la policy
+      # UPDATE). Ahora se bloquea la rutina propia, de la empresa y todavía sin
+      # recorrido; la existente, la ajena y la de otra empresa siguen pidiendo
+      # editar. Cadena COMPLETA: control negativo, huella exacta, dos sesiones a
+      # la vez y siete mutantes.
+      - name: Rutinas — con crear se guarda el recorrido de la rutina nueva
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55703
+        run: supabase/tests/rutinas_recorrido_crear/run.sh
 
       # 20261103000000: calendario de limpieza. Tres RPC SECURITY DEFINER leen y
       # escriben saltándose la RLS: ver no alcanza para asignar, día pasado y
