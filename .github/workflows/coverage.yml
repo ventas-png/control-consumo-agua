@@ -885,6 +885,18 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55702
         run: supabase/tests/rutas_escribir_por_permiso/run.sh
+      # 20261226000000: convergencia de drift. Las columnas de tareas_bloque del
+      # repositorio pasan a describir las que producción YA tiene (drift #826
+      # declarado desde 2026-09-01): foto_url, icono, created_at NOT NULL y
+      # orden sin NOT NULL. Lo que hay que probar es lo que un sandbox desde el
+      # repo no ve: que el escenario de producción dé su huella registrada, que
+      # sobre él la migración sea un no-op y que sobre el repo converja sin mover
+      # ningún otro grupo.
+      - name: Columnas de tareas_bloque — convergencia a la forma de producción
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55703
+        run: supabase/tests/tareas_bloque_columnas/run.sh
       # 20261029000100 + 20261030000000: purgar_empresa, la purga atómica del
       # edge delete-company, y su política de retención. Todo o nada con fallos
       # inyectados en cada punto; cada categoría de retención detiene la purga
