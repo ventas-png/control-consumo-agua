@@ -29,8 +29,8 @@
 --    conciliación uno-a-uno de siempre rechaza un documento ya usado en grupo.
 --
 -- CÓMO REVERTIR
---   Restaurar banco_sugerencias_conciliacion y banco_estado_conciliacion desde
---   20260813000000 / 20260612010200;
+--   Restaurar banco_sugerencias_conciliacion desde 20260612010200 y
+--   banco_estado_conciliacion desde 20260611030100;
 --   DROP FUNCTION public.banco_conciliar_varios(uuid, jsonb);
 --   DROP FUNCTION public.banco_candidatos_conciliacion(uuid, text);
 --   DROP TRIGGER trg_banco_partidas ON public.banco_movimientos;
