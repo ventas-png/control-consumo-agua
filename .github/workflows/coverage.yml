@@ -885,7 +885,7 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55702
         run: supabase/tests/rutas_escribir_por_permiso/run.sh
-      # 20261225000000: convergencia de drift. Las columnas de tareas_bloque del
+      # 20261226000000: convergencia de drift. Las columnas de tareas_bloque del
       # repositorio pasan a describir las que producción YA tiene (drift #826
       # declarado desde 2026-09-01): foto_url, icono, created_at NOT NULL y
       # orden sin NOT NULL. Lo que hay que probar es lo que un sandbox desde el

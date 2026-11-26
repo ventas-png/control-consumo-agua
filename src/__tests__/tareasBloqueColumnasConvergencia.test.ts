@@ -1,4 +1,4 @@
-// Guardas estáticas de 20261225000000 (convergencia de las columnas de
+// Guardas estáticas de 20261226000000 (convergencia de las columnas de
 // tareas_bloque a la forma de producción).
 //
 // La prueba que importa es la ejecutable —supabase/tests/tareas_bloque_columnas/
@@ -12,14 +12,14 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const sql = readFileSync(
-  resolve('supabase/migrations/20261225000000_tareas_bloque_columnas_convergencia.sql'),
+  resolve('supabase/migrations/20261226000000_tareas_bloque_columnas_convergencia.sql'),
   'utf8',
 )
 // Sin los comentarios: lo que se ejecuta.
 const codigo = sql.replace(/--[^\n]*/g, '')
 const baseline = JSON.parse(readFileSync(resolve('scripts/schema-drift/drift-conocido.json'), 'utf8'))
 
-describe('20261225000000 · no-op sobre producción por construcción', () => {
+describe('20261226000000 · no-op sobre producción por construcción', () => {
   it('cada ALTER vive dentro de un bloque guardado por el catálogo', () => {
     // Fuera del DO $$ … $$ no hay ninguna sentencia: un ALTER suelto correría
     // en producción aunque la columna ya tuviera esa forma.
@@ -48,7 +48,7 @@ describe('20261225000000 · no-op sobre producción por construcción', () => {
   })
 })
 
-describe('20261225000000 · la baseline de drift encoge', () => {
+describe('20261226000000 · la baseline de drift encoge', () => {
   it('tabla:tareas_bloque/columnas ya no está declarada', () => {
     expect(baseline.grupos).not.toHaveProperty(['tabla:tareas_bloque/columnas'])
   })
@@ -59,7 +59,7 @@ describe('20261225000000 · la baseline de drift encoge', () => {
   })
 })
 
-describe('20261225000000 · el sandbox sigue en CI', () => {
+describe('20261226000000 · el sandbox sigue en CI', () => {
   it('coverage.yml corre supabase/tests/tareas_bloque_columnas/run.sh', () => {
     const ci = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')
     expect(ci).toMatch(/run: supabase\/tests\/tareas_bloque_columnas\/run\.sh/)

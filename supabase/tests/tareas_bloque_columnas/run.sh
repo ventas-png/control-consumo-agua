@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20261225000000 (convergencia de las columnas de
+# Verificación EJECUTABLE de 20261226000000 (convergencia de las columnas de
 # tareas_bloque a la forma de producción).
 #
 # QUÉ COMPRUEBA
@@ -26,7 +26,7 @@ trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_CO
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-MIGRACION=20261225000000_tareas_bloque_columnas_convergencia
+MIGRACION=20261226000000_tareas_bloque_columnas_convergencia
 VERSION=${MIGRACION%%_*}
 NUESTRA="$MIGS/$MIGRACION.sql"
 HUELLA="$RAIZ/scripts/schema-drift/fingerprint.sql"

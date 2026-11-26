@@ -46,7 +46,7 @@ const DRIFT_CONOCIDO = resolve('scripts/schema-drift/drift-conocido.json')
  * cuando la migración append-only que hace converger los dos lados se fusione.
  */
 //
-// Vacía desde 20261225000000: `tareas_bloque.foto_url` e `icono` eran las dos
+// Vacía desde 20261226000000: `tareas_bloque.foto_url` e `icono` eran las dos
 // únicas, y esa migración las escribió en el repositorio.
 const DRIFT_DECLARADO: Partial<Record<(typeof TABLAS_VIGILADAS)[number], readonly string[]>> = {}
 
