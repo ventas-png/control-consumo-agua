@@ -22,7 +22,7 @@ import { fetchCalendarioLimpieza, fetchRutinasLimpieza } from '../../../../domai
 import { asignarRutinasTurno, quitarRutinaTurno } from '../../../../domain/condominios/tabMutations'
 import {
   avisoAsignacion, cargaDelTurno, duracionPorRutina, motivoNoProgramable, porEmpleado,
-  rutinaQuitable, turnoProgramable, type DuracionRutina,
+  rutinaCumplida, rutinaQuitable, tareasQueCuentan, turnoProgramable, type DuracionRutina,
 } from '../../../../domain/condominios/calendarioLimpieza'
 import { formatearMinutos } from '../../../../domain/condominios/rutinasRecorrido'
 import { etiquetaCargo } from '../../../../domain/condominios/rrhhCatalogos'
@@ -251,7 +251,9 @@ export function VistaCalendario({ proyectoId, companyId, plantillas, cargos = []
   function chip(t: TurnoCalendarioLimpieza, r: RutinaEnTurno) {
     const nombre = nombreRutina(r.rutina_id)
     const quitable = canEdit && rutinaQuitable(t, r, hoy)
-    const hecha = r.tareas > 0 && r.hechas === r.tareas
+    // El opcional sin hacer no cuenta: la rutina se cumple sin él.
+    const hecha = rutinaCumplida(r)
+    const total = tareasQueCuentan(r)
     return (
       <button
         key={r.rutina_id}
@@ -260,8 +262,8 @@ export function VistaCalendario({ proyectoId, companyId, plantillas, cargos = []
         onDragStart={e => empezar(e, { tipo: 'puesta', rutinaId: r.rutina_id, bloqueId: t.bloque_id }, nombre)}
         onDragEnd={terminar}
         onClick={() => setDetalle({ bloqueId: t.bloque_id, rutinaId: r.rutina_id })}
-        aria-label={`${nombre}, ${t.personal_nombre} el ${etiquetaDia(t.fecha)}: ${r.hechas} de ${r.tareas} hechas`}
-        title={`${nombre} · ${r.hechas}/${r.tareas} hechas`}
+        aria-label={`${nombre}, ${t.personal_nombre} el ${etiquetaDia(t.fecha)}: ${r.hechas} de ${total} hechas`}
+        title={`${nombre} · ${r.hechas}/${total} hechas`}
         style={{
           display: 'flex', alignItems: 'center', gap: '3px', width: '100%', minWidth: 0,
           padding: '2px 5px', marginTop: '3px', borderRadius: '6px', cursor: quitable ? 'grab' : 'pointer',
@@ -273,7 +275,7 @@ export function VistaCalendario({ proyectoId, companyId, plantillas, cargos = []
       >
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nombre}</span>
         {(r.hechas > 0 || r.trabajadas > 0) && (
-          <span style={{ flexShrink: 0, fontSize: '10px', opacity: 0.85 }}>{hecha ? '✓' : `${r.hechas}/${r.tareas}`}</span>
+          <span style={{ flexShrink: 0, fontSize: '10px', opacity: 0.85 }}>{hecha ? '✓' : `${r.hechas}/${total}`}</span>
         )}
       </button>
     )
@@ -598,6 +600,7 @@ export function VistaCalendario({ proyectoId, companyId, plantillas, cargos = []
             {fila('Tareas', String(r.tareas))}
             {fila('Hechas', String(r.hechas))}
             {fila('Pendientes', String(r.pendientes))}
+            {(r.opcionales_sin_hacer ?? 0) > 0 && fila('Opcionales sin hacer', `${r.opcionales_sin_hacer} · no cuentan como pendientes`)}
             {d && fila('Duración estimada', `${formatearMinutos(d.minutos)}${d.sinDato ? ` (+${d.sinDato} sin duración)` : ''}`)}
             {quitable && (
               <p style={{ margin: '12px 0 0', fontSize: '13px', color: 'var(--at-ink-3)' }}>

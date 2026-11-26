@@ -233,9 +233,15 @@ export interface ResultadoGuardarRecorrido {
 export interface RutinaEnTurno {
   rutina_id: string
   tareas: number
+  /** Obligatorias sin hacer (pendientes y no anuladas). El opcional no «falta». */
   pendientes: number
   hechas: number
   trabajadas: number
+  /**
+   * Opcionales que no se hicieron (pendientes, omitidas o anuladas), 20261225000100.
+   * Los indicadores las sacan del total. Ausente = 0 (respuesta anterior a la migración).
+   */
+  opcionales_sin_hacer?: number
 }
 
 /**
@@ -349,6 +355,13 @@ export interface TareaBloque {
   requiere_checklist?: boolean
   /** Rutina que generó la tarea. null = alta manual o carga suelta. */
   rutina_id?: string | null
+  /**
+   * false = tarea opcional (20261225000100): se copia del paso de la rutina al
+   * asignarla. Sin hacer no cuenta como pendiente ni en el puntaje de cierre;
+   * hecha suma como cualquier otra. Ausente = obligatoria (así nace toda tarea
+   * fuera de una rutina, y así se contaba todo antes de la columna).
+   */
+  obligatoria?: boolean
   // ── Evidencia al cerrar (20260907000400) ─────────────────────────────────
   /** Posiciones (0-based) de `checklist` ya cumplidas. */
   checklist_completado?: number[]

@@ -65,18 +65,56 @@ Los **indicadores** y las **novedades** salen de esas tareas:
 
 | Indicador | Qué cuenta |
 |---|---|
-| Atrasadas (7 días) | Tareas de rutina que quedaron pendientes en la semana anterior |
-| Pendientes hoy (de N) | Tareas de rutina de hoy sin hacer, sobre el total de hoy |
-| Hechas hoy | Tareas de rutina de hoy cerradas (completas o con observación) |
+| Atrasadas (7 días) | Tareas de rutina **obligatorias** que quedaron pendientes en la semana anterior |
+| Pendientes hoy (de N) | Tareas de rutina **obligatorias** de hoy sin hacer. N son las que cuentan hoy: las obligatorias y las opcionales hechas |
+| Hechas hoy | Tareas de rutina de hoy cerradas (completas o con observación), opcionales incluidas |
 | Turnos de hoy sin rutina | Turnos de hoy sin nada asignado, de quienes hacen rutinas (tuvieron alguna en los últimos 30 días); así no cuenta los turnos de seguridad o mantenimiento |
 | Requieren manto. | Novedades de los últimos 30 días marcadas para mantenimiento |
+
+## Pasos opcionales
+
+Migración `20261225000100_limpieza_pasos_opcionales`. En **Rutinas**, cada paso del recorrido se marca **Obligatorio** u
+**Opcional** (`rutina_actividades.obligatoria`). Hasta esta migración la marca se guardaba y nadie la leía: una rutina con
+un paso opcional generaba las mismas tareas que una sin él, y el opcional sin hacer contaba en Pendientes, en Atrasadas y en
+el puntaje de cierre. Ahora:
+
+- **La tarea copia el paso.** `tareas_bloque.obligatoria` (`NOT NULL DEFAULT true`) se llena al asignar la rutina, igual
+  que la duración o el checklist: es una foto del momento. Editar la rutina después no cambia las tareas ya asignadas;
+  para que un día ya asignado tome el cambio, se quita la rutina de ese día y se vuelve a asignar.
+- **Dos pasos en la misma tarea.** Si en una asignación dos pasos caen en la misma tarea (la misma actividad en la misma
+  área, de dos rutinas o del paso legado y una parada), la tarea es una sola y es **obligatoria si cualquiera lo es**. Lo
+  que el turno ya tenía no se toca.
+- **El opcional sin hacer no falta.** No cuenta como pendiente ni como atrasado, y sale del total de «Pendientes hoy
+  (de N)». Hecho, suma como cualquier otra tarea.
+- **El puntaje de cierre: suma si se hace, no resta si no.** Es lo que se decidió con el dueño del producto. Al cerrar el
+  turno, el puntaje es hechas ÷ (obligatorias + opcionales hechas). Cuatro obligatorias hechas y una opcional sin hacer son
+  100 %. Un turno sin tareas sigue en 0 %, y uno con sólo opcionales sin hacer da 100 %. La barra de progreso de «Tareas
+  por turno» usa la misma cuenta (`puntajeCierre` en `src/domain/condominios/ejecucionGuiada.ts`).
+- **Se ve.** La tarjeta de la ejecución guiada, la lista de la parada y la lista del turno dicen «Opcional». El chip de la
+  rutina en el calendario cuenta sobre lo que cuenta («2/3») y se pone ✓ sin las opcionales. Su detalle muestra aparte
+  «Opcionales sin hacer».
+- **Quién la puede cambiar.** Lo mismo que `requiere_foto` y el resto de la foto: quien puede editar la tarea. No tiene un
+  candado propio, porque no cerraría nada: quien edita la tarea ya puede marcarla hecha, y el puntaje lo escribe la
+  pantalla.
+
+**Depende de `20261225000000`.** `tabla:tareas_bloque/columnas` tenía drift declarado contra producción desde el
+2026-09-01 (#826). Con el drift declarado, cualquier columna nueva salía **CAMBIO AMBIGUO** en el auditor de tres vías.
+ventas-png/control-consumo-agua#1175 hace converger esas columnas a la forma medida en producción: allá existen además
+`foto_url` e `icono`, `created_at` es NOT NULL y `orden` acepta NULL. Sobre producción es un no-op y retira la entrada de
+`drift-conocido.json`. **Se fusiona antes**; con eso, la columna nueva es CAMBIO PLANIFICADO.
+
+**Las tres funciones se reescriben enteras** (`limpieza_asignar_rutinas`, `limpieza_calendario` y
+`materializar_rutinas_turno`), con el texto de la versión anterior intacto salvo lo agregado. Los mutantes de
+`supabase/tests/limpieza_calendario` y `rutinas_recorrido` ahora mutan también la versión viva: si una migración
+posterior repite el texto, lo mutan ahí. Así, si alguien reescribe una de estas funciones y pierde una compuerta, esas
+suites lo dicen.
 
 ## Base de datos
 
 | Función | Qué hace | Quién |
 |---|---|---|
-| `limpieza_calendario(proyecto, desde, hasta)` | Turnos del rango (≤ 92 días) con nombre, cargo y estado de la persona, su jornada (nombre, código, color, horario) y, por turno, las rutinas asignadas (`tareas`, `pendientes`, `hechas`, `trabajadas`) y cuántas tareas sueltas tiene. | Ver el tab de Limpieza + empresa + acceso al proyecto |
-| `limpieza_asignar_rutinas(turno, rutinas[])` | Crea las tareas del recorrido de cada rutina en ese turno, detrás de lo que ya tenía y en el orden pedido. Lo que ya está (misma actividad en la misma área, aunque esté anulado) se omite. Una rutina inactiva, de otro condominio o sin actividades activas se rechaza. | **Editar** Limpieza (`condominios_puede_actuar`) + empresa + proyecto; turno abierto, de hoy en adelante |
+| `limpieza_calendario(proyecto, desde, hasta)` | Turnos del rango (≤ 92 días) con nombre, cargo y estado de la persona, su jornada (nombre, código, color, horario) y, por turno, las rutinas asignadas y cuántas tareas sueltas tiene. Por rutina: `tareas`, `pendientes` (obligatorias sin hacer), `hechas`, `trabajadas` y `opcionales_sin_hacer` (pendientes, omitidas o anuladas). | Ver el tab de Limpieza + empresa + acceso al proyecto |
+| `limpieza_asignar_rutinas(turno, rutinas[])` | Crea las tareas del recorrido de cada rutina en ese turno, detrás de lo que ya tenía y en el orden pedido, con `obligatoria` copiada del paso. Lo que ya está (misma actividad en la misma área, aunque esté anulado) se omite. Una rutina inactiva, de otro condominio o sin actividades activas se rechaza. | **Editar** Limpieza (`condominios_puede_actuar`) + empresa + proyecto; turno abierto, de hoy en adelante |
 | `limpieza_quitar_rutina(turno, rutina)` | Borra las tareas de esa rutina en ese turno si **ninguna** se trabajó. Si alguna sí, `55000` y no borra nada. | Lo mismo |
 
 - **Trabajada** tiene una sola definición, `limpieza_tarea_trabajada`, que comparten la lectura (para ofrecer o no
@@ -90,7 +128,8 @@ Los **indicadores** y las **novedades** salen de esas tareas:
   `personal_condominio` ni `plantillas_horario` por RLS. Proyecta sólo nombre, cargo y estado de la persona, y nada del
   expediente (salario, DPI, cuenta…). Sigue el patrón de `rutas_operadores_asignables`.
 - **Sin cambios:**
-  - `materializar_rutinas_turno` sigue existiendo, pero ya ninguna pantalla la llama.
+  - `materializar_rutinas_turno` sigue existiendo, pero ya ninguna pantalla la llama. Desde `20261225000100` copia
+    `obligatoria` con la misma regla que el calendario.
   - `programacion_limpieza` y `ejecuciones_limpieza` quedan como historia: no se borran, pero el panel ya no las
     carga (ninguna pantalla las lee). Lo vigila `limpiezaCalendarioMigracion.test.ts`.
 
@@ -99,13 +138,21 @@ Los **indicadores** y las **novedades** salen de esas tareas:
 | Qué | Dónde |
 |---|---|
 | Suite SQL ejecutable: cadena completa, huella del auditor (cambian exactamente 10 grupos), 52 invariantes, 14 mutantes | `supabase/tests/limpieza_calendario/` (`run.sh`, `fixture.sql`, `assert.sql`) |
+| Pasos opcionales: cadena completa, huella del auditor (cambian exactamente 4 grupos), 25 invariantes, 9 mutantes | `supabase/tests/limpieza_opcional/` (`run.sh`, `fixture.sql`, `assert.sql`) |
+| Convergencia de las columnas de `tareas_bloque`: forma de producción, no-op, aborta ante un tipo distinto | `supabase/tests/tareas_bloque_columnas/` (`run.sh`, `forma_produccion.sql`) |
+| Guardas de los pasos opcionales: la copia, la regla de la exigencia, las compuertas de las RPC reescritas, la proyección del personal sin crecer, la pantalla con la misma cuenta | `src/__tests__/limpiezaPasosOpcionalesMigracion.test.ts`, `tareasBloqueColumnasConvergencia.test.ts` |
 | Guardas estáticas: proyección mínima del personal, permiso de acción, REVOKE, ninguna pantalla llama a materializar | `src/__tests__/limpiezaCalendarioMigracion.test.ts` |
-| Dominio puro (qué se programa, qué se quita, carga del turno, indicadores) | `src/domain/condominios/calendarioLimpieza.ts` (+ `__tests__/calendarioLimpieza.test.ts`) |
+| Dominio puro (qué se programa, qué se quita, carga del turno, indicadores, qué cuenta de una rutina) | `src/domain/condominios/calendarioLimpieza.ts` (+ `__tests__/calendarioLimpieza.test.ts`) |
+| Puntaje de cierre con opcionales | `puntajeCierre` en `src/domain/condominios/ejecucionGuiada.ts` (+ `__tests__/ejecucionGuiada.test.ts`) |
 | Vistas | `__tests__/VistaCalendario.test.tsx`, `__tests__/VistaRutaDia.test.tsx`, `tabs/__tests__/ProgramacionLimpiezaTab.test.tsx` |
 
 ## Reversión
 
 Quitar la migración no borra nada: las tareas ya asignadas son `tareas_bloque` normales.
+
+Para `20261225000100`, primero se vuelven a aplicar las definiciones de `limpieza_asignar_rutinas` y `limpieza_calendario`
+de `20261103000000` y la de `materializar_rutinas_turno` de `20261102000000`, y después
+`ALTER TABLE public.tareas_bloque DROP COLUMN obligatoria;`. Lo único que se pierde es qué tareas eran opcionales.
 
 ```sql
 DROP FUNCTION IF EXISTS public.limpieza_quitar_rutina(uuid, uuid);

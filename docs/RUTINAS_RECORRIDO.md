@@ -21,6 +21,12 @@ Sin arrastre (pantallas táctiles, teclado) cada gesto tiene su botón: **＋** 
 seleccionada, la de borde resaltado), **↑ ↓** para reordenar —en el borde de un área la actividad cruza a la vecina— y
 **✕** para quitar. Todo es **borrador hasta «Guardar»**: cabecera y recorrido se guardan juntos.
 
+**Obligatorio / Opcional.** Cada paso tiene su botón. Un paso **opcional** genera su tarea igual, marcada «Opcional». Si no
+se hace, no queda pendiente, no cuenta como atrasado y no baja el puntaje de cierre del turno; si se hace, suma. La marca
+se copia a la tarea al asignar la rutina (`tareas_bloque.obligatoria`, `20261225000100`). Editarla después no cambia los
+días ya asignados. Detalle en [LIMPIEZA_CALENDARIO.md § Pasos opcionales](LIMPIEZA_CALENDARIO.md#pasos-opcionales).
+Hasta esa migración el botón guardaba el dato pero nada lo leía.
+
 **Varias de una vez.** **＋ Agregar áreas** (arriba del recorrido) abre una ventana para marcar muchas áreas juntas, y
 **＋ Actividades** (en la cabecera de cada área) hace lo mismo con el catálogo de actividades, con búsqueda, filtro de
 servicio y lo que suman las marcadas. Lo marcado entra **al final, en el orden en que se marcó** (cada marca muestra su
@@ -70,6 +76,10 @@ búsqueda, y «Marcar todas» / «Marcar las que se ven» marca de una vez lo li
   (`FOR UPDATE`) para que dos guardados no se mezclen.
 - **`materializar_rutinas_turno`** — misma firma y controles; el área de cada tarea es la de su parada, el orden sigue
   al recorrido, la parada de un área dada de baja no genera trabajo nuevo y «ya existe» compara también el área.
+  `20261225000100` la redefine para copiar también si el paso es obligatorio (versión viva; la vigila
+  `materializarRutinasRls.test.ts`).
+- **`rutina_actividades.obligatoria`** — si el paso es obligatorio. Desde `20261225000100` se copia a
+  `tareas_bloque.obligatoria` al asignar la rutina; antes se guardaba y nadie lo leía.
 - `rutinas_limpieza.area_id` queda como **legado** (sólo aplica a pasos sin parada); el editor ya no lo ofrece.
 
 ## Despliegue: los índices de `tareas_bloque`

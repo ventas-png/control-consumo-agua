@@ -3,7 +3,8 @@
 import { describe, it, expect } from 'vitest'
 import type { AreaCondominio, PlantillaTareaHerramienta, TareaBloque, TareaBloqueSuministro } from '../../../types'
 import {
-  duracionLegible, itemsPorConfirmar, paradaDe, paradasDelTurno, preparacionDelTurno, siguientePendiente,
+  duracionLegible, itemsPorConfirmar, paradaDe, paradasDelTurno, preparacionDelTurno, puntajeCierre,
+  siguientePendiente, tareaHecha, tareaOpcional,
 } from '../ejecucionGuiada'
 
 function t(id: string, orden: number, over: Partial<TareaBloque> = {}): TareaBloque {
@@ -108,5 +109,54 @@ describe('preparacionDelTurno', () => {
 describe('duracionLegible', () => {
   it('minutos y horas', () => {
     expect([duracionLegible(40), duracionLegible(60), duracionLegible(85)]).toEqual(['40 min', '1 h', '1 h 25 min'])
+  })
+})
+
+// 20261225000100 · decisión del dueño del producto: el opcional SUMA SI SE HACE
+// y NO RESTA SI NO.
+describe('puntajeCierre', () => {
+  const hecha = (id: string, over: Partial<TareaBloque> = {}) => t(id, 0, { estado: 'completada', ...over })
+
+  it('sin opcionales: hechas sobre todas, como siempre', () => {
+    expect(puntajeCierre([hecha('1'), hecha('2'), t('3', 0), t('4', 0, { estado: 'omitida' })]))
+      .toEqual({ puntaje: 50, hechas: 2, cuentan: 4 })
+  })
+
+  it('cuatro obligatorias hechas y una opcional sin hacer: 100%', () => {
+    const ts = [hecha('1'), hecha('2'), hecha('3'), hecha('4', { estado: 'con_observacion' }), t('5', 0, { obligatoria: false })]
+    expect(puntajeCierre(ts)).toEqual({ puntaje: 100, hechas: 4, cuentan: 4 })
+  })
+
+  it('la opcional hecha suma en el total y en lo hecho', () => {
+    // 1 de 2 obligatorias + la opcional hecha: 2 de 3, no 1 de 2.
+    const ts = [hecha('1'), t('2', 0), hecha('3', { obligatoria: false })]
+    expect(puntajeCierre(ts)).toEqual({ puntaje: 67, hechas: 2, cuentan: 3 })
+  })
+
+  it('la opcional omitida tampoco resta', () => {
+    const ts = [hecha('1'), t('2', 0, { obligatoria: false, estado: 'omitida' })]
+    expect(puntajeCierre(ts).puntaje).toBe(100)
+  })
+
+  it('la obligatoria omitida sí resta', () => {
+    const ts = [hecha('1'), t('2', 0, { estado: 'omitida' })]
+    expect(puntajeCierre(ts).puntaje).toBe(50)
+  })
+
+  it('sin tareas, 0; sólo opcionales sin hacer, 100 (no faltó nada exigido)', () => {
+    expect(puntajeCierre([]).puntaje).toBe(0)
+    expect(puntajeCierre([t('1', 0, { obligatoria: false }), t('2', 0, { obligatoria: false })]))
+      .toEqual({ puntaje: 100, hechas: 0, cuentan: 0 })
+  })
+
+  it('sin el dato, la tarea es obligatoria', () => {
+    expect(tareaOpcional(t('1', 0))).toBe(false)
+    expect(tareaOpcional(t('1', 0, { obligatoria: true }))).toBe(false)
+    expect(tareaOpcional(t('1', 0, { obligatoria: false }))).toBe(true)
+  })
+
+  it('hecha es completa o con observación; omitida no', () => {
+    expect(['completada', 'con_observacion', 'omitida', 'pendiente'].map(e => tareaHecha(e as TareaBloque['estado'])))
+      .toEqual([true, true, false, false])
   })
 })

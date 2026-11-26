@@ -22495,6 +22495,7 @@ export type Database = {
           motivo_sin_evidencia: string | null
           notas_operativo: string | null
           novedad: string | null
+          obligatoria: boolean
           orden: number | null
           plantilla_id: string | null
           prioridad: string | null
@@ -22529,6 +22530,7 @@ export type Database = {
           motivo_sin_evidencia?: string | null
           notas_operativo?: string | null
           novedad?: string | null
+          obligatoria?: boolean
           orden?: number | null
           plantilla_id?: string | null
           prioridad?: string | null
@@ -22563,6 +22565,7 @@ export type Database = {
           motivo_sin_evidencia?: string | null
           notas_operativo?: string | null
           novedad?: string | null
+          obligatoria?: boolean
           orden?: number | null
           plantilla_id?: string | null
           prioridad?: string | null

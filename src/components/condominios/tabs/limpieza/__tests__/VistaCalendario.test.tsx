@@ -262,6 +262,26 @@ describe('VistaCalendario · quitar y mover', () => {
     expect(screen.getByRole('dialog', { name: '🧭 Niveles' })).toBeTruthy()
   })
 
+  // 20261225000100: el opcional sin hacer no cuenta. 4 tareas, 1 opcional sin
+  // hacer: el chip dice 2/3 y, con las 3 que cuentan hechas, ✓.
+  it('el chip cuenta sobre lo que cuenta y el detalle separa las opcionales sin hacer', async () => {
+    cargar([
+      turno({ rutinas: [{ rutina_id: 'rN', tareas: 4, pendientes: 1, hechas: 2, trabajadas: 2, opcionales_sin_hacer: 1 }] }),
+      turno({ bloque_id: 'b23', fecha: '2026-10-23', rutinas: [{ rutina_id: 'rS', tareas: 4, pendientes: 0, hechas: 3, trabajadas: 3, opcionales_sin_hacer: 1 }] }),
+    ])
+    montar()
+    const niveles = await screen.findByRole('button', { name: /^Niveles, Ana Pérez/ })
+    expect(niveles.getAttribute('aria-label')).toMatch(/2 de 3 hechas$/)
+    expect(niveles.textContent).toMatch(/2\/3$/)
+    const sotanos = screen.getByRole('button', { name: /^Sótanos, Ana Pérez/ })
+    expect(sotanos.textContent).toMatch(/✓$/)
+
+    fireEvent.click(niveles)
+    const detalle = screen.getByRole('dialog', { name: '🧭 Niveles' })
+    expect(detalle.textContent).toMatch(/Pendientes1/)
+    expect(detalle.textContent).toMatch(/Opcionales sin hacer1 · no cuentan como pendientes/)
+  })
+
   it('con tareas trabajadas no se ofrece quitar: se explica dónde se corrige', async () => {
     cargar([turno({ rutinas: [enTurno('rN', 1)] })])
     montar()

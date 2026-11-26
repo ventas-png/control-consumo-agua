@@ -14,6 +14,40 @@ import { herramientaId, herramientaNombre } from './herramientasPlantilla'
 /** Una tarea ya no se ejecuta: se cerró (bien o con observación) o se omitió. */
 export const tareaResuelta = (estado: EstadoTareaBloque) => estado !== 'pendiente'
 
+/** Una tarea está HECHA: completa o con observación. Omitida no es hecha. */
+export const tareaHecha = (estado: EstadoTareaBloque) => estado === 'completada' || estado === 'con_observacion'
+
+/**
+ * La tarea es opcional (20261225000100): su paso de la rutina lo era. Sin el
+ * dato es obligatoria, que es como nace toda tarea fuera de una rutina.
+ */
+export const tareaOpcional = (t: Pick<TareaBloque, 'obligatoria'>) => t.obligatoria === false
+
+export interface PuntajeCierre {
+  /** 0–100, lo que se guarda en `bloques_turno.puntaje_completitud`. */
+  puntaje: number
+  hechas: number
+  /** Las que cuentan: las obligatorias y las opcionales hechas. */
+  cuentan: number
+}
+
+/**
+ * El puntaje de cierre de un turno: hechas sobre las que cuentan.
+ *
+ * El opcional SUMA SI SE HACE Y NO RESTA SI NO (decisión del dueño del
+ * producto): sin hacer sale del total; hecho cuenta en el total y en lo hecho.
+ * Cuatro obligatorias hechas y una opcional sin hacer son 100%.
+ *
+ * Un turno sin tareas sigue dando 0, como antes. Uno con tareas pero ninguna que
+ * cuente (sólo opcionales, ninguna hecha) da 100: no faltó nada de lo exigido.
+ */
+export function puntajeCierre(tareas: Pick<TareaBloque, 'estado' | 'obligatoria'>[]): PuntajeCierre {
+  const hechas = tareas.filter(t => tareaHecha(t.estado)).length
+  const cuentan = tareas.filter(t => !tareaOpcional(t) || tareaHecha(t.estado)).length
+  if (tareas.length === 0) return { puntaje: 0, hechas: 0, cuentan: 0 }
+  return { puntaje: cuentan > 0 ? Math.round((hechas / cuentan) * 100) : 100, hechas, cuentan }
+}
+
 /**
  * Una parada del recorrido: tareas CONSECUTIVAS de la misma área. Es la forma
  * en que las rutinas materializan su recorrido (área por área, en orden), y la

@@ -132,9 +132,11 @@ SET ROLE authenticated;
 SELECT lc.como('VER');
 SELECT lc.chk(
   (SELECT rutinas FROM public.limpieza_calendario(lc.id('D1'), CURRENT_DATE + 5, CURRENT_DATE + 5)),
+  -- `opcionales_sin_hacer` desde 20261225000100 (pasos opcionales): aquí todos
+  -- los pasos son obligatorios, así que es 0. Lo prueba supabase/tests/limpieza_opcional.
   jsonb_build_array(
-    jsonb_build_object('rutina_id', lc.id('R2'), 'tareas', 1, 'pendientes', 1, 'hechas', 0, 'trabajadas', 0),
-    jsonb_build_object('rutina_id', lc.id('R1'), 'tareas', 3, 'pendientes', 3, 'hechas', 0, 'trabajadas', 0)),
+    jsonb_build_object('rutina_id', lc.id('R2'), 'tareas', 1, 'pendientes', 1, 'hechas', 0, 'trabajadas', 0, 'opcionales_sin_hacer', 0),
+    jsonb_build_object('rutina_id', lc.id('R1'), 'tareas', 3, 'pendientes', 3, 'hechas', 0, 'trabajadas', 0, 'opcionales_sin_hacer', 0)),
   'B8 · el calendario lista las rutinas del turno en el orden en que entraron');
 SELECT lc.chk(
   (SELECT otras_tareas FROM public.limpieza_calendario(lc.id('D1'), CURRENT_DATE + 6, CURRENT_DATE + 6)),

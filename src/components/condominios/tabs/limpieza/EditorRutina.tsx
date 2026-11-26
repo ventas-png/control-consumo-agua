@@ -650,7 +650,7 @@ export function EditorRutina({
                       <span style={{ fontSize: '11px', color: 'var(--at-ink-3)' }}>{paso.obligatoria ? 'Obligatorio' : 'Opcional'}</span>
                     ) : (
                       <span style={{ display: 'flex', gap: '4px' }}>
-                        <button onClick={() => setRec(alternarObligatoria(rec, i, j))} title={paso.obligatoria ? 'Paso obligatorio' : 'Paso opcional'} aria-label={`${paso.obligatoria ? 'Volver opcional' : 'Volver obligatorio'} ${act?.titulo ?? 'el paso'}`} style={{ ...botonMini, border: 'none', fontWeight: 600, background: paso.obligatoria ? 'var(--at-primary-soft)' : 'var(--at-chip)', color: paso.obligatoria ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
+                        <button onClick={() => setRec(alternarObligatoria(rec, i, j))} title={paso.obligatoria ? 'Obligatorio: si no se hace, queda pendiente y baja el puntaje del turno' : 'Opcional: si no se hace, no queda pendiente ni baja el puntaje del turno; si se hace, suma'} aria-label={`${paso.obligatoria ? 'Volver opcional' : 'Volver obligatorio'} ${act?.titulo ?? 'el paso'}`} style={{ ...botonMini, border: 'none', fontWeight: 600, background: paso.obligatoria ? 'var(--at-primary-soft)' : 'var(--at-chip)', color: paso.obligatoria ? 'var(--at-primary)' : 'var(--at-ink-3)' }}>
                           {paso.obligatoria ? 'Obligatorio' : 'Opcional'}
                         </button>
                         <button onClick={() => arriba && moverPaso({ parada: i, indice: j }, arriba)} disabled={!arriba} aria-label={`Subir ${act?.titulo ?? 'el paso'}`} style={{ ...botonMini, opacity: arriba ? 1 : 0.4 }}>↑</button>
