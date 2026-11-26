@@ -92,8 +92,8 @@ const campoTarea: CSSProperties = {
   borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-warning-tint)',
 }
 
-/** Las columnas de la tarea que se guardan al instante, cada vez la lista entera. */
-type ColumnaEnOrden = 'checklist_completado' | 'foto_urls'
+/** Las columnas de la tarea que se guardan al instante, cada vez con su valor entero. */
+type ColumnaEnOrden = 'checklist_completado' | 'foto_urls' | 'evidencia_texto'
 
 /** El mapa sin esa clave (para soltar lo local de una tarea). */
 function sin<T>(m: Record<string, T>, clave: string): Record<string, T> {
@@ -445,36 +445,48 @@ export function TareasPersonalTab({
     [pendientesDe, cantidades],
   )
 
-  // Pasos y fotos se guardan al instante, y cada guardado manda la lista ENTERA
-  // de su columna: manda el orden en que la base escribe. Con red lenta, tres
-  // pasos tocados seguidos eran tres PATCH en paralelo y ganaba cualquiera (la
-  // pantalla con los tres, la fila en `[0, 1]` y el trigger rechazando el
-  // cierre); con las fotos, quitar una y enseguida otra podía dejar en la fila
-  // una foto cuyo archivo ya se había borrado del bucket. Ahora cada columna de
-  // cada tarea se escribe de a una vez, en el orden en que se pidió.
+  // Pasos, fotos y comentario se guardan al instante, y cada guardado manda el
+  // valor ENTERO de su columna: manda el orden en que la base escribe. Con red
+  // lenta, tres pasos tocados seguidos eran tres PATCH en paralelo y ganaba
+  // cualquiera (la pantalla con los tres, la fila en `[0, 1]` y el trigger
+  // rechazando el cierre); quitar una foto y enseguida otra podía dejar en la
+  // fila una foto ya borrada del bucket; y el comentario guardado al salir del
+  // campo podía pisar el texto completo con uno a medio escribir, a veces con
+  // la tarea ya cerrada. Ahora cada columna de cada tarea se escribe de a una
+  // vez, en el orden en que se pidió.
   const colas = useRef<Record<string, Promise<unknown>>>({})
-  const pedidos = useRef<Record<string, number>>({})
+  /** Cuántos se pidieron y el último valor pedido, mientras no falle: lo que la fila va a tener. */
+  const pedidos = useRef<Record<string, { n: number; valor: unknown }>>({})
   const claveCola = (tareaId: string, columna: ColumnaEnOrden) => `${tareaId}:${columna}`
 
-  /** `ultimo`: si al responder seguía siendo la última lista pedida para esa columna. */
-  function escribirEnOrden(tareaId: string, columna: ColumnaEnOrden, lista: unknown[]) {
+  /** `ultimo`: si al responder seguía siendo el último valor pedido para esa columna. */
+  function escribirEnOrden(tareaId: string, columna: ColumnaEnOrden, valor: unknown) {
     const clave = claveCola(tareaId, columna)
-    const n = (pedidos.current[clave] ?? 0) + 1
-    pedidos.current[clave] = n
+    const n = (pedidos.current[clave]?.n ?? 0) + 1
+    pedidos.current[clave] = { n, valor }
     const escrito = (colas.current[clave] ?? Promise.resolve())
-      .then(() => updateCondominioRow('tareas_bloque', tareaId, { [columna]: lista }))
+      .then(() => updateCondominioRow('tareas_bloque', tareaId, { [columna]: valor }))
     // Un guardado que revienta no corta la cola: el siguiente sale igual.
     colas.current[clave] = escrito.catch(() => {})
-    return escrito.then(({ error }) => ({ error, ultimo: pedidos.current[clave] === n }))
+    return escrito.then(({ error }) => {
+      const ultimo = pedidos.current[clave].n === n
+      // Si falló el último, ya no se sabe qué tiene la fila: que no se dé por escrito.
+      if (error && ultimo) pedidos.current[clave] = { n, valor: undefined }
+      return { error, ultimo }
+    })
   }
+
+  /** Lo último que se pidió escribir en esa columna, salvo que haya fallado; `undefined` si nada. */
+  const valorPedido = (tareaId: string, columna: ColumnaEnOrden) => pedidos.current[claveCola(tareaId, columna)]?.valor
 
   /**
    * Deja en la fila lo que la pantalla muestra de una columna, antes del cierre:
-   * la lista local si la hay (detrás de los guardados en camino) y, si no,
-   * espera a que esos guardados terminen.
+   * el valor local si lo hay (detrás de los guardados en camino, aunque sea
+   * igual al de la fila, que puede estar a punto de cambiar) y, si no, espera
+   * a que esos guardados terminen.
    */
-  async function asentar(tareaId: string, columna: ColumnaEnOrden, enPantalla: unknown[] | undefined) {
-    if (enPantalla) return (await escribirEnOrden(tareaId, columna, enPantalla)).error
+  async function asentar(tareaId: string, columna: ColumnaEnOrden, enPantalla: unknown) {
+    if (enPantalla !== undefined) return (await escribirEnOrden(tareaId, columna, enPantalla)).error
     await colas.current[claveCola(tareaId, columna)]
     return null
   }
@@ -507,6 +519,24 @@ export function TareasPersonalTab({
       setFotosLocales(m => sin(m, t.id))
       notify({ variant: 'error', title: 'Error', text: error.message })
     }
+    onRefresh()
+  }
+
+  /**
+   * Al salir del campo, y sólo si el texto cambió respecto de lo último pedido
+   * (o de la fila): entrar y salir sin escribir mandaba un `''` que, si llegaba
+   * último, hacía rechazar el cierre por falta de comentario.
+   */
+  async function guardarComentario(t: TareaBloque) {
+    const texto = comentarios[t.id]
+    if (texto === undefined) return
+    const vigente = valorPedido(t.id, 'evidencia_texto') ?? t.evidencia_texto ?? ''
+    if (texto === vigente) return
+    const { error, ultimo } = await escribirEnOrden(t.id, 'evidencia_texto', texto)
+    if (!ultimo) return
+    // El texto queda en pantalla aunque falle: es lo que escribió quien ejecuta,
+    // y «Listo» lo vuelve a mandar. Antes el error se tragaba sin aviso.
+    if (error) notify({ variant: 'error', title: 'No se guardó el comentario', text: error.message })
     onRefresh()
   }
 
@@ -588,22 +618,16 @@ export function TareasPersonalTab({
           notify({ variant: 'warning', title: 'Falta evidencia', text: chequeo.motivo })
           return false
         }
-        // Lo mismo con pasos y fotos: lo que se ve se escribe ANTES del cierre,
-        // detrás de los guardados que sigan en camino. Son columnas distintas,
-        // así que van a la par.
+        // Pasos, fotos y comentario: lo que se ve se escribe ANTES del cierre,
+        // detrás de los guardados que sigan en camino, porque el trigger lee la
+        // fila y no la pantalla. Son columnas distintas, así que van a la par.
         const errores = await Promise.all([
           asentar(t.id, 'checklist_completado', pasosLocales[t.id]),
           asentar(t.id, 'foto_urls', fotosLocales[t.id]),
+          asentar(t.id, 'evidencia_texto', comentarios[t.id]),
         ])
         const error = errores.find(e => e)
         if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
-        // Un comentario escrito y todavía sin guardar (el blur y el clic llegan
-        // juntos) se guarda ANTES del cierre: el trigger lee la fila, no la pantalla.
-        const escrito = comentarios[t.id]
-        if (escrito !== undefined && escrito !== (t.evidencia_texto ?? '')) {
-          const { error } = await updateCondominioRow('tareas_bloque', t.id, { evidencia_texto: escrito })
-          if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
-        }
       }
       const { data, error } = await cerrarTareaYConsumir(
         tareaId,
@@ -821,7 +845,7 @@ export function TareasPersonalTab({
             </label>
             <textarea id={`com-${t.id}`} rows={2} value={comentarioDe(t)}
               onChange={e => { const v = e.target.value; setComentarios(c => ({ ...c, [t.id]: v })) }}
-              onBlur={() => void updateCondominioRow('tareas_bloque', t.id, { evidencia_texto: comentarioDe(t) }).then(onRefresh)}
+              onBlur={() => void guardarComentario(t)}
               style={{ width: '100%', boxSizing: 'border-box', padding: '8px', border: '1.5px solid var(--at-line)', borderRadius: '8px', fontSize: '13px', background: 'var(--at-surface)' }} />
           </div>
         )}
