@@ -27,14 +27,14 @@ import { resolve, join } from 'node:path'
 //
 // VERSIÓN VIVA. 20261102000000 (rutinas como recorrido por áreas) redefinió la
 // RPC con la misma firma: el área sale de la parada y el orden del recorrido.
-// 20261225000100 (pasos opcionales) la volvió a redefinir, con el mismo texto
+// 20261226000100 (pasos opcionales) la volvió a redefinir, con el mismo texto
 // más la copia de `obligatoria`. Los guards de la RPC miran ESA versión; los de
 // las columnas de snapshot y la FK de linaje siguen mirando 20260907000300, que
 // es donde se declaran.
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
 const MIG_MAT = '20260907000300_materializar_rutinas.sql'
-const MIG_VIVA = '20261225000100_limpieza_pasos_opcionales.sql'
+const MIG_VIVA = '20261226000100_limpieza_pasos_opcionales.sql'
 /** La que cambió la unicidad de tareas_bloque a (bloque, plantilla, área). */
 const MIG_INDICE = '20261102000000_rutinas_recorrido_por_areas.sql'
 
@@ -202,7 +202,7 @@ describe('materializar_rutinas_turno (versión viva) · idempotencia que respeta
 })
 
 describe('materializar_rutinas_turno · el guard de append-only sigue contento', () => {
-  it('20261225000100 es la versión viva y nadie la reescribió después', () => {
+  it('20261226000100 es la versión viva y nadie la reescribió después', () => {
     // Se busca la REDEFINICIÓN, no la mención. Antes bastaba con nombrar la RPC
     // para que este guard se disparara, y 20260907000500 la nombra dentro de un
     // `COMMENT ON … IS '…'` —que es texto documentando de dónde vienen las

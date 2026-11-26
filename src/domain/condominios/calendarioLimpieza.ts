@@ -67,7 +67,7 @@ export function motivoNoProgramable(t: TurnoCalendarioLimpieza, hoy: string): st
 
 /**
  * Las tareas de la rutina que CUENTAN en el turno: las obligatorias y las
- * opcionales hechas (20261225000100). El opcional sin hacer no falta: la rutina
+ * opcionales hechas (20261226000100). El opcional sin hacer no falta: la rutina
  * se da por cumplida sin él, así que sale del total.
  */
 export const tareasQueCuentan = (r: RutinaEnTurno): number => r.tareas - (r.opcionales_sin_hacer ?? 0)

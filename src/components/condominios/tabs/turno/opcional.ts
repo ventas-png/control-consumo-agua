@@ -1,4 +1,4 @@
-// La marca «Opcional» de una tarea (20261225000100): la misma en la tarjeta de
+// La marca «Opcional» de una tarea (20261226000100): la misma en la tarjeta de
 // la ejecución guiada, en la lista de la parada y en la lista del turno.
 import type { CSSProperties } from 'react'
 

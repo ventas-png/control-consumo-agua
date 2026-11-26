@@ -112,7 +112,7 @@ describe('duracionLegible', () => {
   })
 })
 
-// 20261225000100 · decisión del dueño del producto: el opcional SUMA SI SE HACE
+// 20261226000100 · decisión del dueño del producto: el opcional SUMA SI SE HACE
 // y NO RESTA SI NO.
 describe('puntajeCierre', () => {
   const hecha = (id: string, over: Partial<TareaBloque> = {}) => t(id, 0, { estado: 'completada', ...over })

@@ -50,7 +50,7 @@
 -- propio porque no cerraría nada: quien edita la tarea ya puede marcarla hecha,
 -- y el puntaje lo escribe la pantalla en bloques_turno.
 --
--- DEPENDE DE 20261225000000. `tabla:tareas_bloque/columnas` estaba declarada
+-- DEPENDE DE 20261226000000. `tabla:tareas_bloque/columnas` estaba declarada
 -- como drift; esa migración hizo converger el grupo a producción, así que la
 -- columna nueva es un CAMBIO PLANIFICADO para el auditor de tres vías y no uno
 -- ambiguo.
@@ -80,7 +80,7 @@ COMMENT ON COLUMN public.tareas_bloque.obligatoria IS
   'false = tarea opcional: sin hacer no cuenta como pendiente ni en el puntaje de cierre; hecha suma como cualquier otra. Se copia del paso de la rutina al asignarla (limpieza_asignar_rutinas, materializar_rutinas_turno); las tareas fuera de una rutina nacen obligatorias.';
 
 COMMENT ON COLUMN public.rutina_actividades.obligatoria IS
-  'false = paso opcional; la rutina se da por cumplida sin él. Se copia a tareas_bloque.obligatoria al asignar la rutina (20261225000100).';
+  'false = paso opcional; la rutina se da por cumplida sin él. Se copia a tareas_bloque.obligatoria al asignar la rutina (20261226000100).';
 
 -- ── 2. Asignar rutinas a un turno ────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.limpieza_asignar_rutinas(
@@ -171,7 +171,7 @@ BEGIN
       p.instrucciones_seguridad,
       p.requiere_comentario,
       p.requiere_checklist,
-      -- (20261225000100) Lo declara el PASO, no la actividad: la misma
+      -- (20261226000100) Lo declara el PASO, no la actividad: la misma
       -- actividad puede ser obligatoria en una rutina y opcional en otra.
       ra.obligatoria,
       pe.k,
@@ -202,7 +202,7 @@ BEGIN
              ORDER BY c.k, c.orden_parada NULLS FIRST, c.parada_id NULLS FIRST,
                       c.orden_paso, c.titulo, c.plantilla_id
            ) AS pos,
-           -- (20261225000100) Dos pasos que caen en la MISMA tarea (misma
+           -- (20261226000100) Dos pasos que caen en la MISMA tarea (misma
            -- actividad y área; PARTITION BY agrupa los NULL como el índice
            -- NULLS NOT DISTINCT) son una sola, y es obligatoria si cualquiera
            -- lo es. Así no depende de qué fila inserte primero el motor.
@@ -344,7 +344,7 @@ BEGIN
     FROM (
       SELECT tb.rutina_id,
              count(*)::int AS tareas,
-             -- (20261225000100) Pendiente es lo que FALTA: el opcional sin
+             -- (20261226000100) Pendiente es lo que FALTA: el opcional sin
              -- hacer no falta, la rutina se da por cumplida sin él.
              count(*) FILTER (WHERE tb.estado = 'pendiente' AND tb.anulada_en IS NULL AND tb.obligatoria)::int AS pendientes,
              count(*) FILTER (WHERE tb.estado IN ('completada', 'con_observacion'))::int AS hechas,
@@ -448,7 +448,7 @@ BEGIN
       p.instrucciones_seguridad,
       p.requiere_comentario,
       p.requiere_checklist,
-      -- (20261225000100) Si el paso es obligatorio. Dos pasos que caen en la
+      -- (20261226000100) Si el paso es obligatorio. Dos pasos que caen en la
       -- MISMA tarea del bloque (misma actividad y área) son una sola, y es
       -- obligatoria si cualquiera lo es: la misma regla que el calendario.
       bool_or(ra.obligatoria) OVER (

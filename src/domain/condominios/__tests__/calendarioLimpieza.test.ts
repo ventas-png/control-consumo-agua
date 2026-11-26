@@ -105,7 +105,7 @@ describe('indicadores', () => {
     expect(k).toEqual({ atrasadas: 2, pendientesHoy: 3, totalHoy: 6, hechasHoy: 3, turnosHoySinRutina: 1 })
   })
 
-  // 20261225000100: `pendientes` ya viene sin las opcionales (lo cuenta la base),
+  // 20261226000100: `pendientes` ya viene sin las opcionales (lo cuenta la base),
   // y el total de hoy saca las opcionales sin hacer: suman sólo si se hacen.
   it('el opcional sin hacer no está en Pendientes, ni en Atrasadas, ni en el total de hoy', () => {
     const k = kpisLimpieza([

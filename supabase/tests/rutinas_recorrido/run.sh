@@ -94,24 +94,22 @@ aplicar() { PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=
 copia()   { PGOPTIONS="-c client_min_messages=warning" psql -q -d postgres -c "DROP DATABASE IF EXISTS $2" -c "CREATE DATABASE $2 TEMPLATE $1" >/dev/null; }
 huella()  { psql -q -v ON_ERROR_STOP=1 -tA -d "$1" -f "$HUELLA" | LC_ALL=C sort; }
 posteriores() {   # aplica, sobre $1, las migraciones de versión mayor que la nuestra
-  # Con un mutante en curso ($2 = texto, $3 = reemplazo), la versión VIVA también
-  # lo lleva: si una migración posterior repite el texto porque redefine la
-  # función (20261225000100 lo hace con limpieza_asignar_rutinas,
-  # limpieza_calendario y materializar_rutinas_turno), se muta ahí también. Si
-  # la redefinió con OTRO texto, el mutante pasa y la suite lo dice: alguien
-  # tiene que mirar si la regla sigue en pie en la versión nueva.
-  local pat="${2-}" rep="${3-}"
+  # Con $2/$3 (un mutante), la que traiga el mismo texto se aplica con el MISMO
+  # reemplazo: 20261225000000 redefine guardar_recorrido_rutina con este cuerpo
+  # (y 20261226000100, materializar_rutinas_turno), y aplicada tal cual desharía
+  # la mutación —la suite probaría la versión sana y el mutante «pasaría» sin
+  # que la regla se hubiera aflojado—.
   for f in "$MIGS"/*.sql; do
     local base; base="$(basename "$f" .sql)"
     [[ "${base:0:14}" > "$VERSION" ]] || continue
-    if [ -n "$pat" ] && python3 - "$f" "$TRABAJO/posterior.sql" "$pat" "$rep" <<'PY2'
+    if [ $# -ge 3 ] && python3 - "$f" "$TRABAJO/posterior.sql" "$2" "$3" <<'PY'
 import sys
 src, dst, pat, rep = sys.argv[1:5]
 s = open(src, encoding='utf-8').read()
 if pat not in s:
     sys.exit(1)
 open(dst, 'w', encoding='utf-8').write(s.replace(pat, rep))
-PY2
+PY
     then
       chmod 644 "$TRABAJO/posterior.sql"
       aplicar "$1" "$TRABAJO/posterior.sql"

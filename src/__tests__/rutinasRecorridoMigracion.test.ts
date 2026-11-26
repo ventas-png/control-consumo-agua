@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
 // Guards ESTÁTICOS de 20261102000000 (rutinas como recorrido por áreas).
@@ -19,26 +19,34 @@ import { resolve, join } from 'node:path'
 //   2. Que la tabla de paradas conserve sus FKs COMPUESTAS y el gate del tab.
 //   3. Que el paso cuelgue de la parada de SU rutina (FK a (id, rutina_id)).
 //   4. Que el job que corre el sandbox siga registrado.
+//
+// guardar_recorrido_rutina se REDEFINIÓ en 20261225000000 (con crear y sin
+// editar se guarda el primer recorrido de la rutina propia): sus guards miran
+// esa versión, la viva, y vigilan que nadie la reescriba sin pasar por aquí.
+// Su conducta la prueba supabase/tests/rutinas_recorrido_crear/run.sh.
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
 const MIG = '20261102000000_rutinas_recorrido_por_areas.sql'
+/** La versión viva de guardar_recorrido_rutina (y donde nace su helper). */
+const MIG_GUARDAR = '20261225000000_rutinas_recorrido_nueva_con_crear.sql'
 const PERM_LIMPIEZA = 'condominios.tab.prog_limpieza'
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
 const soloCodigo = (sql: string) => sql.replace(/--[^\n]*/g, '')
 const sql = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG), 'utf8'))
+const sqlGuardar = soloCodigo(readFileSync(join(MIGRATIONS_DIR, MIG_GUARDAR), 'utf8'))
 
 /** Encabezado de una función (hasta el `AS $$`) y su cuerpo. */
-function funcion(nombre: string): { cabecera: string; cuerpo: string } {
-  const m = sql.match(
+function funcion(nombre: string, fuente = sql): { cabecera: string; cuerpo: string } {
+  const m = fuente.match(
     new RegExp(`CREATE OR REPLACE FUNCTION public\\.${nombre}\\(([\\s\\S]*?)AS \\$\\$([\\s\\S]*?)\\n\\$\\$;`, 'i'),
   )
   if (!m) throw new Error(`no se encontró la función ${nombre}`)
   return { cabecera: m[1], cuerpo: m[2] }
 }
 
-describe('20261102000000 · guardar_recorrido_rutina escribe bajo la RLS de quien llama', () => {
-  const { cabecera, cuerpo } = funcion('guardar_recorrido_rutina')
+describe('guardar_recorrido_rutina (versión viva) · escribe bajo la RLS de quien llama', () => {
+  const { cabecera, cuerpo } = funcion('guardar_recorrido_rutina', sqlGuardar)
 
   it('es SECURITY INVOKER con search_path vacío, nunca DEFINER', () => {
     expect(cabecera).toMatch(/SECURITY INVOKER/i)
@@ -62,12 +70,59 @@ describe('20261102000000 · guardar_recorrido_rutina escribe bajo la RLS de quie
   })
 
   it('anon no puede invocarla', () => {
-    expect(sql).toMatch(
-      /REVOKE EXECUTE ON FUNCTION public\.guardar_recorrido_rutina\(uuid, jsonb\) FROM PUBLIC, anon;/i,
-    )
-    expect(sql).toMatch(
-      /GRANT\s+EXECUTE ON FUNCTION public\.guardar_recorrido_rutina\(uuid, jsonb\) TO authenticated, service_role;/i,
-    )
+    for (const fuente of [sql, sqlGuardar]) {
+      expect(fuente).toMatch(
+        /REVOKE EXECUTE ON FUNCTION public\.guardar_recorrido_rutina\(uuid, jsonb\) FROM PUBLIC, anon;/i,
+      )
+      expect(fuente).toMatch(
+        /GRANT\s+EXECUTE ON FUNCTION public\.guardar_recorrido_rutina\(uuid, jsonb\) TO authenticated, service_role;/i,
+      )
+    }
+  })
+
+  it('sin la policy UPDATE, sólo pregunta por la rutina NUEVA (y no escribe con privilegios)', () => {
+    // El helper se consulta únicamente cuando el FOR UPDATE bajo la RLS no
+    // encontró la rutina, y antes de la primera escritura.
+    const forUpdate = cuerpo.search(/FOR UPDATE;/)
+    const helper = cuerpo.search(/public\.rutina_bloquear_si_nueva\(p_rutina_id\)/)
+    expect(helper).toBeGreaterThan(forUpdate)
+    expect(helper).toBeLessThan(cuerpo.search(/DELETE FROM/i))
+    expect(cuerpo.slice(forUpdate, helper)).toMatch(/IF NOT FOUND THEN\s+IF\s*$/)
+  })
+
+  it('20261225000000 es la versión viva y nadie la reescribió después', () => {
+    const REDEFINE = /(CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.(guardar_recorrido_rutina|rutina_bloquear_si_nueva)|DROP\s+FUNCTION[^;]*(guardar_recorrido_rutina|rutina_bloquear_si_nueva))/i
+    const culpables = readdirSync(MIGRATIONS_DIR)
+      .filter(f => f.endsWith('.sql') && f > MIG_GUARDAR)
+      .filter(f => REDEFINE.test(soloCodigo(readFileSync(join(MIGRATIONS_DIR, f), 'utf8'))))
+    expect(culpables).toEqual([])
+  })
+})
+
+describe('20261225000000 · rutina_bloquear_si_nueva sólo bloquea la rutina nueva de quien la creó', () => {
+  const { cabecera, cuerpo } = funcion('rutina_bloquear_si_nueva', sqlGuardar)
+
+  it('es SECURITY DEFINER con search_path vacío y anon no la invoca', () => {
+    expect(cabecera).toMatch(/SECURITY DEFINER/i)
+    expect(cabecera).toMatch(/SET search_path = ''/i)
+    expect(sqlGuardar).toMatch(/REVOKE EXECUTE ON FUNCTION public\.rutina_bloquear_si_nueva\(uuid\) FROM PUBLIC, anon;/i)
+  })
+
+  it('exige crear, que la rutina sea del que llama y de su empresa', () => {
+    expect(cuerpo).toMatch(/IF NOT public\.condominios_puede_actuar\('prog_limpieza', 'create'\) THEN\s+RETURN false;/)
+    expect(cuerpo).toMatch(/AND r\.company_id = public\.get_my_company_id\(\)/)
+    expect(cuerpo).toMatch(/AND r\.creado_por = auth\.uid\(\)/)
+  })
+
+  it('mira «sin recorrido» DESPUÉS de bloquear, en otra sentencia, y no escribe', () => {
+    const bloqueo = cuerpo.search(/FOR UPDATE;/)
+    expect(bloqueo).toBeGreaterThan(-1)
+    const despues = cuerpo.slice(bloqueo)
+    expect(despues).toMatch(/EXISTS \(SELECT 1 FROM public\.rutina_areas WHERE rutina_id = p_rutina_id\)/)
+    expect(despues).toMatch(/EXISTS \(SELECT 1 FROM public\.rutina_actividades WHERE rutina_id = p_rutina_id\)/)
+    expect(cuerpo.slice(0, bloqueo)).not.toMatch(/rutina_areas|rutina_actividades/)
+    // Ninguna escritura: lo que escribe lo hace la RPC, bajo la RLS de quien llama.
+    expect(cuerpo).not.toMatch(/\bINSERT\s+INTO\b|\bDELETE\s+FROM\b|\bUPDATE\s+public\./i)
   })
 })
 
@@ -148,8 +203,9 @@ describe('20261102000000 · tareas_bloque', () => {
 })
 
 describe('20261102000000 · el sandbox conductual sigue en CI', () => {
-  it('coverage.yml corre supabase/tests/rutinas_recorrido/run.sh', () => {
+  it('coverage.yml corre supabase/tests/rutinas_recorrido/run.sh y rutinas_recorrido_crear/run.sh', () => {
     const ci = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')
     expect(ci).toMatch(/run: supabase\/tests\/rutinas_recorrido\/run\.sh/)
+    expect(ci).toMatch(/run: supabase\/tests\/rutinas_recorrido_crear\/run\.sh/)
   })
 })

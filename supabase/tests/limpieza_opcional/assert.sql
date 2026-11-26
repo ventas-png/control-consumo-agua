@@ -1,5 +1,5 @@
 -- ============================================================================
--- INVARIANTES de 20261225000100 (el paso opcional de una rutina deja de contar
+-- INVARIANTES de 20261226000100 (el paso opcional de una rutina deja de contar
 -- como pendiente). Corre sobre la cadena REAL + fixture.sql. Cada comprobación
 -- imprime «OK  …»; la primera que no se cumple aborta la corrida.
 --

@@ -239,6 +239,30 @@ export function TareasPersonalTab({
   }
 
   /**
+   * «✓ Cerrar turno», del encabezado o del resumen del paso a paso.
+   *
+   * Cerrar no tiene vuelta atrás desde la pantalla: lo que quede pendiente
+   * pasa a contar como atrasado en Limpieza y el puntaje sale con lo hecho.
+   * Por eso, si queda algo, se pregunta; si no, se cierra de un toque.
+   */
+  async function pedirCierre(id: string) {
+    // La opcional sin hacer no pasa a atrasadas ni baja el puntaje (20261226000100):
+    // no hay nada que advertir por ella.
+    const pendientes = tareasGuiadas(id).filter(t => t.estado === 'pendiente' && !tareaOpcional(t)).length
+    if (pendientes > 0) {
+      const r = await confirm({
+        title: '¿Cerrar el turno con tareas pendientes?',
+        text: pendientes === 1
+          ? 'Queda 1 tarea pendiente. Si cerrás el turno, pasará a atrasadas y no se puede reabrir desde aquí.'
+          : `Quedan ${pendientes} tareas pendientes. Si cerrás el turno, pasarán a atrasadas y no se puede reabrir desde aquí.`,
+        icon: 'warning', confirmText: 'Cerrar igual', cancelText: 'Seguir en el turno',
+      })
+      if (!r.isConfirmed) return
+    }
+    await cerrarBloque(id, 'completado')
+  }
+
+  /**
    * Borrar un bloque de turno.
    *
    * YA NO BORRA EN CASCADA, y el texto tampoco lo promete. Desde
@@ -911,7 +935,7 @@ export function TareasPersonalTab({
                         </button>
                       )}
                       {bloque.estado === 'en_curso' && (
-                        <button onClick={() => cerrarBloque(bloque.id, 'completado')} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
+                        <button onClick={() => void pedirCierre(bloque.id)} style={{ padding: '6px 12px', background: 'var(--at-success-tint)', color: 'var(--at-success)', border: '1px solid var(--at-success-border)', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>
                           ✓ Cerrar turno
                         </button>
                       )}
@@ -955,7 +979,7 @@ export function TareasPersonalTab({
                           onListo={t => void resolverYSeguir(bloque.id, t, 'completada')}
                           onObservacion={t => void resolverYSeguir(bloque.id, t, 'con_observacion')}
                           onOmitir={t => void omitirYSeguir(bloque.id, t)}
-                          onCerrarTurno={() => void cerrarBloque(bloque.id, 'completado')}
+                          onCerrarTurno={() => void pedirCierre(bloque.id)}
                           onVerLista={() => setVistaLista(v => ({ ...v, [bloque.id]: true }))}
                           panel={t => (tienePanel(t)
                             ? panelEjecucion(t, () => void resolverYSeguir(bloque.id, t, 'completada', motivoDe(t.id).trim()))

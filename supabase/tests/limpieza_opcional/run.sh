@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════
-# Verificación EJECUTABLE de 20261225000100 (el paso opcional de una rutina de
+# Verificación EJECUTABLE de 20261226000100 (el paso opcional de una rutina de
 # limpieza deja de contar como pendiente).
 #
 # POR QUÉ EXISTE
@@ -14,7 +14,7 @@
 #
 # QUÉ HACE
 #   1 · cadena   bootstrap + TODAS las migraciones anteriores a la versión
-#                (incluida 20261225000000, la convergencia de columnas que la
+#                (incluida 20261226000000, la convergencia de columnas que la
 #                hace posible), en una base vacía
 #   2 · migra    la migración DOS veces: la segunda no cambia la huella del
 #                auditor de drift, y la primera cambia EXACTAMENTE la columna
@@ -37,7 +37,7 @@ trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_CO
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-MIGRACION=20261225000100_limpieza_pasos_opcionales
+MIGRACION=20261226000100_limpieza_pasos_opcionales
 VERSION=${MIGRACION%%_*}
 NUESTRA="$MIGS/$MIGRACION.sql"
 HUELLA="$RAIZ/scripts/schema-drift/fingerprint.sql"

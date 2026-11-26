@@ -1,5 +1,5 @@
 -- ============================================================================
--- PADRÓN DE LA SUITE «limpieza_opcional» (20261225000100)
+-- PADRÓN DE LA SUITE «limpieza_opcional» (20261226000100)
 --
 -- Se carga sobre la cadena REAL de migraciones: lo que se prueba son las RPC
 -- contra las tablas, triggers y policies que de verdad tiene el repositorio.

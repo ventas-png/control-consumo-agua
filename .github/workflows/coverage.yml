@@ -885,7 +885,7 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55702
         run: supabase/tests/rutas_escribir_por_permiso/run.sh
-      # 20261225000000: convergencia de drift. Las columnas de tareas_bloque del
+      # 20261226000000: convergencia de drift. Las columnas de tareas_bloque del
       # repositorio pasan a describir las que producción YA tiene (drift #826
       # declarado desde 2026-09-01): foto_url, icono, created_at NOT NULL y
       # orden sin NOT NULL. Lo que hay que probar es lo que un sandbox desde el
@@ -897,7 +897,7 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55703
         run: supabase/tests/tareas_bloque_columnas/run.sh
-      # 20261225000100: el paso opcional de una rutina de limpieza deja de contar
+      # 20261226000100: el paso opcional de una rutina de limpieza deja de contar
       # como pendiente. tareas_bloque.obligatoria se copia del paso al asignar
       # (calendario) y al materializar (por jornada); si dos pasos caen en la
       # misma tarea, gana la exigencia en cualquier orden; el calendario cuenta
@@ -1225,6 +1225,18 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55568
         run: supabase/tests/rutinas_recorrido/run.sh
+
+      # 20261225000000: con CREAR y sin EDITAR, guardar el recorrido de la
+      # rutina recién creada moría en P0002 (el FOR UPDATE pedía la policy
+      # UPDATE). Ahora se bloquea la rutina propia, de la empresa y todavía sin
+      # recorrido; la existente, la ajena y la de otra empresa siguen pidiendo
+      # editar. Cadena COMPLETA: control negativo, huella exacta, dos sesiones a
+      # la vez y siete mutantes.
+      - name: Rutinas — con crear se guarda el recorrido de la rutina nueva
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55703
+        run: supabase/tests/rutinas_recorrido_crear/run.sh
 
       # 20261103000000: calendario de limpieza. Tres RPC SECURITY DEFINER leen y
       # escriben saltándose la RLS: ver no alcanza para asignar, día pasado y

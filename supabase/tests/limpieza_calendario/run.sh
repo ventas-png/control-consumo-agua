@@ -93,7 +93,7 @@ huella()  { psql -q -v ON_ERROR_STOP=1 -tA -d "$1" -f "$HUELLA" | LC_ALL=C sort;
 posteriores() {   # aplica, sobre $1, las migraciones de versión mayor que la nuestra
   # Con un mutante en curso ($2 = texto, $3 = reemplazo), la versión VIVA también
   # lo lleva: si una migración posterior repite el texto porque redefine la
-  # función (20261225000100 lo hace con limpieza_asignar_rutinas,
+  # función (20261226000100 lo hace con limpieza_asignar_rutinas,
   # limpieza_calendario y materializar_rutinas_turno), se muta ahí también. Si
   # la redefinió con OTRO texto, el mutante pasa y la suite lo dice: alguien
   # tiene que mirar si la regla sigue en pie en la versión nueva.

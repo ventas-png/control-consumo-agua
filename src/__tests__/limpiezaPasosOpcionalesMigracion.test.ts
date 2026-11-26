@@ -1,4 +1,4 @@
-// Guardas estáticas de 20261225000100 (el paso opcional de una rutina deja de
+// Guardas estáticas de 20261226000100 (el paso opcional de una rutina deja de
 // contar como pendiente).
 //
 // La prueba que importa es la ejecutable —supabase/tests/limpieza_opcional/
@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const MIGRATIONS_DIR = resolve('supabase/migrations')
-const MIG = '20261225000100_limpieza_pasos_opcionales.sql'
+const MIG = '20261226000100_limpieza_pasos_opcionales.sql'
 const MIG_CALENDARIO = '20261103000000_limpieza_calendario_rutinas.sql'
 
 /** SQL sin comentarios de línea: lo que la BD ejecuta, no lo que explicamos. */
@@ -34,13 +34,13 @@ const materializar = funcion(sql, 'materializar_rutinas_turno')
 const columnasInsert = (cuerpo: string) =>
   cuerpo.match(/INSERT INTO public\.tareas_bloque \(([\s\S]*?)\)\s*SELECT/i)![1].split(',').map(c => c.trim())
 
-describe('20261225000100 · la columna', () => {
+describe('20261226000100 · la columna', () => {
   it('nace obligatoria y no acepta NULL', () => {
     expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS obligatoria boolean NOT NULL DEFAULT true;/)
   })
 })
 
-describe('20261225000100 · la tarea COPIA el paso', () => {
+describe('20261226000100 · la tarea COPIA el paso', () => {
   it('asignar y materializar escriben obligatoria en el INSERT', () => {
     expect(columnasInsert(asignar)).toContain('obligatoria')
     expect(columnasInsert(materializar)).toContain('obligatoria')
@@ -59,7 +59,7 @@ describe('20261225000100 · la tarea COPIA el paso', () => {
   })
 })
 
-describe('20261225000100 · el calendario', () => {
+describe('20261226000100 · el calendario', () => {
   it('pendiente es lo obligatorio; el opcional sin hacer va aparte', () => {
     expect(calendario).toMatch(
       /FILTER \(WHERE tb\.estado = 'pendiente' AND tb\.anulada_en IS NULL AND tb\.obligatoria\)::int AS pendientes/,
@@ -79,7 +79,7 @@ describe('20261225000100 · el calendario', () => {
   })
 })
 
-describe('20261225000100 · reescribir las RPC no perdió ninguna compuerta', () => {
+describe('20261226000100 · reescribir las RPC no perdió ninguna compuerta', () => {
   it('las tres siguen siendo SECURITY DEFINER con search_path fijado', () => {
     for (const cuerpo of [asignar, calendario]) {
       expect(cuerpo).toMatch(/SECURITY DEFINER\s+SET search_path = ''/)
@@ -118,13 +118,18 @@ describe('20261225000100 · reescribir las RPC no perdió ninguna compuerta', ()
   })
 })
 
-describe('20261225000100 · la pantalla cuenta con la misma regla', () => {
+describe('20261226000100 · la pantalla cuenta con la misma regla', () => {
   const sinComentarios = (f: string) => readFileSync(resolve(f), 'utf8').replace(/^\s*(\/\/|\*).*$/gm, '')
 
   it('el cierre del turno usa puntajeCierre, no hechas / todas', () => {
     const tab = sinComentarios('src/components/condominios/tabs/TareasPersonalTab.tsx')
     expect(tab).toMatch(/const \{ puntaje \} = puntajeCierre\(ts\)/)
     expect(tab).not.toMatch(/completadas \/ ts\.length/)
+  })
+
+  it('cerrar con pendientes pregunta sólo por las obligatorias', () => {
+    const tab = sinComentarios('src/components/condominios/tabs/TareasPersonalTab.tsx')
+    expect(tab).toMatch(/filter\(t => t\.estado === 'pendiente' && !tareaOpcional\(t\)\)/)
   })
 
   it('el chip del calendario no compara hechas contra todas las tareas', () => {
@@ -134,7 +139,7 @@ describe('20261225000100 · la pantalla cuenta con la misma regla', () => {
   })
 })
 
-describe('20261225000100 · el sandbox sigue en CI', () => {
+describe('20261226000100 · el sandbox sigue en CI', () => {
   it('coverage.yml corre supabase/tests/limpieza_opcional/run.sh', () => {
     const ci = readFileSync(resolve('.github/workflows/coverage.yml'), 'utf8')
     expect(ci).toMatch(/run: supabase\/tests\/limpieza_opcional\/run\.sh/)

@@ -1,6 +1,6 @@
 -- La forma MEDIDA en producción de las columnas de tareas_bloque (pg_attribute,
 -- 2026-11-26, sólo SELECT), montada sobre la cadena del repositorio ANTERIOR a
--- 20261225000000. run.sh exige que esta forma dé exactamente la huella que
+-- 20261226000000. run.sh exige que esta forma dé exactamente la huella que
 -- huella-produccion.json registra para el grupo: si no la diera, el escenario no
 -- describiría producción y la prueba de no-op no diría nada.
 --

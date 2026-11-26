@@ -262,7 +262,7 @@ describe('VistaCalendario · quitar y mover', () => {
     expect(screen.getByRole('dialog', { name: '🧭 Niveles' })).toBeTruthy()
   })
 
-  // 20261225000100: el opcional sin hacer no cuenta. 4 tareas, 1 opcional sin
+  // 20261226000100: el opcional sin hacer no cuenta. 4 tareas, 1 opcional sin
   // hacer: el chip dice 2/3 y, con las 3 que cuentan hechas, ✓.
   it('el chip cuenta sobre lo que cuenta y el detalle separa las opcionales sin hacer', async () => {
     cargar([

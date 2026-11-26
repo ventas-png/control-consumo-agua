@@ -73,7 +73,7 @@ Los **indicadores** y las **novedades** salen de esas tareas:
 
 ## Pasos opcionales
 
-Migración `20261225000100_limpieza_pasos_opcionales`. En **Rutinas**, cada paso del recorrido se marca **Obligatorio** u
+Migración `20261226000100_limpieza_pasos_opcionales`. En **Rutinas**, cada paso del recorrido se marca **Obligatorio** u
 **Opcional** (`rutina_actividades.obligatoria`). Hasta esta migración la marca se guardaba y nadie la leía: una rutina con
 un paso opcional generaba las mismas tareas que una sin él, y el opcional sin hacer contaba en Pendientes, en Atrasadas y en
 el puntaje de cierre. Ahora:
@@ -89,7 +89,8 @@ el puntaje de cierre. Ahora:
 - **El puntaje de cierre: suma si se hace, no resta si no.** Es lo que se decidió con el dueño del producto. Al cerrar el
   turno, el puntaje es hechas ÷ (obligatorias + opcionales hechas). Cuatro obligatorias hechas y una opcional sin hacer son
   100 %. Un turno sin tareas sigue en 0 %, y uno con sólo opcionales sin hacer da 100 %. La barra de progreso de «Tareas
-  por turno» usa la misma cuenta (`puntajeCierre` en `src/domain/condominios/ejecucionGuiada.ts`).
+  por turno» usa la misma cuenta (`puntajeCierre` en `src/domain/condominios/ejecucionGuiada.ts`). La confirmación al
+  cerrar con tareas pendientes (#1174) cuenta sólo las obligatorias: si quedan sólo opcionales, cierra sin preguntar.
 - **Se ve.** La tarjeta de la ejecución guiada, la lista de la parada y la lista del turno dicen «Opcional». El chip de la
   rutina en el calendario cuenta sobre lo que cuenta («2/3») y se pone ✓ sin las opcionales. Su detalle muestra aparte
   «Opcionales sin hacer».
@@ -97,7 +98,7 @@ el puntaje de cierre. Ahora:
   candado propio, porque no cerraría nada: quien edita la tarea ya puede marcarla hecha, y el puntaje lo escribe la
   pantalla.
 
-**Depende de `20261225000000`.** `tabla:tareas_bloque/columnas` tenía drift declarado contra producción desde el
+**Depende de `20261226000000`.** `tabla:tareas_bloque/columnas` tenía drift declarado contra producción desde el
 2026-09-01 (#826). Con el drift declarado, cualquier columna nueva salía **CAMBIO AMBIGUO** en el auditor de tres vías.
 ventas-png/control-consumo-agua#1175 hace converger esas columnas a la forma medida en producción: allá existen además
 `foto_url` e `icono`, `created_at` es NOT NULL y `orden` acepta NULL. Sobre producción es un no-op y retira la entrada de
@@ -128,7 +129,7 @@ suites lo dicen.
   `personal_condominio` ni `plantillas_horario` por RLS. Proyecta sólo nombre, cargo y estado de la persona, y nada del
   expediente (salario, DPI, cuenta…). Sigue el patrón de `rutas_operadores_asignables`.
 - **Sin cambios:**
-  - `materializar_rutinas_turno` sigue existiendo, pero ya ninguna pantalla la llama. Desde `20261225000100` copia
+  - `materializar_rutinas_turno` sigue existiendo, pero ya ninguna pantalla la llama. Desde `20261226000100` copia
     `obligatoria` con la misma regla que el calendario.
   - `programacion_limpieza` y `ejecuciones_limpieza` quedan como historia: no se borran, pero el panel ya no las
     carga (ninguna pantalla las lee). Lo vigila `limpiezaCalendarioMigracion.test.ts`.
@@ -150,7 +151,7 @@ suites lo dicen.
 
 Quitar la migración no borra nada: las tareas ya asignadas son `tareas_bloque` normales.
 
-Para `20261225000100`, primero se vuelven a aplicar las definiciones de `limpieza_asignar_rutinas` y `limpieza_calendario`
+Para `20261226000100`, primero se vuelven a aplicar las definiciones de `limpieza_asignar_rutinas` y `limpieza_calendario`
 de `20261103000000` y la de `materializar_rutinas_turno` de `20261102000000`, y después
 `ALTER TABLE public.tareas_bloque DROP COLUMN obligatoria;`. Lo único que se pierde es qué tareas eran opcionales.
 

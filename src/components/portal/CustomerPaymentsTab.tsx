@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react'
-import { notify } from '../shared/Dialog'
 import { fetchPortalPaymentConfig, fetchPortalRecargoTarjeta } from '../../domain/portal/queries'
 import type { Registro, Cliente, UserSession } from '../../types'
 import { calcularTotalPagar } from '../../lib/business'
@@ -235,30 +234,11 @@ export function CustomerPaymentsTab({ registros, currentUser, companyId, moneda,
                       💳 Pagar en línea
                     </button>
                   )}
-                  {paymentConfig.paypal_activo && (
-                    <button
-                      onClick={() => {
-                        notify({
-                          variant: 'info',
-                          title: 'PayPal',
-                          text: 'Integración de PayPal disponible próximamente',
-                        })
-                      }}
-                      style={{
-                        padding: '10px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        background: 'linear-gradient(135deg, #0070ba, #003d7a)',
-                        color: 'white',
-                        fontWeight: 700,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      🅿️ Pagar PayPal
-                    </button>
-                  )}
+                  {/* Sin botón de PayPal: el cobro por PayPal todavía no existe
+                      (el proveedor del servidor es un stub). Antes, con PayPal
+                      activado en la empresa —o sin el dato—, el cliente veía
+                      «Pagar PayPal» y al tocarlo sólo «disponible
+                      próximamente»: una acción ofrecida que no se puede hacer. */}
                   <button
                     onClick={() => setManualModal(registro)}
                     style={{

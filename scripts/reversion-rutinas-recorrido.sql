@@ -35,8 +35,9 @@
 -- --    (CREATE OR REPLACE FUNCTION public.materializar_rutinas_turno … y su COMMENT,
 -- --    REVOKE y GRANT). Misma firma: no hace falta DROP.
 --
--- -- 2. El guardado atómico.
+-- -- 2. El guardado atómico, y el bloqueo de la rutina nueva que le sumó 20261225000000.
 -- DROP FUNCTION IF EXISTS public.guardar_recorrido_rutina(uuid, jsonb);
+-- DROP FUNCTION IF EXISTS public.rutina_bloquear_si_nueva(uuid);
 --
 -- -- 3. Los UNIQUE originales, ANTES de retirar los nuevos.
 -- CREATE UNIQUE INDEX IF NOT EXISTS uq_tareas_bloque_plantilla

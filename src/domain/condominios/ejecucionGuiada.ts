@@ -18,7 +18,7 @@ export const tareaResuelta = (estado: EstadoTareaBloque) => estado !== 'pendient
 export const tareaHecha = (estado: EstadoTareaBloque) => estado === 'completada' || estado === 'con_observacion'
 
 /**
- * La tarea es opcional (20261225000100): su paso de la rutina lo era. Sin el
+ * La tarea es opcional (20261226000100): su paso de la rutina lo era. Sin el
  * dato es obligatoria, que es como nace toda tarea fuera de una rutina.
  */
 export const tareaOpcional = (t: Pick<TareaBloque, 'obligatoria'>) => t.obligatoria === false

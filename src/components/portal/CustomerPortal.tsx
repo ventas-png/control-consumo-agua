@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   fetchPortalBootstrap,
+  fetchPortalUnidadesResidente,
   fetchPortalContadores,
   fetchPortalProjectsByCompanies,
   fetchPortalFotoIds,
@@ -30,6 +31,7 @@ import { CustomerComunicacion } from './CustomerComunicacion'
 import { BrandLogo } from '../shared/BrandLogo'
 import { NotificationBell } from '../layout/NotificationBell'
 import { avisoConfirmacionPago } from '../../domain/portal/avisoConfirmacionPago'
+import { proyectosSinServicio } from '../../lib/portalServicios'
 
 interface Props {
   currentUser: UserSession
@@ -107,7 +109,17 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
     if (!clienteId) { setLoading(false); return }
     setLoading(true)
     try {
-      const { ccData, uData, rData, clData } = await fetchPortalBootstrap(clienteId)
+      // Las unidades del residente con sus servicios (portal_mis_unidades) van
+      // en paralelo al bootstrap: dicen en qué proyectos está apagado Agua (lo
+      // apagó el proyecto o la empresa no lo contrata). Sus unidades,
+      // contadores y lecturas no se muestran aquí. Si la lectura falla, no se
+      // filtra nada (como antes).
+      const [{ ccData, uData, rData, clData }, misUnidades] = await Promise.all([
+        fetchPortalBootstrap(clienteId),
+        fetchPortalUnidadesResidente(),
+      ])
+      const sinAgua = proyectosSinServicio(misUnidades, 'agua') ?? new Set<string>()
+      const conAgua = <T extends { project_id?: string | null }>(row: T) => !row.project_id || !sinAgua.has(row.project_id)
 
       // Build companies list and activo map from junction
       const companyMap: Record<string, CompanyInfo> = {}
@@ -125,7 +137,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       const companiesList = Object.values(companyMap)
       setCompanyActivoMap(activoMap)
 
-      const unidadesList = (uData as UnidadInfo[]) ?? []
+      const unidadesList = ((uData as UnidadInfo[]) ?? []).filter(conAgua)
       const unidadIds = unidadesList.map(u => u.id)
       const companyIds = companiesList.map(c => c.id)
       const unidadProjectIds = [...new Set(unidadesList.map(u => u.project_id).filter(Boolean))] as string[]
@@ -136,10 +148,10 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
         unidadIds.length > 0 ? fetchPortalContadores(unidadIds) : Promise.resolve(null),
         companyIds.length > 0 ? fetchPortalProjectsByCompanies(companyIds) : Promise.resolve(null),
       ])
-      const cData = (contData as ContadorInfo[]) ?? []
+      const cData = ((contData as ContadorInfo[]) ?? []).filter(conAgua)
 
       setCompanies(companiesList)
-      setProjects((pData as ProjectInfo[]) ?? [])
+      setProjects(((pData as ProjectInfo[]) ?? []).filter(p => !sinAgua.has(p.id)))
       setUnidades(unidadesList)
       setContadores(cData)
 
@@ -161,7 +173,9 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
       setFotoRegistroIds(new Set(fotoIds))
 
       const merged = new Map<string, LecturaInfo>()
-      for (const row of (rData as LecturaInfo[] | null) ?? []) merged.set(row.id, row)
+      for (const row of (rData as (LecturaInfo & { project_id?: string | null })[] | null) ?? []) {
+        if (conAgua(row)) merged.set(row.id, row)
+      }
       for (const row of (byContadorData as LecturaInfo[] | null) ?? []) {
         if (!merged.has(row.id)) merged.set(row.id, row)
       }

@@ -184,7 +184,9 @@ export function VistaRutinas({
           cargos={cargos}
           proyectoId={proyectoId}
           companyId={companyId}
-          soloLectura={!canEdit}
+          // Rutina nueva: crearla —cabecera y primer recorrido— es de canCreate
+          // (20261225000000). La existente se cambia con canEdit.
+          soloLectura={editor.rutina ? !canEdit : !canCreate}
           onGuardado={() => { setEditor(null); void cargar(); onRefresh() }}
           onCerrar={() => { setEditor(null); void cargar() }}
         />

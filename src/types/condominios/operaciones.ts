@@ -238,7 +238,7 @@ export interface RutinaEnTurno {
   hechas: number
   trabajadas: number
   /**
-   * Opcionales que no se hicieron (pendientes, omitidas o anuladas), 20261225000100.
+   * Opcionales que no se hicieron (pendientes, omitidas o anuladas), 20261226000100.
    * Los indicadores las sacan del total. Ausente = 0 (respuesta anterior a la migración).
    */
   opcionales_sin_hacer?: number
@@ -356,7 +356,7 @@ export interface TareaBloque {
   /** Rutina que generó la tarea. null = alta manual o carga suelta. */
   rutina_id?: string | null
   /**
-   * false = tarea opcional (20261225000100): se copia del paso de la rutina al
+   * false = tarea opcional (20261226000100): se copia del paso de la rutina al
    * asignarla. Sin hacer no cuenta como pendiente ni en el puntaje de cierre;
    * hecha suma como cualquier otra. Ausente = obligatoria (así nace toda tarea
    * fuera de una rutina, y así se contaba todo antes de la columna).
