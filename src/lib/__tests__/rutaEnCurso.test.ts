@@ -89,3 +89,24 @@ describe('indiceDeReanudacion', () => {
     expect(indiceDeReanudacion(paradas, -3, new Set())).toBe(0)
   })
 })
+
+describe('rutaEnCurso — rutas que no viven en la base', () => {
+  const ruta = {
+    id: 'pendientes:1', nombre: 'Pendientes', tipo_ruta: 'contadores' as const, project_id: null,
+    cliente_ids: [], contador_ids: ['c1'], unidad_ids: [], completada: false,
+    created_at: '2026-11-25T00:00:00Z', frecuencia: 'unica' as const,
+  }
+
+  it('guarda su copia para poder reactivarla tras una recarga', () => {
+    const st = memoria()
+    iniciarRutaEnCurso(st, ruta.id, 'u1', T0, ruta)
+    guardarProgresoRuta(st, ruta.id, { index: 0, leidos: ['c1'] }, T0 + 1)
+    expect(leerRutaEnCurso(st, T0 + 2)).toMatchObject({ ruta, leidos: ['c1'] })
+  })
+
+  it('una copia que no corresponde al id guardado se ignora', () => {
+    const st = memoria()
+    st.valor = JSON.stringify({ rutaId: 'otra', userId: 'u1', index: 0, leidos: [], actualizadaEn: T0, ruta })
+    expect(leerRutaEnCurso(st, T0)?.ruta).toBeUndefined()
+  })
+})

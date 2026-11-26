@@ -3,7 +3,7 @@
 # CONTABILIDAD · PÓLIZA MANUAL EN UNA TRANSACCIÓN Y BORRADOR EDITABLE · arnés
 # contra un PostgreSQL REAL
 #
-# Prueba 20261222000000 (conta_poliza_manual_guardar) sobre la cadena ENTERA de
+# Prueba 20261226000000 (conta_poliza_manual_guardar) sobre la cadena ENTERA de
 # migraciones, con el padrón de fail_open_sin_perfil y el catálogo básico:
 #   · crea borrador con sus líneas; guarda y publica con folio;
 #   · ATOMICIDAD: publicación rechazada (descuadre, sin «Cambiar estado»,
@@ -19,7 +19,7 @@ trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_CO
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-MIGRACION=20261222000000_conta_poliza_manual_guardar
+MIGRACION=20261226000000_conta_poliza_manual_guardar
 VERSION=${MIGRACION%%_*}
 PADRON="$RAIZ/supabase/tests/fail_open_sin_perfil/fixture.sql"
 
@@ -42,7 +42,7 @@ done
 
 DATA=$(mktemp -d /tmp/pmgdata.XXXX)
 SOCK=$(mktemp -d /tmp/pmgsock.XXXX)
-PUERTO=${PGPORT_TEST:-55702}
+PUERTO=${PGPORT_TEST:-55704}
 BD=pmg
 
 COMO=""

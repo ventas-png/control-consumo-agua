@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     error: null as RowError,
   })),
   updateCondominioRow: vi.fn(async () => ({ error: null as RowError })),
+  updateCondominioRowAfectando: vi.fn(async () => ({ error: null as RowError })),
   deleteCondominioRow: vi.fn(async () => ({ error: null as RowError })),
   guardarRecorridoRutina: vi.fn(async () => ({
     data: { paradas: 0, pasos: 0 } as Record<string, number> | null,
@@ -44,6 +45,7 @@ vi.mock('../../../../../lib/supabase', () => ({
 vi.mock('../../../../../domain/condominios/tabMutations', () => ({
   createCondominioRowReturning: mocks.createCondominioRowReturning,
   updateCondominioRow: mocks.updateCondominioRow,
+  updateCondominioRowAfectando: mocks.updateCondominioRowAfectando,
   deleteCondominioRow: mocks.deleteCondominioRow,
   guardarRecorridoRutina: mocks.guardarRecorridoRutina,
 }))
@@ -146,6 +148,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.createCondominioRowReturning.mockResolvedValue({ data: { id: 'rutNueva' }, error: null })
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
+  mocks.updateCondominioRowAfectando.mockResolvedValue({ error: null })
   mocks.deleteCondominioRow.mockResolvedValue({ error: null })
   mocks.guardarRecorridoRutina.mockResolvedValue({ data: { paradas: 0, pasos: 0 }, error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
@@ -555,8 +558,49 @@ describe('VistaRutinas · guardado y errores', () => {
     fireEvent.click(screen.getByText('Guardar'))
     await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalledTimes(2))
     expect(mocks.createCondominioRowReturning).toHaveBeenCalledTimes(1)
-    expect(mocks.updateCondominioRow).toHaveBeenCalledWith('rutinas_limpieza', 'rutNueva', expect.anything())
+    // La cabecera no cambió: no se reescribe. Con crear y sin editar ese UPDATE
+    // no pasaría la RLS y afectaría cero filas sin avisar.
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
+    expect(mocks.updateCondominioRowAfectando).not.toHaveBeenCalled()
     expect(rutinaGuardada(1)).toBe('rutNueva')
+  })
+
+  it('si al reintentar se cambió la cabecera, se reescribe exigiendo que la base la cambie', async () => {
+    mocks.guardarRecorridoRutina.mockResolvedValueOnce({ data: null, error: { message: 'sin red' } })
+    montar()
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Nocturna' } })
+    fireEvent.click(screen.getByLabelText('Agregar Gradas al recorrido'))
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalledTimes(1))
+
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Nocturna larga' } })
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalledTimes(2))
+    expect(mocks.updateCondominioRowAfectando).toHaveBeenCalledWith(
+      'rutinas_limpieza', 'rutNueva', expect.objectContaining({ nombre: 'Nocturna larga' }))
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
+  })
+
+  it('si la base no aplica ese cambio (crear sin editar), lo dice y no da el recorrido por guardado', async () => {
+    mocks.guardarRecorridoRutina.mockResolvedValueOnce({ data: null, error: { message: 'sin red' } })
+    mocks.updateCondominioRowAfectando.mockResolvedValueOnce({ error: { message: 'cero filas', code: 'SIN_FILAS' } })
+    montar({ canEdit: false })
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Nocturna' } })
+    fireEvent.click(screen.getByLabelText('Agregar Gradas al recorrido'))
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalledTimes(1))
+
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Otra' } })
+    fireEvent.click(screen.getByText('Guardar'))
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalledTimes(2))
+    const [args] = mocks.notify.mock.calls[1] as unknown as [{ title: string; text: string }]
+    expect(args.title).toBe('No se pudo cambiar la cabecera')
+    expect(args.text).toMatch(/hace falta permiso para editar/)
+    expect(mocks.guardarRecorridoRutina).toHaveBeenCalledTimes(1)
+    // El borrador sigue abierto para dejar la cabecera como estaba.
+    expect(screen.getByRole('dialog', { name: 'Nueva rutina' })).toBeTruthy()
   })
 
   it('un fallo de carga se muestra y ofrece reintentar', async () => {
@@ -582,6 +626,51 @@ describe('VistaRutinas · permisos', () => {
     expect(screen.queryByLabelText('Quitar Barrido de piso de Apartamento 1AB')).toBeNull()
     expect(screen.queryByText('Guardar')).toBeNull()
     expect(screen.queryByLabelText('Eliminar Rutina Lunes AM')).toBeNull()
+  })
+
+  // Con crear y sin editar, «+ Nueva rutina» abría el editor en sólo lectura
+  // («Recorrido de «»», sin Guardar). Crear una rutina —cabecera y primer
+  // recorrido— es de canCreate (20261225000000); cambiar una existente, de canEdit.
+  it('con canCreate y sin canEdit se crea una rutina completa, y las existentes sólo se ven', async () => {
+    cargarCon({ rutinas: [rutina()], paradas: [parada('z1', 'a1', 0)], pasos: [paso('p1', 'barrer', 0, 'z1')] })
+    montar({ canCreate: true, canEdit: false, canDelete: false })
+
+    fireEvent.click(await screen.findByText('+ Nueva rutina'))
+    const ventana = screen.getByRole('dialog', { name: 'Nueva rutina' })
+    expect(screen.queryByText(/Recorrido de «/)).toBeNull()
+    expect(within(ventana).getByRole('complementary', { name: 'Paleta de áreas y actividades' })).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Vespertina' } })
+    fireEvent.click(screen.getByLabelText('Agregar Gradas al recorrido'))
+    fireEvent.click(within(paleta()).getByRole('tab', { name: /Actividades/ }))
+    fireEvent.click(screen.getByLabelText('Agregar Barrido de piso a Gradas'))
+    fireEvent.click(within(ventana).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(mocks.guardarRecorridoRutina).toHaveBeenCalledTimes(1))
+    expect(mocks.createCondominioRowReturning).toHaveBeenCalledWith(
+      'rutinas_limpieza', expect.objectContaining({ nombre: 'Vespertina' }), 'id')
+    expect(rutinaGuardada(0)).toBe('rutNueva')
+    expect(recorridoGuardado()).toEqual(['a3:barrer'])
+    expect(mocks.updateCondominioRow).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+    // La existente: se ve, no se arma ni se guarda, ni se activa/desactiva.
+    expect(screen.queryByText('Desactivar')).toBeNull()
+    fireEvent.click(screen.getByLabelText('Ver el recorrido de Rutina Lunes AM'))
+    expect(screen.getByRole('dialog', { name: 'Recorrido de «Rutina Lunes AM»' })).toBeTruthy()
+    expect(screen.queryByRole('complementary', { name: 'Paleta de áreas y actividades' })).toBeNull()
+    expect(screen.queryByText('Guardar')).toBeNull()
+  })
+
+  it('con canEdit y sin canCreate se cambia la existente, pero no se ofrece crear', async () => {
+    cargarCon({ rutinas: [rutina()], paradas: [parada('z1', 'a1', 0)], pasos: [paso('p1', 'barrer', 0, 'z1')] })
+    montar({ canCreate: false, canEdit: true, canDelete: false })
+
+    fireEvent.click(await screen.findByLabelText('Editar el recorrido de Rutina Lunes AM'))
+    expect(screen.queryByText('+ Nueva rutina')).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Editar «Rutina Lunes AM»' })).toBeTruthy()
+    expect(screen.getByRole('complementary', { name: 'Paleta de áreas y actividades' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeTruthy()
   })
 })
 

@@ -336,7 +336,7 @@ export function useImportarCuentasMutation(companyId?: string) {
 
 /**
  * Guarda una póliza MANUAL en una sola transacción del servidor
- * (`conta_poliza_manual_guardar`, 20261222000000): cabecera + líneas y, con
+ * (`conta_poliza_manual_guardar`, 20261226000000): cabecera + líneas y, con
  * `publicar`, la publicación. Si cualquier paso se rechaza no queda nada.
  *
  * Antes eran tres peticiones (cabecera, líneas, publicar): un rechazo al

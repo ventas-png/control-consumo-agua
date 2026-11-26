@@ -68,22 +68,22 @@ export function RutaCard({ ruta, ctx }: { ruta: Ruta; ctx: RutasCtx }) {
           </button>
         )}
         {canEdit && (
-          <>
-            <button
-              onClick={() => handleRecordarAhora(ruta)}
-              disabled={recordandoId === ruta.id}
-              title="Enviar recordatorio al operador y administradores"
-              style={{ padding: '8px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: recordandoId === ruta.id ? 'wait' : 'pointer', fontSize: '13px' }}
-            >
-              {recordandoId === ruta.id ? 'Enviando…' : '🔔 Recordar'}
-            </button>
-            <button
-              onClick={() => abrirEditar(ruta)}
-              style={{ padding: '8px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
-            >
-              Editar
-            </button>
-          </>
+          <button
+            onClick={() => handleRecordarAhora(ruta)}
+            disabled={recordandoId === ruta.id}
+            title="Enviar recordatorio al operador y administradores"
+            style={{ padding: '8px 14px', background: 'var(--at-primary-soft)', color: 'var(--at-primary-hover)', border: '1px solid var(--at-primary-soft-2)', borderRadius: '8px', fontWeight: 600, cursor: recordandoId === ruta.id ? 'wait' : 'pointer', fontSize: '13px' }}
+          >
+            {recordandoId === ruta.id ? 'Enviando…' : '🔔 Recordar'}
+          </button>
+        )}
+        {canEdit && (
+          <button
+            onClick={() => abrirEditar(ruta)}
+            style={{ padding: '8px 14px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', fontSize: '13px' }}
+          >
+            Editar
+          </button>
         )}
         {canDelete && (
           <button

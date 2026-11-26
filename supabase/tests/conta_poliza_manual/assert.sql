@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- Invariantes de 20261222000000 (conta_poliza_manual_guardar).
+-- Invariantes de 20261226000000 (conta_poliza_manual_guardar).
 -- Padrón: el de fail_open_sin_perfil. Empresa D: OWN_D propietario, OPE_D operador
 -- con el rol «Finanzas / Contador» (asignado a D1, no a D2), VIS_D sin rol.
 -- OP_C es operador de OTRA empresa.

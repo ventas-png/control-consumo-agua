@@ -53,6 +53,9 @@ export const CONFIGURABLE_MODULES: readonly ModuleDefinition[] = [
 export const WATER_MODULE_KEYS = new Set([
   'dashboard', 'lecturas', 'cobros', 'rutas', 'calidad',
   'mapa', 'tabla', 'contadores', 'tarifas', 'servicios_energia',
+  // Sin permisos propios (usa los de lecturas/rutas, ver usePermissions); está
+  // aquí para que el menú la esconda cuando la empresa no tiene agua.
+  'lecturas_pendientes',
 ])
 export const CONDOMINIOS_MODULE_KEYS = new Set(['condominios', 'condominios_dashboard', 'condominios_visitantes', 'condominios_cuotas', 'condominios_mantenimiento'])
 

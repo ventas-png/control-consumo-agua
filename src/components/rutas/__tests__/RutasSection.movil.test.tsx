@@ -17,7 +17,7 @@ const { RutasSection } = await import('../RutasSection')
 
 const RUTA = { id: 'r1', nombre: 'Ruta norte', project_id: 'p1', tipo_ruta: 'clientes', cliente_ids: [] } as unknown as Ruta
 
-function renderRutas(userRole: UserRole = 'admin') {
+function renderRutas(userRole: UserRole = 'admin', permitido = true) {
   return render(
     <RutasSection
       clientes={[{ id: 'c1', nombre: 'Ana', codigo: 'C-1' }] as Cliente[]}
@@ -30,6 +30,8 @@ function renderRutas(userRole: UserRole = 'admin') {
       onRutaUpdated={() => {}}
       onRutaDeleted={() => {}}
       onEjecutarRuta={() => {}}
+      canCreate={permitido}
+      canEdit={permitido}
     />,
   )
 }
@@ -58,8 +60,8 @@ describe('RutasSection — teléfono', () => {
     expect(screen.getByText(/En esta ruta \(1\)/)).toBeTruthy()
   })
 
-  it('el permiso de crear no cambia: un operador no ve "+ Nueva Ruta"', () => {
-    renderRutas('operator')
+  it('el permiso de crear no cambia: sin agua.rutas.create/edit no se ve "+ Nueva Ruta" ni "Editar"', () => {
+    renderRutas('operator', false)
     expect(screen.queryByText('+ Nueva Ruta')).toBeNull()
     expect(screen.queryByText('Editar')).toBeNull()
   })

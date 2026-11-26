@@ -64,8 +64,8 @@ export function RutasSection({
   onRutaUpdated,
   onRutaDeleted,
   onEjecutarRuta,
-  canCreate: _canCreate = true,
-  canEdit: _canEdit = true,
+  canCreate: canCreateProp = true,
+  canEdit: canEditProp = true,
   canDelete: canDeleteProp = true,
 }: Props) {
   const [editando, setEditando] = useState<Ruta | null>(null)
@@ -102,9 +102,14 @@ export function RutasSection({
     } catch { /* sin almacenamiento: el filtro sólo dura mientras la pantalla esté abierta */ }
   }
 
-  const canEdit = userRole !== 'viewer' && userRole !== 'operator'
-  // Eliminar conserva la condición de rol y además exige el permiso granular (RBAC)
-  const canDelete = canEdit && canDeleteProp
+  // Cada botón sigue el permiso RBAC del módulo (agua.rutas.create/edit/delete),
+  // no el rol de plataforma: el «Admin Agua» se crea con rol base `operator`
+  // (EmpresaUsuariosSection) y recibe sus permisos por user_roles. La base
+  // aplica las mismas claves (20261221000000) y «Recordar» (route-reminders)
+  // pide agua.rutas.edit, así que el botón visible es el que el servidor acepta.
+  const canCreate = canCreateProp && userRole !== 'viewer'
+  const canEdit = canEditProp && userRole !== 'viewer'
+  const canDelete = canDeleteProp && userRole !== 'viewer'
 
   // Los operadores asignables dependen del PROYECTO de la ruta, no de la
   // empresa: quien no tiene acceso al condominio no puede leer sus contadores
@@ -459,7 +464,7 @@ export function RutasSection({
               ))}
             </select>
           )}
-          {canEdit && (
+          {canCreate && (
             <button
               onClick={abrirCrear}
               style={{ padding: '10px 20px', background: 'linear-gradient(135deg, var(--at-cta) 0%, var(--at-cta-2) 100%)', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 600, cursor: 'pointer' }}
