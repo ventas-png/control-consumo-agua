@@ -3,7 +3,7 @@
 # CONTABILIDAD · TODO DOCUMENTO SIN PÓLIZA QUEDA A LA VISTA · arnés contra un
 # PostgreSQL REAL
 #
-# Prueba 20261227000000 (conta_asientos_omitidos y las envolturas de
+# Prueba 20261230000100 (conta_asientos_omitidos y las envolturas de
 # conta_generar_asiento / conta_reversar_automatico) sobre la cadena ENTERA de
 # migraciones — TAMBIÉN las posteriores: si una migración futura reescribe el
 # generador con CREATE OR REPLACE y pisa la envoltura, esta suite falla.
@@ -20,7 +20,7 @@ trap 'rc=$?; echo "❌ run.sh terminó con rc=$rc en la línea $LINENO: $BASH_CO
 AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RAIZ="$(cd "$AQUI/../../.." && pwd)"
 MIGS="$RAIZ/supabase/migrations"
-MIGRACION=20261227000000_conta_asientos_omitidos
+MIGRACION=20261230000100_conta_asientos_omitidos
 VERSION=${MIGRACION%%_*}
 PADRON="$RAIZ/supabase/tests/fail_open_sin_perfil/fixture.sql"
 
@@ -43,7 +43,7 @@ done
 
 DATA=$(mktemp -d /tmp/aomdata.XXXX)
 SOCK=$(mktemp -d /tmp/aomsock.XXXX)
-PUERTO=${PGPORT_TEST:-55705}
+PUERTO=${PGPORT_TEST:-55782}
 BD=aom
 
 COMO=""

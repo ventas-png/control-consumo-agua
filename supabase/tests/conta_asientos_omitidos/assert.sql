@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- Invariantes de 20261227000000. Padrón: el de fail_open_sin_perfil. Empresa D,
+-- Invariantes de 20261230000100. Padrón: el de fail_open_sin_perfil. Empresa D,
 -- proyecto D1; OPE_D operador con el rol «Finanzas / Contador» (asignado a D1);
 -- VIS_D sin rol; OWN_C / OP_C de otra empresa.
 

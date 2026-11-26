@@ -420,7 +420,7 @@ export function useCargosPendientesQuery(params: {
  * Documentos VIGENTES sin póliza por el camino general (recibos de agua, cuotas
  * sin clasificar, cobros, gastos sin factura, pagos a proveedor, recepciones…)
  * en la contabilidad activa. Los registra la envoltura de
- * `conta_generar_asiento` (20261227000000) cada vez que el generador no pudo
+ * `conta_generar_asiento` (20261230000100) cada vez que el generador no pudo
  * asentar; desaparecen solos cuando el documento se asienta o se anula.
  */
 export function useOmitidosQuery(companyId?: string, projectId?: string | null) {

@@ -2,7 +2,7 @@
 //
 // Recibos de agua, cuotas sin clasificar, cobros por el camino general, gastos
 // sin factura, pagos a proveedor, recepciones de compra… Cuando a uno de esos
-// eventos le falta su cuenta, el generador no asienta y —hasta 20261227000000—
+// eventos le falta su cuenta, el generador no asienta y —hasta 20261230000100—
 // no dejaba rastro. Ahora cada omisión queda registrada con su motivo y con la
 // llamada completa, así que aquí se ve qué falta, se va a corregirlo y se
 // reprocesa. La fila desaparece sola cuando el documento se asienta o se anula.

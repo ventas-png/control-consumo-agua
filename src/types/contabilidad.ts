@@ -827,7 +827,7 @@ export interface ConciliacionEstadoCuenta {
   }>
 }
 
-// ── Documentos sin póliza por el camino general (20261227000000) ─────────────
+// ── Documentos sin póliza por el camino general (20261230000100) ─────────────
 
 /** Por qué el generador no pudo asentar el documento. */
 export type CodigoOmitido = 'sin_mapeo' | 'cuenta_invalida' | 'error'
