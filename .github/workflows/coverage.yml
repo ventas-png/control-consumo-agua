@@ -899,6 +899,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55782
         run: supabase/tests/conta_asientos_omitidos/run.sh
+      # 20261231000000: conta_cxc_antiguedad. La antigüedad de saldos por cobrar
+      # sale de los libros (las líneas publicadas de la CxC) y reparte por PEPS:
+      # los abonos cubren primero los cargos más antiguos; usa el vencimiento
+      # del documento; un corte anterior ignora lo posterior; un reverso es un
+      # abono; el sobrepago queda a la vista en «sin asignar»; la suma ES el
+      # saldo de la cuenta por cobrar; permisos, alcance y ACL.
+      - name: Contabilidad — antigüedad de saldos por cobrar desde los libros
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55783
+        run: supabase/tests/conta_cxc_antiguedad/run.sh
       # 20261221000000: en `rutas`, crear/editar/eliminar exigen agua.rutas.
       # create/edit/delete y el acceso al proyecto, y quien ejecuta la ruta
       # (asignado o con agua.lecturas.create) sólo puede darla por completada.

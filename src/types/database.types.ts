@@ -26451,6 +26451,24 @@ export type Database = {
         Args: { p_periodo: string; p_project_id: string }
         Returns: boolean
       }
+      conta_cxc_antiguedad: {
+        Args: { p_project_id: string | null; p_corte?: string | null }
+        Returns: {
+          cliente_id: string | null
+          cliente_nombre: string | null
+          codigo_auxiliar: string | null
+          d1_30: number
+          d31_60: number
+          d61_90: number
+          d90_mas: number
+          por_vencer: number
+          sin_asignar: number
+          total: number
+          unidad_id: string | null
+          unidad_nombre: string | null
+          vencimiento_mas_antiguo: string | null
+        }[]
+      }
       conta_omitido_reprocesar: {
         Args: { p_id: string }
         Returns: {

@@ -887,3 +887,36 @@ export function etiquetaEventoContable(evento: string): string {
   const especial = CUENTAS_ESPECIALES.find((e) => e.evento === evento)
   return especial ? `Cuenta especial › ${especial.label}` : evento
 }
+
+// ── Antigüedad de saldos por cobrar (20261231000000) ────────────────────────
+
+/**
+ * Una fila de `conta_cxc_antiguedad`: el saldo CONTABLE de un auxiliar y unidad
+ * al corte, repartido por antigüedad (PEPS). Los tramos más `sin_asignar` suman
+ * `total`, y `total` es su saldo en la cuenta por cobrar de los libros.
+ */
+export interface AntiguedadCxcFila {
+  cliente_id: string | null
+  cliente_nombre: string | null
+  codigo_auxiliar: string | null
+  unidad_id: string | null
+  unidad_nombre: string | null
+  por_vencer: number
+  d1_30: number
+  d31_60: number
+  d61_90: number
+  d90_mas: number
+  /** Lo que no se pudo atribuir a un cargo: negativo = pagó de más. */
+  sin_asignar: number
+  total: number
+  vencimiento_mas_antiguo: string | null
+}
+
+/** Tramos de la antigüedad, en el orden en que se muestran. */
+export const TRAMOS_ANTIGUEDAD_CXC = [
+  { clave: 'por_vencer', label: 'Por vencer' },
+  { clave: 'd1_30', label: '1–30 días' },
+  { clave: 'd31_60', label: '31–60' },
+  { clave: 'd61_90', label: '61–90' },
+  { clave: 'd90_mas', label: '+90' },
+] as const satisfies ReadonlyArray<{ clave: keyof AntiguedadCxcFila; label: string }>

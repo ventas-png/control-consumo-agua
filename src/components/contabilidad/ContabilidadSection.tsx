@@ -208,7 +208,7 @@ export function ContabilidadSection() {
         <AjustesTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} />
       )}
       {tab === 'estadocuenta' && (
-        <EstadoCuentaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <EstadoCuentaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} ledgerNombre={ledgerNombre} />
       )}
       {tab === 'balanza' && (
         <BalanzaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
