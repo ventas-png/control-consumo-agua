@@ -45,9 +45,10 @@ const DRIFT_CONOCIDO = resolve('scripts/schema-drift/drift-conocido.json')
  * así que esto no sirve para tapar drift sin declarar. Cada entrada se borra
  * cuando la migración append-only que hace converger los dos lados se fusione.
  */
-const DRIFT_DECLARADO: Partial<Record<(typeof TABLAS_VIGILADAS)[number], readonly string[]>> = {
-  tareas_bloque: ['foto_url', 'icono'],
-}
+//
+// Vacía desde 20261225000000: `tareas_bloque.foto_url` e `icono` eran las dos
+// únicas, y esa migración las escribió en el repositorio.
+const DRIFT_DECLARADO: Partial<Record<(typeof TABLAS_VIGILADAS)[number], readonly string[]>> = {}
 
 /**
  * Tablas del motor operativo de Condominios (catálogos de limpieza, turnos y
