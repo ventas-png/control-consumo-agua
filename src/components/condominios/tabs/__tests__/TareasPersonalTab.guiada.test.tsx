@@ -326,6 +326,8 @@ describe('en curso: una tarjeta por vez, por paradas', () => {
     const [tabla, , patch] = mocks.updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
     // 100 y no 50: la tarea recién cerrada cuenta aunque la recarga no haya vuelto.
     expect([tabla, patch.estado, patch.puntaje_completitud]).toEqual(['bloques_turno', 'completado', 100])
+    // Y por lo mismo no pregunta: la que estaba pendiente ya se resolvió aquí.
+    expect(mocks.confirm).not.toHaveBeenCalled()
     // Y el turno ya se ve cerrado: no queda un segundo «Cerrar turno» para volver a escribir.
     await waitFor(() => expect(screen.queryByText('✓ Cerrar turno')).toBeNull())
   })
@@ -358,5 +360,71 @@ describe('en curso: una tarjeta por vez, por paradas', () => {
     expect(screen.getAllByTitle('Completada')).toHaveLength(3)
     fireEvent.click(screen.getByText('▶ Volver al paso a paso'))
     expect(screen.getByRole('region', { name: /^Parada 1 de 2/ })).toBeTruthy()
+  })
+})
+
+describe('cerrar el turno', () => {
+  const cerrarDesdeEncabezado = () => fireEvent.click(screen.getByText('✓ Cerrar turno'))
+  const cierreDelTurno = () => mocks.updateCondominioRow.mock.calls
+    .filter(c => (c as unknown as [string])[0] === 'bloques_turno')
+
+  it('con tareas pendientes pide confirmar, diciendo cuántas y que pasan a atrasadas', async () => {
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    montar('en_curso', [tarea('t1', 0), tarea('t2', 1), tarea('t3', 2, { estado: 'completada' })])
+    cerrarDesdeEncabezado()
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1))
+    const [opts] = mocks.confirm.mock.calls[0] as unknown as [{ title: string; text: string }]
+    expect(opts.text).toMatch(/Quedan 2 tareas pendientes/)
+    expect(opts.text).toMatch(/atrasadas/)
+    // Cancelar no cierra: el turno sigue en curso.
+    expect(cierreDelTurno()).toHaveLength(0)
+    expect(screen.getByText('✓ Cerrar turno')).toBeTruthy()
+  })
+
+  it('con tareas pendientes, si se confirma, cierra con el puntaje de lo hecho', async () => {
+    montar('en_curso', [tarea('t1', 0), tarea('t2', 1, { estado: 'completada' })])
+    cerrarDesdeEncabezado()
+
+    await waitFor(() => expect(cierreDelTurno()).toHaveLength(1))
+    expect(mocks.confirm).toHaveBeenCalledTimes(1)
+    const [opts] = mocks.confirm.mock.calls[0] as unknown as [{ text: string }]
+    expect(opts.text).toMatch(/Queda 1 tarea pendiente/)
+    const [, id, patch] = cierreDelTurno()[0] as unknown as [string, string, Record<string, unknown>]
+    expect([id, patch.estado, patch.puntaje_completitud]).toEqual(['blo1', 'completado', 50])
+  })
+
+  it('sin pendientes cierra de un toque, sin preguntar', async () => {
+    montar('en_curso', [
+      tarea('t1', 0, { estado: 'completada' }),
+      tarea('t2', 1, { estado: 'con_observacion' }),
+      tarea('t3', 2, { estado: 'omitida' }),
+    ])
+    cerrarDesdeEncabezado()
+
+    await waitFor(() => expect(cierreDelTurno()).toHaveLength(1))
+    expect(mocks.confirm).not.toHaveBeenCalled()
+    const [, , patch] = cierreDelTurno()[0] as unknown as [string, string, Record<string, unknown>]
+    expect(patch.estado).toBe('completado')
+    await waitFor(() => expect(screen.queryByText('✓ Cerrar turno')).toBeNull())
+  })
+
+  it('el resumen con tareas sin resolver también pregunta antes de cerrar', async () => {
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    montar('en_curso', [
+      tarea('t1', 0, { area_id: 'a8' }),
+      tarea('t2', 1, { area_id: 'a7', estado: 'completada' }),
+    ])
+    abrir()
+    const nav = screen.getByRole('navigation', { name: 'Recorrido por áreas' })
+    fireEvent.click(within(nav).getByLabelText(/^Ir a Nivel 7/))
+    // El área ya está hecha: se ve su tarea, sin acciones, y desde ahí el resumen.
+    fireEvent.click(screen.getByText('Ver resumen ›'))
+
+    const fin = screen.getByRole('region', { name: 'Recorrido terminado' })
+    expect(fin.textContent).toMatch(/Quedan tareas sin resolver/)
+    fireEvent.click(within(fin).getByText('✓ Cerrar turno'))
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1))
+    expect(cierreDelTurno()).toHaveLength(0)
   })
 })
