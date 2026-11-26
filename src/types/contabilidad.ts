@@ -289,6 +289,50 @@ export const REVALUACION_RESULTADO_LABELS: Record<RevaluacionFxResultado, string
   sin_tasa: 'Sin tipo de cambio',
 }
 
+// ── Depreciación de activos fijos (RPC conta_depreciar_activos) ─────────────
+// Línea recta mensual: (costo − valor residual) / vida útil, desde el mes
+// siguiente al alta. Una póliza por activo y mes; el último mes absorbe el resto.
+
+export type DepreciacionResultado =
+  | 'previsualizacion'
+  | 'aplicado'
+  | 'ya_depreciado'
+  | 'no_iniciado'
+  | 'totalmente_depreciado'
+  | 'sin_cambio'
+  | 'sin_cuentas'
+  | 'reversado'
+  | 'error'
+
+export interface DepreciacionFila {
+  activo_id: string
+  codigo: string
+  nombre: string
+  fecha_alta: string
+  costo: number
+  valor_residual: number
+  vida_util_meses: number
+  acumulada_antes: number
+  depreciacion: number
+  valor_en_libros: number
+  meses_previos_sin_depreciar: number
+  resultado: DepreciacionResultado
+  motivo: string | null
+  asiento_id: string | null
+}
+
+export const DEPRECIACION_RESULTADO_LABELS: Record<DepreciacionResultado, string> = {
+  previsualizacion: 'Por depreciar',
+  aplicado: 'Depreciado',
+  ya_depreciado: 'Ya depreciado',
+  no_iniciado: 'Aún no inicia',
+  totalmente_depreciado: 'Totalmente depreciado',
+  sin_cambio: 'Sin importe',
+  sin_cuentas: 'Faltan cuentas',
+  reversado: 'Mes reversado',
+  error: 'Error',
+}
+
 // ── Reglas de imputación contable ───────────────────────────────────────────
 // Espejo de 20260926000000. Los destinos NO son códigos contables: son
 // etiquetas semánticas que la BD declara en `conta_destinos_imputacion()` y

@@ -13,6 +13,7 @@ import { runQuery } from '../queryFetch'
 import { contabilidadKeys } from './keys'
 import { planificarCatalogo } from './importCuentas'
 import type {
+  DepreciacionFila,
   AsientoContable,
   CuentaContable,
   RevaluacionFxFila,
@@ -547,6 +548,29 @@ export function useRevaluarFxMutation() {
       ),
     onSuccess: (_data, vars) => {
       // Solo la aplicación toca asientos/saldos; la previsualización es lectura.
+      if (vars.aplicar) void qc.invalidateQueries({ queryKey: contabilidadKeys.all })
+    },
+  })
+}
+
+// ── Depreciación mensual de activos fijos ───────────────────────────────────
+// El cálculo (línea recta) y las pólizas viven en el RPC conta_depreciar_activos,
+// idempotente por activo+mes. La previsualización no escribe nada.
+
+export function useDepreciarActivosMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { periodo: string; aplicar: boolean; projectId: string | null }) =>
+      await runQuery<DepreciacionFila[]>((signal) =>
+        supabase
+          .rpc('conta_depreciar_activos', {
+            p_periodo: vars.periodo,
+            p_aplicar: vars.aplicar,
+            p_project_id: vars.projectId,
+          })
+          .abortSignal(signal),
+      ),
+    onSuccess: (_data, vars) => {
       if (vars.aplicar) void qc.invalidateQueries({ queryKey: contabilidadKeys.all })
     },
   })

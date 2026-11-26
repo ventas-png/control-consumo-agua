@@ -26469,6 +26469,25 @@ export type Database = {
           vencimiento_mas_antiguo: string | null
         }[]
       }
+      conta_depreciar_activos: {
+        Args: { p_periodo: string; p_aplicar?: boolean; p_project_id?: string | null }
+        Returns: {
+          activo_id: string
+          acumulada_antes: number
+          asiento_id: string | null
+          codigo: string
+          costo: number
+          depreciacion: number
+          fecha_alta: string
+          meses_previos_sin_depreciar: number
+          motivo: string | null
+          nombre: string
+          resultado: string
+          valor_en_libros: number
+          valor_residual: number
+          vida_util_meses: number
+        }[]
+      }
       conta_omitido_reprocesar: {
         Args: { p_id: string }
         Returns: {

@@ -22,6 +22,7 @@ import { ImportarLineasOrdenModal } from '../compras/ImportarLineasOrdenModal'
 import { useTransicionOrdenConContrato } from '../compras/excepcionContrato'
 import { ContratoSelector } from '../proveedores/ContratoSelector'
 import { ContratoSeguimientoModal } from '../proveedores/ContratoSeguimientoModal'
+import { DepreciacionActivosModal } from './DepreciacionActivosModal'
 import { adjuntarRespaldoRecepcion, validarArchivoRespaldo, MIME_RESPALDO, MAX_BYTES_RESPALDO } from '../../domain/compras/respaldos'
 import { DURACION_ERROR_LARGO_MS, mensajeAccionCompras } from '../../domain/compras/errores'
 import {
@@ -91,6 +92,7 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
   const [seguirDe, setSeguirDe] = useState<string | null>(null)
   const [respaldosDe, setRespaldosDe] = useState<RecepcionConRelaciones | null>(null)
   const [importarEn, setImportarEn] = useState<OrdenCompraConRelaciones | null>(null)
+  const [depreciando, setDepreciando] = useState(false)
 
   const { data: ordenes = [], isLoading: cargandoOrdenes } = useOrdenesCompraQuery(companyId, projectId)
   const { data: recepciones = [], isLoading: cargandoRecepciones } = useRecepcionesQuery(companyId, projectId)
@@ -492,6 +494,9 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
           isLoading={cargandoActivos}
           searchableKeys={['codigo', 'nombre', (a) => a.numero_serie ?? '']}
           searchPlaceholder="Buscar activo…"
+          toolbar={activos.some((a) => a.estado !== 'dado_de_baja')
+            ? <button onClick={() => setDepreciando(true)} style={btnPrimario}>📉 Depreciar el mes</button>
+            : undefined}
           emptyState={{
             title: 'Sin activos fijos',
             description: 'Se dan de alta solos cuando una recepción trae líneas con destino «Activo fijo». Quedan con su cuenta de activo y su cuenta de depreciación acumulada listas.',
@@ -558,6 +563,15 @@ export function ComprasTab({ companyId, projectId, monedaBase }: Props) {
       {seguirContrato && <ContratoSeguimientoModal contratoId={seguirContrato} onClose={() => setSeguirContrato(null)} />}
       {seguirDe && (
         <SeguimientoOrdenModal ordenId={seguirDe} monedaBase={monedaBase} onClose={() => setSeguirDe(null)} />
+      )}
+
+      {depreciando && (
+        <DepreciacionActivosModal
+          projectId={projectId}
+          monedaBase={monedaBase}
+          puedeAplicar={puedeCrear && puedeCambiarEstado}
+          onClose={() => setDepreciando(false)}
+        />
       )}
 
       {importarEn && (

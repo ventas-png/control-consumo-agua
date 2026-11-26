@@ -910,6 +910,16 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55783
         run: supabase/tests/conta_cxc_antiguedad/run.sh
+      # 20261231000100: conta_depreciar_activos. Depreciación mensual en línea
+      # recta desde el mes siguiente al alta: la vista previa no escribe; una
+      # póliza por activo y mes (repetir no duplica); el último mes absorbe el
+      # resto y cierra exacta en el valor residual; un mes reversado se avisa;
+      # mes futuro, ejercicio cerrado, permisos, alcance y ACL.
+      - name: Contabilidad — depreciación mensual de activos fijos
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55784
+        run: supabase/tests/conta_depreciacion_activos/run.sh
       # 20261221000000: en `rutas`, crear/editar/eliminar exigen agua.rutas.
       # create/edit/delete y el acceso al proyecto, y quien ejecuta la ruta
       # (asignado o con agua.lecturas.create) sólo puede darla por completada.
