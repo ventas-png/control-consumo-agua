@@ -45,7 +45,7 @@ if [ ! -d "$DATA" ]; then
 fi
 mkdir -p "$SOCK"; chown postgres "$SOCK"
 correr "pg_ctl -D $DATA status" >/dev/null 2>&1 || \
-  correr "pg_ctl -D $DATA -o '-p $PUERTO -k $SOCK -c listen_addresses=127.0.0.1 -c timezone=America/Guatemala' -l $DATA/pg.log start" >/dev/null
+  correr "pg_ctl -D $DATA -o '-p $PUERTO -k $SOCK -c listen_addresses=127.0.0.1 -c timezone=America/Guatemala' -l $DATA/pg.log start" >/dev/null 2>&1 </dev/null
 for _ in $(seq 1 200); do psql -q -d postgres -c 'SELECT 1' >/dev/null 2>&1 && break; sleep 0.1; done
 if ! psql -lqt | cut -d'|' -f1 | grep -qw demo; then
   psql -q -d postgres -c "CREATE DATABASE demo" >/dev/null
@@ -83,9 +83,9 @@ db-max-rows = 1000
 log-level = "error"
 EOF
 "$AQUI/detener.sh" --solo-servicios >/dev/null 2>&1 || true
-nohup "$AQUI/bin/postgrest" "$AQUI/.postgrest.conf" > "$AQUI/postgrest.log" 2>&1 & echo $! > "$AQUI/.pid-postgrest"
-JWT_SECRET=$SECRETO nohup node "$AQUI/pasarela.mjs" > "$AQUI/pasarela.log" 2>&1 & echo $! > "$AQUI/.pid-pasarela"
+nohup "$AQUI/bin/postgrest" "$AQUI/.postgrest.conf" > "$AQUI/postgrest.log" 2>&1 < /dev/null & echo $! > "$AQUI/.pid-postgrest"
+JWT_SECRET=$SECRETO nohup node "$AQUI/pasarela.mjs" > "$AQUI/pasarela.log" 2>&1 < /dev/null & echo $! > "$AQUI/.pid-pasarela"
 ( cd "$RAIZ" && VITE_SUPABASE_URL=http://127.0.0.1:54321 VITE_SUPABASE_ANON_KEY=$ANON VITE_APP_ENV=development \
-  nohup npx vite --port 5173 --host 127.0.0.1 --strictPort > "$AQUI/vite.log" 2>&1 & echo $! > "$AQUI/.pid-vite" )
+  nohup npx vite --port 5173 --host 127.0.0.1 --strictPort > "$AQUI/vite.log" 2>&1 < /dev/null & echo $! > "$AQUI/.pid-vite" )
 for _ in $(seq 1 100); do curl -s -o /dev/null http://127.0.0.1:5173/ && break; sleep 0.3; done
 echo "OK  app en http://127.0.0.1:5173 · API simulada en http://127.0.0.1:54321"

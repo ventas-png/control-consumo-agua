@@ -6,19 +6,18 @@ import { abrir, ir, foto, confirmar, paso, pasos } from './app.mjs'
 const { nav, page, errores } = await abrir('ana')
 
 async function recorrer(empleado, pre) {
-  const filtro = page.locator('select', { has: page.locator('option', { hasText: 'Todos los empleados' }) }).first()
-  const opciones = await filtro.locator('option').allInnerTexts()
-  const opcion = opciones.find(x => x.includes(empleado))
-  if (opcion) await filtro.selectOption({ label: opcion })
-  await page.waitForTimeout(800)
-  const iniciar = page.getByRole('button', { name: '▶ Iniciar' })
-  if (await iniciar.isVisible().catch(() => false)) {
+  // El encabezado de la tarjeta del empleado: el contenedor más cercano a su nombre que tiene botones.
+  const cab = page.getByText(`${empleado} — `).first().locator('xpath=ancestor::div[.//button][1]')
+  await cab.waitFor({ timeout: 10000 })
+  const iniciar = cab.getByRole('button', { name: '▶ Iniciar' })
+  if (await iniciar.count()) {
     await iniciar.click()
     const prep = page.getByRole('region', { name: 'Antes de iniciar el turno' })
     await prep.waitFor({ timeout: 10000 })
     await prep.getByText('Obligatoria').first().waitFor({ timeout: 10000 })
     await page.waitForTimeout(800)
-    const sinNombre = await prep.getByText('Herramienta', { exact: true }).count()
+    // Nombre y etiqueta «Obligatoria» van en el mismo elemento: «HerramientaObligatoria» = sin nombre.
+    const sinNombre = await prep.getByText(/^Herramienta\s*(Obligatoria)?\s*$/).count()
     paso(sinNombre === 0, `${empleado} · herramientas con nombre en «Antes de iniciar»: ${sinNombre === 0 ? 'sí' : `${sinNombre} aparecen sólo como «Herramienta»`}`)
     await foto(page, `${pre}02-preparacion`, { fullPage: true })
     const casillas = prep.getByRole('checkbox')
@@ -27,7 +26,8 @@ async function recorrer(empleado, pre) {
     await prep.getByRole('button', { name: /Tengo todo/ }).click()
     paso(true, `${empleado} · ${n} cosas confirmadas e inicio del turno`)
   } else {
-    await page.getByText('▾').first().click()
+    const guiado = () => page.getByRole('button', { name: /^Empezar en|Listo · Siguiente/ }).or(page.getByText('¡Recorrido terminado!'))
+    if (!(await guiado().first().isVisible().catch(() => false))) await cab.getByText('▾').click()
     paso(true, `${empleado} · turno ya en curso: se retoma el paso a paso`)
   }
 
