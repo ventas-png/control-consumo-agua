@@ -1,7 +1,7 @@
 // Ejecución guiada de un turno, sin React: paradas del recorrido, a dónde se
 // avanza y qué hay que preparar antes de iniciar.
 import { describe, it, expect } from 'vitest'
-import type { AreaCondominio, PlantillaTareaHerramienta, TareaBloque, TareaBloqueSuministro } from '../../../types'
+import type { AreaCondominio, HerramientaDelTurno, TareaBloque, TareaBloqueSuministro } from '../../../types'
 import {
   duracionLegible, itemsPorConfirmar, paradaDe, paradasDelTurno, preparacionDelTurno, puntajeCierre,
   siguientePendiente, tareaHecha, tareaOpcional,
@@ -68,11 +68,12 @@ describe('preparacionDelTurno', () => {
     t('4', 3, { plantilla_id: 'vidrios', estado: 'completada', instrucciones_seguridad: 'Arnés' }),
   ]
   // Escoba: equipo del catálogo (filas nuevas); Jalador: vínculo legado a Inventario. Ambos cuentan igual.
-  const herramientas = [
-    { plantilla_tarea_id: 'barrer', equipo_id: 'escoba', inventario_id: null, equipo_nombre: 'Escoba', cantidad: 1, obligatoria: false },
-    { plantilla_tarea_id: 'vidrios', equipo_id: 'escoba', inventario_id: null, equipo_nombre: 'Escoba', cantidad: 2, obligatoria: true },
-    { plantilla_tarea_id: 'vidrios', equipo_id: null, inventario_id: 'jalador', inventario_nombre: 'Jalador', cantidad: 1, obligatoria: false },
-  ] as PlantillaTareaHerramienta[]
+  // La forma es la de la RPC herramientas_del_turno (20261231000000).
+  const herramientas: HerramientaDelTurno[] = [
+    { plantilla_tarea_id: 'barrer', equipo_id: 'escoba', inventario_id: null, nombre: 'Escoba', estado: 'operativo', cantidad: 1, obligatoria: false },
+    { plantilla_tarea_id: 'vidrios', equipo_id: 'escoba', inventario_id: null, nombre: 'Escoba', estado: 'operativo', cantidad: 2, obligatoria: true },
+    { plantilla_tarea_id: 'vidrios', equipo_id: null, inventario_id: 'jalador', nombre: 'Jalador', estado: 'disponible', cantidad: 1, obligatoria: false },
+  ]
   const insumos = [
     { id: 'i1', tarea_id: '1', suministro_id: 'alcohol', nombre_suministro: 'Alcohol 70%', cantidad_planificada: 0.5, unidad_medida: 'litro' },
     { id: 'i2', tarea_id: '2', suministro_id: 'alcohol', nombre_suministro: 'Alcohol 70%', cantidad_planificada: 0.25, unidad_medida: 'litro' },
@@ -99,6 +100,13 @@ describe('preparacionDelTurno', () => {
     expect(itemsPorConfirmar(p)).toEqual([
       'herramienta:escoba', 'herramienta:jalador', 'insumo:alcohol', 'indicacion:0', 'camara',
     ])
+  })
+
+  it('si el recurso llega sin nombre, la herramienta se lista igual (no desaparece de lo que hay que llevar)', () => {
+    const sinNombre: HerramientaDelTurno[] = [
+      { plantilla_tarea_id: 'barrer', equipo_id: 'x', inventario_id: null, nombre: null, estado: null, cantidad: 1, obligatoria: true },
+    ]
+    expect(preparacionDelTurno(tareas, [], sinNombre, areas).herramientas.map(h => h.nombre)).toEqual(['Herramienta'])
   })
 
   it('sin nada que preparar, no hay nada que confirmar', () => {

@@ -16,7 +16,7 @@ insumos y el trigger de evidencia.
 
 | Sección | De dónde sale |
 |---|---|
-| 🧰 Herramientas y equipo | Las de la plantilla de cada tarea (`plantilla_tarea_herramientas`). Va la mayor cantidad que pida **una** tarea (la escoba se reusa), y es *Obligatoria* si alguna lo exige. Lo obligatorio va primero. |
+| 🧰 Herramientas y equipo | Las de la plantilla de cada tarea (`plantilla_tarea_herramientas`), con su nombre por la RPC `herramientas_del_turno` (ver abajo). Va la mayor cantidad que pida **una** tarea (la escoba se reusa), y es *Obligatoria* si alguna lo exige. Lo obligatorio va primero. |
 | 🧴 Insumos | El plan congelado de cada tarea (`tarea_bloque_suministros`) que todavía no se descontó ni se declaró no usado. Aquí **sí** se suma entre tareas. |
 | 🦺 Indicaciones antes de empezar | Las instrucciones de seguridad de las tareas, sin repetir. |
 | 📷 Evidencia | «Teléfono con cámara y batería» si alguna tarea pide foto. |
@@ -28,6 +28,26 @@ el resto de la lista igual se muestra. Si la base no deja iniciar el turno, tamb
 y el botón parecía no hacer nada.
 
 ![Antes de iniciar](capturas/ejecucion_guiada/10-preparacion.png)
+
+### El nombre de las herramientas, sin el tab de Equipos (20261231000000)
+
+Las herramientas se leían de `plantilla_tarea_herramientas` con el catálogo embebido (`equipos_comunes(nombre, estado)`
+y, para los vínculos anteriores a 20261122000000, `inventario_condominio(nombre, estado)`). La RLS de esos catálogos
+exige su propio tab (`condominios.tab.equipos`, `condominios.tab.inventario`). A un rol con sólo Limpieza —el personal de
+limpieza o su supervisor— el embed le llegaba en `null`, y la lista decía «Herramienta · Obligatoria» sin decir cuál.
+
+Ahora la pantalla pide las herramientas **del turno** a la RPC `herramientas_del_turno(p_bloque_id)`. Es `SECURITY
+DEFINER`, con el mismo patrón que `limpieza_calendario`:
+
+- devuelve sólo la actividad, el recurso (`equipo_id` o `inventario_id`), la cantidad, si es obligatoria y, del catálogo,
+  **sólo nombre y estado**;
+- sólo de las actividades de las tareas de ese turno, y de su mismo condominio;
+- exige la empresa, uno de los tabs que trabajan el turno (`tareas_personal`, `turnos`, `revision_tareas` o
+  `prog_limpieza`) y acceso al condominio del turno. `desempeno_personal` ve el turno pero no lo ejecuta: no la invoca.
+
+Los catálogos siguen cerrados: Equipos e Inventario completos siguen exigiendo su tab. Se eligió esto, y no copiar el
+nombre en la tarea como se hace con los insumos, para que la preparación siga mostrando la receta **vigente** de cada
+actividad, sin tabla nueva y sin rellenar los turnos ya programados.
 
 ## En curso: una tarjeta por vez
 
@@ -78,5 +98,7 @@ turno**. Si quedan pendientes, ofrece «Ir a lo pendiente».
 | Qué | Dónde |
 |---|---|
 | Reglas puras: paradas, siguiente pendiente, preparación (herramientas por la mayor cantidad, insumos sumados, indicaciones sin repetir, cámara) | `src/domain/condominios/__tests__/ejecucionGuiada.test.ts` |
+| La RPC `herramientas_del_turno`: quién lee, sólo nombre y estado, sólo lo del turno y de su condominio, con 13 mutantes | `supabase/tests/herramientas_turno/run.sh` (y las guardas de `src/__tests__/herramientasDelTurnoMigracion.test.ts`) |
+| Un rol con sólo Limpieza ve el nombre de cada herramienta en la Ruta del día | `src/components/condominios/tabs/limpieza/__tests__/VistaRutaDia.herramientas.test.tsx` |
 | Pantalla: preparación antes de iniciar, avance por paradas, evidencia, comentario antes del cierre, pasos seguidos, omitir, novedad, resumen y cierre | `src/components/condominios/tabs/__tests__/TareasPersonalTab.guiada.test.tsx` |
 | La lista de siempre (evidencia, insumos, novedades) | `TareasPersonalTab.{evidencia,insumos,novedades}.test.tsx`, que ahora pasan a «Ver lista completa» |

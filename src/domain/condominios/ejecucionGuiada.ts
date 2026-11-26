@@ -7,9 +7,9 @@
 // una tarjeta por vez: lo que se arma antes (herramientas, insumos,
 // indicaciones, cámara), el agrupamiento por parada y a dónde se avanza.
 import type {
-  AreaCondominio, EstadoTareaBloque, PlantillaTareaHerramienta, TareaBloque, TareaBloqueSuministro,
+  AreaCondominio, EstadoTareaBloque, HerramientaDelTurno, TareaBloque, TareaBloqueSuministro,
 } from '../../types'
-import { herramientaId, herramientaNombre } from './herramientasPlantilla'
+import { herramientaId } from './herramientasPlantilla'
 
 /** Una tarea ya no se ejecuta: se cerró (bien o con observación) o se omitió. */
 export const tareaResuelta = (estado: EstadoTareaBloque) => estado !== 'pendiente'
@@ -152,7 +152,8 @@ export interface PreparacionTurno {
  * Lo que hay que tener a mano antes de iniciar, sacado de las tareas
  * PENDIENTES del turno:
  *   · herramientas y equipo: los de la plantilla de cada tarea
- *     (`plantilla_tarea_herramientas`), por la mayor cantidad pedida;
+ *     (`plantilla_tarea_herramientas`, con su nombre por la RPC
+ *     `herramientas_del_turno`), por la mayor cantidad pedida;
  *   · insumos: el plan congelado de cada tarea (`tareas_bloque_suministros`)
  *     que aún no se consumió ni se declaró no usado, sumado;
  *   · indicaciones de seguridad: las de cada tarea, sin repetir.
@@ -160,7 +161,7 @@ export interface PreparacionTurno {
 export function preparacionDelTurno(
   tareas: TareaBloque[],
   insumos: TareaBloqueSuministro[],
-  herramientas: PlantillaTareaHerramienta[],
+  herramientas: HerramientaDelTurno[],
   areas: AreaCondominio[],
 ): PreparacionTurno {
   const pendientes = [...tareas].filter(t => !tareaResuelta(t.estado)).sort((a, b) => a.orden - b.orden)
@@ -178,7 +179,7 @@ export function preparacionDelTurno(
       } else {
         porHerramienta.set(recursoId, {
           recurso_id: recursoId,
-          nombre: herramientaNombre(h) ?? 'Herramienta',
+          nombre: h.nombre ?? 'Herramienta',
           cantidad: h.cantidad,
           obligatoria: h.obligatoria,
           tareas: [t.titulo],

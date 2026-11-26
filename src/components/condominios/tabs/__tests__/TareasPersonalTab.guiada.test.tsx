@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
     error: null as RowError,
   })),
   fetchInsumosDeTareas: vi.fn(async () => ({ insumos: [] as unknown[], error: null })),
-  fetchHerramientasDePlantillas: vi.fn(async () => ({
+  fetchHerramientasDelTurno: vi.fn(async () => ({
     herramientas: [] as unknown[], error: null as { message: string } | null,
   })),
   openPromptDialog: vi.fn(async () => null as Record<string, string> | null),
@@ -46,7 +46,7 @@ vi.mock('../../../../domain/condominios/tabMutations', () => ({
 }))
 vi.mock('../../../../domain/condominios/tabQueries', () => ({
   fetchInsumosDeTareas: mocks.fetchInsumosDeTareas,
-  fetchHerramientasDePlantillas: mocks.fetchHerramientasDePlantillas,
+  fetchHerramientasDelTurno: mocks.fetchHerramientasDelTurno,
 }))
 vi.mock('../../../shared/Dialog', () => ({ confirm: mocks.confirm, notify: mocks.notify }))
 vi.mock('../../../shared/PromptDialog', () => ({ openPromptDialog: mocks.openPromptDialog }))
@@ -124,16 +124,16 @@ beforeEach(() => {
   mocks.updateCondominioRow.mockResolvedValue({ error: null })
   mocks.cerrarTareaYConsumir.mockResolvedValue({ data: { consumidos: 0, no_usados: 0, sin_stock: [] }, error: null })
   mocks.fetchInsumosDeTareas.mockResolvedValue({ insumos: [], error: null })
-  mocks.fetchHerramientasDePlantillas.mockResolvedValue({ herramientas: [], error: null })
+  mocks.fetchHerramientasDelTurno.mockResolvedValue({ herramientas: [], error: null })
   mocks.confirm.mockResolvedValue({ isConfirmed: true })
 })
 afterEach(cleanup)
 
 describe('antes de iniciar: lo que hay que tener a mano', () => {
   beforeEach(() => {
-    mocks.fetchHerramientasDePlantillas.mockResolvedValue({
+    mocks.fetchHerramientasDelTurno.mockResolvedValue({
       herramientas: [
-        { plantilla_tarea_id: 'barrer', equipo_id: 'escoba', inventario_id: null, equipo_nombre: 'Escoba', cantidad: 1, obligatoria: true },
+        { plantilla_tarea_id: 'barrer', equipo_id: 'escoba', inventario_id: null, nombre: 'Escoba', estado: 'operativo', cantidad: 1, obligatoria: true },
       ],
       error: null,
     })
@@ -149,7 +149,8 @@ describe('antes de iniciar: lo que hay que tener a mano', () => {
 
     const prep = await screen.findByRole('region', { name: 'Antes de iniciar el turno' })
     await within(prep).findByText('Escoba')
-    expect(mocks.fetchHerramientasDePlantillas).toHaveBeenCalledWith(['barrer', 'vidrios'])
+    // Por el turno (RPC herramientas_del_turno), no por la lista de actividades.
+    expect(mocks.fetchHerramientasDelTurno).toHaveBeenCalledWith('blo1')
     expect(within(prep).getByText('Obligatoria')).toBeTruthy()
     expect(within(prep).getByText('Alcohol etílico 70% — 1 litro')).toBeTruthy()
     expect(within(prep).getByText('Usar rótulo de área en mantenimiento')).toBeTruthy()
@@ -186,16 +187,23 @@ describe('antes de iniciar: lo que hay que tener a mano', () => {
   })
 
   it('si no pudo leer las herramientas lo dice, y no esconde el resto', async () => {
-    mocks.fetchHerramientasDePlantillas.mockResolvedValue({ herramientas: [], error: { message: 'permiso denegado' } })
+    mocks.fetchHerramientasDelTurno.mockResolvedValue({ herramientas: [], error: { message: 'permiso denegado' } })
     montar('pendiente', recorrido())
     fireEvent.click(screen.getByText('▶ Iniciar'))
     expect((await screen.findByRole('alert')).textContent).toMatch(/permiso denegado/)
     expect(screen.getByText('Alcohol etílico 70% — 1 litro')).toBeTruthy()
   })
 
+  it('un turno sin actividades no pide herramientas: no se consulta', async () => {
+    montar('pendiente', [tarea('t1', 0)])
+    fireEvent.click(screen.getByText('▶ Iniciar'))
+    await screen.findByText('✓ Tengo todo · Iniciar turno')
+    expect(mocks.fetchHerramientasDelTurno).not.toHaveBeenCalled()
+  })
+
   it('si la base no deja iniciar, lo avisa y la preparación sigue ahí', async () => {
     mocks.fetchInsumosDeTareas.mockResolvedValue({ insumos: [], error: null })
-    mocks.fetchHerramientasDePlantillas.mockResolvedValue({ herramientas: [], error: null })
+    mocks.fetchHerramientasDelTurno.mockResolvedValue({ herramientas: [], error: null })
     mocks.updateCondominioRow.mockResolvedValue({ error: { message: 'RLS' } })
     montar('pendiente', [tarea('t1', 0)])
     fireEvent.click(screen.getByText('▶ Iniciar'))
