@@ -4,6 +4,9 @@ import { join } from 'node:path'
 import { abrir, ir, foto, confirmar, paso, pasos } from './app.mjs'
 
 const { nav, page, errores } = await abrir('ana')
+// RAPIDO=1 marca los pasos del checklist sin pausa (prueba la carrera de guardados); SOLO=<empleado> recorre sólo ése.
+const RITMO = process.env.RAPIDO ? 0 : 800
+const SOLO = process.env.SOLO
 
 async function recorrer(empleado, pre) {
   // El encabezado de la tarjeta del empleado: el contenedor más cercano a su nombre que tiene botones.
@@ -57,9 +60,9 @@ async function recorrer(empleado, pre) {
         await listo().click(); await page.waitForTimeout(900)
         paso(await sigueIgual(), `${empleado} · «${titulo}» sin checklist: ${(await sigueIgual()) ? 'no avanza (bien)' : 'avanzó (mal)'}`)
       }
-      // A ritmo humano: un toque cada 0,8 s.
+      // A ritmo humano (un toque cada 0,8 s), o seguidos con RAPIDO=1.
       const cs = tarjeta.getByRole('checkbox')
-      for (let i = 0; i < await cs.count(); i++) if (!(await cs.nth(i).isChecked())) { await cs.nth(i).check(); await page.waitForTimeout(800) }
+      for (let i = 0; i < await cs.count(); i++) if (!(await cs.nth(i).isChecked())) { await cs.nth(i).check(); if (RITMO) await page.waitForTimeout(RITMO) }
       await listo().click(); hechas.push(`${titulo}: checklist completo`)
     } else if (titulo.startsWith('Trapeado de piso')) {
       if (!hechas.some(h => h.startsWith('Trapeado'))) {
@@ -105,8 +108,8 @@ try {
   await page.getByRole('tab', { name: /Ruta del día/ }).click()
   await page.getByText('Ana Pérez — Conserje').first().waitFor({ timeout: 15000 })
   await foto(page, 'b01-ruta-dia')
-  await recorrer('Ana Pérez', 'b')
-  await recorrer('Luis Gómez', 'c')
+  if (!SOLO || SOLO === 'Ana Pérez') await recorrer('Ana Pérez', 'b')
+  if (!SOLO || SOLO === 'Luis Gómez') await recorrer('Luis Gómez', 'c')
 } catch (e) {
   paso(false, `Se detuvo: ${String(e).split('\n')[0]}`)
   await foto(page, 'b99-error', { fullPage: true }).catch(() => {})

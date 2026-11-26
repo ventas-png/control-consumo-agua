@@ -6,7 +6,7 @@ import { join } from 'node:path'
 const require = createRequire(new URL('../../../package.json', import.meta.url))
 const { chromium } = require('playwright')
 
-export const APP = 'http://127.0.0.1:5173'
+export const APP = process.env.APP_URL ?? 'http://127.0.0.1:5173'
 export const FOTOS = join(import.meta.dirname, '..', 'fotos')
 mkdirSync(FOTOS, { recursive: true })
 const clave = readFileSync(join(import.meta.dirname, '..', '.credenciales'), 'utf8').match(/clave: (.+)/)[1].trim()

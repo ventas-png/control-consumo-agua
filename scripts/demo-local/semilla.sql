@@ -1,7 +1,8 @@
 -- EMPRESA DEMO para pruebas y manuales (copia local). Datos inventados.
 --   Empresa «Prestadora Demo» · condominio «Condominio Demo»
 --   Usuarios: admin@demo.local (dueño de la empresa), supervisor@demo.local (Supervisor de limpieza:
---   ver/crear/editar/eliminar en Limpieza) y ana@demo.local (Personal de limpieza: ver/editar en Limpieza).
+--   ver/crear/editar/eliminar en Limpieza), ana@demo.local (Personal de limpieza: ver/editar en Limpieza) y
+--   creador@demo.local (Crea rutinas: ver/crear en Limpieza, sin editar).
 --   La contraseña llega por -v clave=… (no queda en este archivo).
 \set ON_ERROR_STOP on
 BEGIN;
@@ -9,7 +10,8 @@ CREATE TEMP TABLE ids (k text PRIMARY KEY, id uuid NOT NULL);
 INSERT INTO ids VALUES
   ('E','d0000000-0000-4000-8000-00000000000e'), ('P','d1000000-0000-4000-8000-0000000000c1'),
   ('ADM','d2000000-0000-4000-8000-000000000001'), ('SUP','d2000000-0000-4000-8000-000000000002'),
-  ('ANA_U','d2000000-0000-4000-8000-000000000003'),
+  ('ANA_U','d2000000-0000-4000-8000-000000000003'), ('CRE','d2000000-0000-4000-8000-000000000004'),
+  ('ROL_CRE','d3000000-0000-4000-8000-000000000003'),
   ('ROL_SUP','d3000000-0000-4000-8000-000000000001'), ('ROL_LIMP','d3000000-0000-4000-8000-000000000002');
 CREATE FUNCTION pg_temp.i(k text) RETURNS uuid LANGUAGE sql AS $$ SELECT id FROM ids WHERE ids.k = $1 $$;
 
@@ -22,22 +24,28 @@ INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, creat
 SELECT pg_temp.i(k), email, extensions.crypt(:'clave', extensions.gen_salt('bf')), now(), now(), now(), 'authenticated', 'authenticated',
        '{"provider":"email","providers":["email"]}', jsonb_build_object('full_name', nombre)
 FROM (VALUES ('ADM','admin@demo.local','Admin Demo'), ('SUP','supervisor@demo.local','Sofía Supervisora'),
-             ('ANA_U','ana@demo.local','Ana Pérez')) v(k, email, nombre);
+             ('ANA_U','ana@demo.local','Ana Pérez'), ('CRE','creador@demo.local','Carlos Creador')) v(k, email, nombre);
 INSERT INTO public.app_users (id, full_name, role, company_id) VALUES
   (pg_temp.i('ADM'), 'Admin Empresa Demo', 'company_owner', pg_temp.i('E')),
   (pg_temp.i('SUP'), 'Sofía Supervisora', 'operator', pg_temp.i('E')),
-  (pg_temp.i('ANA_U'), 'Ana Pérez', 'operator', pg_temp.i('E'));
+  (pg_temp.i('ANA_U'), 'Ana Pérez', 'operator', pg_temp.i('E')),
+  (pg_temp.i('CRE'), 'Carlos Creador', 'operator', pg_temp.i('E'));
 INSERT INTO public.user_project_assignments (user_id, project_id, permission_type) VALUES
-  (pg_temp.i('ADM'), pg_temp.i('P'), 'total'), (pg_temp.i('SUP'), pg_temp.i('P'), 'total'), (pg_temp.i('ANA_U'), pg_temp.i('P'), 'total');
+  (pg_temp.i('ADM'), pg_temp.i('P'), 'total'), (pg_temp.i('SUP'), pg_temp.i('P'), 'total'), (pg_temp.i('ANA_U'), pg_temp.i('P'), 'total'),
+  (pg_temp.i('CRE'), pg_temp.i('P'), 'total');
 INSERT INTO public.roles (id, company_id, name, description) VALUES
   (pg_temp.i('ROL_SUP'), pg_temp.i('E'), 'Supervisor de limpieza', 'Arma rutinas, asigna el calendario y atiende novedades'),
-  (pg_temp.i('ROL_LIMP'), pg_temp.i('E'), 'Personal de limpieza', 'Ejecuta la ruta del día');
+  (pg_temp.i('ROL_LIMP'), pg_temp.i('E'), 'Personal de limpieza', 'Ejecuta la ruta del día'),
+  (pg_temp.i('ROL_CRE'), pg_temp.i('E'), 'Crea rutinas', 'Sólo crea rutinas nuevas: no edita las existentes');
 INSERT INTO public.role_permissions (role_id, permission_key, effect)
 SELECT pg_temp.i('ROL_SUP'), k, 'allow' FROM unnest(ARRAY['condominios.tab.prog_limpieza', 'condominios.tab.prog_limpieza.create',
   'condominios.tab.prog_limpieza.edit', 'condominios.tab.prog_limpieza.delete']) k
 UNION ALL
-SELECT pg_temp.i('ROL_LIMP'), k, 'allow' FROM unnest(ARRAY['condominios.tab.prog_limpieza', 'condominios.tab.prog_limpieza.edit']) k;
-INSERT INTO public.user_roles (user_id, role_id) VALUES (pg_temp.i('SUP'), pg_temp.i('ROL_SUP')), (pg_temp.i('ANA_U'), pg_temp.i('ROL_LIMP'));
+SELECT pg_temp.i('ROL_LIMP'), k, 'allow' FROM unnest(ARRAY['condominios.tab.prog_limpieza', 'condominios.tab.prog_limpieza.edit']) k
+UNION ALL
+SELECT pg_temp.i('ROL_CRE'), k, 'allow' FROM unnest(ARRAY['condominios.tab.prog_limpieza', 'condominios.tab.prog_limpieza.create']) k;
+INSERT INTO public.user_roles (user_id, role_id) VALUES (pg_temp.i('SUP'), pg_temp.i('ROL_SUP')), (pg_temp.i('ANA_U'), pg_temp.i('ROL_LIMP')),
+  (pg_temp.i('CRE'), pg_temp.i('ROL_CRE'));
 
 -- ── Operaciones → Áreas ─────────────────────────────────────────────────────
 INSERT INTO public.areas_condominio (company_id, project_id, nombre, icono, orden, descripcion)

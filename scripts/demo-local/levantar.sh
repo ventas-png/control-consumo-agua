@@ -59,7 +59,7 @@ psql -q -v ON_ERROR_STOP=1 -d demo -f "$AQUI/ajustes.sql"
 # ── 3. Empresa demo (una sola vez) ──────────────────────────────────────────────
 if [ "$(psql -d demo -Atc "SELECT count(*) FROM public.companies WHERE nombre = 'Prestadora Demo'")" = "0" ]; then
   CLAVE="Demo-$(python3 -c 'import secrets; print(secrets.token_urlsafe(9))')"
-  umask 077; printf 'admin@demo.local\nsupervisor@demo.local\nana@demo.local\nclave: %s\n' "$CLAVE" > "$AQUI/.credenciales"
+  umask 077; printf 'admin@demo.local\nsupervisor@demo.local\nana@demo.local\ncreador@demo.local\nclave: %s\n' "$CLAVE" > "$AQUI/.credenciales"
   psql -X -q -d demo -v clave="$CLAVE" -f "$AQUI/semilla.sql" >/dev/null
   echo "OK  empresa demo sembrada (clave en scripts/demo-local/.credenciales)"
 fi
