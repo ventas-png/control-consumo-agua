@@ -95,9 +95,10 @@ copia()   { PGOPTIONS="-c client_min_messages=warning" psql -q -d postgres -c "D
 huella()  { psql -q -v ON_ERROR_STOP=1 -tA -d "$1" -f "$HUELLA" | LC_ALL=C sort; }
 posteriores() {   # aplica, sobre $1, las migraciones de versión mayor que la nuestra
   # Con $2/$3 (un mutante), la que traiga el mismo texto se aplica con el MISMO
-  # reemplazo: 20261225000000 redefine guardar_recorrido_rutina con este cuerpo,
-  # y aplicada tal cual desharía la mutación —la suite probaría la versión
-  # sana y el mutante «pasaría» sin que la regla se hubiera aflojado—.
+  # reemplazo: 20261225000000 redefine guardar_recorrido_rutina con este cuerpo
+  # (y 20261226000100, materializar_rutinas_turno), y aplicada tal cual desharía
+  # la mutación —la suite probaría la versión sana y el mutante «pasaría» sin
+  # que la regla se hubiera aflojado—.
   for f in "$MIGS"/*.sql; do
     local base; base="$(basename "$f" .sql)"
     [[ "${base:0:14}" > "$VERSION" ]] || continue
