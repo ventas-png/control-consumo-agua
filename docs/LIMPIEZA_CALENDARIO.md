@@ -172,6 +172,16 @@ to Production» (evento `push`, `success` a las 22:38 UTC). Comprobación poster
 reconstrucción de `main`; los 3742 grupos restantes son idénticos a la captura anterior y el sha256 completo coincide con el
 medido en producción; `drift-conocido.json` no cambia.
 
+**`20261226000000` y `20261226000100` (pasos opcionales) desplegadas el 2026-11-26**:
+- PR #1175 (convergencia) fusionada como `94019092`, run 45827712955 de «Apply Migrations to Production» (`success`). Fue
+  no-op en producción: `tareas_bloque` siguió con las mismas 32 columnas.
+- PR #1177 fusionada como `83e9462a`, run 45838022892 (`success` a las 14:21 UTC, tras la aprobación del Environment).
+- Comprobación posterior de solo lectura en producción (14:31 UTC): 963 migraciones, máx. `20261226000100`.
+- Huella de producción recapturada: 4 grupos cambiados, 0 nuevos (3998). Son exactamente los cuatro que el auditor anunció
+  como cambio planificado (`tabla:tareas_bloque/columnas` y el cuerpo de las tres funciones), con valores idénticos a la
+  reconstrucción de `main`. El resto es idéntico a la captura anterior, y el sha256 completo coincide con el medido en
+  producción.
+
 ## Carga del panel
 
 Al entrar a Condominios ya no se bajan `programacion_limpieza` (el programa por área) ni `ejecuciones_limpieza` (los
