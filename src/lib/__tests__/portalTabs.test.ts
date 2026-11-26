@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
-  PORTAL_TABS, PORTAL_TABS_CONFIGURABLES, PORTAL_TABS_FIJOS,
-  esTabSoloPropietario, normalizarTabsOcultos, tabsForRol, tabsVisiblesPortal,
+  PORTAL_TABS, PORTAL_TABS_CONFIGURABLES, PORTAL_TABS_FIJOS, FUNCIONES_PLAN_PORTAL,
+  esTabSoloPropietario, funcionPlanDeTab, normalizarTabsOcultos, tabsForRol, tabsVisiblesPortal,
 } from '../portalTabs'
+// featureFlags arrastra el cliente de Supabase; aquí sólo interesa su catálogo.
+vi.mock('../supabase', () => ({ supabase: {} }))
+import { FEATURE_CODES } from '../featureFlags'
 
 // Visibilidad de tabs del portal por rol del residente (portal propietario/
 // inquilino): el propietario ve todo; el inquilino/familiar solo lo operativo.
@@ -114,5 +117,46 @@ describe('configuración del portal por condominio', () => {
   it('solo-propietario son exactamente rentas, asambleas y transparencia', () => {
     expect(PORTAL_TABS.filter(t => esTabSoloPropietario(t.id)).map(t => t.id).sort())
       .toEqual(['asambleas', 'rentas', 'transparencia'])
+  })
+})
+
+// Pestañas que dependen del plan de la empresa del condominio. El residente no
+// tiene empresa propia, así que antes las veía siempre con un «mejore su plan»
+// (incluso cuando la empresa SÍ las tenía contratadas).
+describe('pestañas que dependen del plan', () => {
+  it('Asambleas y Transparencia son las únicas atadas al plan, con códigos reales', () => {
+    expect(PORTAL_TABS.filter(t => funcionPlanDeTab(t.id)).map(t => t.id).sort()).toEqual(['asambleas', 'transparencia'])
+    expect(funcionPlanDeTab('asambleas')).toBe('asambleas_digitales')
+    expect(funcionPlanDeTab('transparencia')).toBe('transparencia_financiera')
+    for (const f of FUNCIONES_PLAN_PORTAL) expect(FEATURE_CODES).toContain(f)
+  })
+
+  it('sin la función en el plan, la pestaña no aparece', () => {
+    const visibles = tabsVisiblesPortal('propietario', [], [])
+    expect(visibles).not.toContain('asambleas')
+    expect(visibles).not.toContain('transparencia')
+    expect(visibles).toContain('rentas')
+  })
+
+  it('con la función, aparece (y sólo esa)', () => {
+    const visibles = tabsVisiblesPortal('propietario', [], ['asambleas_digitales', 'cobranza_judicial'])
+    expect(visibles).toContain('asambleas')
+    expect(visibles).not.toContain('transparencia')
+    expect(tabsVisiblesPortal('propietario', [], new Set(FUNCIONES_PLAN_PORTAL))).toEqual(tabsForRol('propietario'))
+  })
+
+  it('el plan no le da al inquilino lo que su rol no ve, ni enciende lo que la empresa apagó', () => {
+    expect(tabsVisiblesPortal('arrendatario', [], FUNCIONES_PLAN_PORTAL)).toEqual(tabsForRol('arrendatario'))
+    expect(tabsVisiblesPortal('propietario', ['asambleas'], FUNCIONES_PLAN_PORTAL)).not.toContain('asambleas')
+  })
+
+  it('sin pasar el plan (vista previa de Config. portal) no se filtra por plan', () => {
+    expect(tabsVisiblesPortal('propietario', [])).toEqual(tabsForRol('propietario'))
+  })
+
+  it('la descripción que lee quien configura avisa que depende del plan', () => {
+    for (const id of ['asambleas', 'transparencia'] as const) {
+      expect(PORTAL_TABS.find(t => t.id === id)!.descripcion).toMatch(/plan/)
+    }
   })
 })
