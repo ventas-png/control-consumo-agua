@@ -375,6 +375,56 @@ export const CUOTA_SALDO_INICIAL_LABELS: Record<CuotaSaldoInicialResultado, stri
   error: 'Error',
 }
 
+// ── Fondo de reserva y caja chica en libros (20261231000300) ────────────────
+
+export type FondoReservaTipo = 'aportacion' | 'retiro' | 'rendimiento'
+
+export const FONDO_RESERVA_TIPO_LABELS: Record<FondoReservaTipo, string> = {
+  aportacion: 'Aportación',
+  retiro: 'Retiro',
+  rendimiento: 'Rendimiento',
+}
+
+/** El fondo según su registro (Condominios) y según libros. */
+export interface FondoReservaResumen {
+  /** Cuentas usadas la última vez; null si aún no hay ningún movimiento con póliza. */
+  cuenta_fondo_id: string | null
+  cuenta_contra_id: string | null
+  saldo_registro: number
+  saldo_libros: number
+  movimientos: number
+  movimientos_sin_poliza: number
+}
+
+export interface CajaChicaContable {
+  caja_id: string
+  responsable: string
+  fecha_apertura: string
+  monto_fondo: number
+  estado: 'abierta' | 'cerrada'
+  /** null = el fondo aún no está constituido en libros. */
+  cuenta_caja_id: string | null
+  vales_pendientes: number
+  total_pendiente: number
+}
+
+export type ReposicionCajaResultado = 'previsualizacion' | 'repuesto' | 'sin_cuenta'
+
+export interface ReposicionCajaFila {
+  movimiento_id: string
+  fecha: string
+  concepto: string
+  comprobante: string | null
+  monto: number
+  cuenta_gasto_id: string | null
+  cuenta_codigo: string | null
+  cuenta_nombre: string | null
+  resultado: ReposicionCajaResultado
+  motivo: string | null
+  reposicion_id: string | null
+  asiento_id: string | null
+}
+
 // ── Reglas de imputación contable ───────────────────────────────────────────
 // Espejo de 20260926000000. Los destinos NO son códigos contables: son
 // etiquetas semánticas que la BD declara en `conta_destinos_imputacion()` y

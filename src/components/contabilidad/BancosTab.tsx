@@ -29,6 +29,8 @@ import {
   type SugerenciaConciliacion,
 } from '../../types/bancos'
 import { Campo, btnLink, btnPrimario, btnSecundario, input , usePermisosContabilidad } from './ui'
+import { FondoReservaModal } from './FondoReservaModal'
+import { CajaChicaModal } from './CajaChicaModal'
 
 interface Props {
   companyId: string
@@ -53,6 +55,7 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
   const [periodo, setPeriodo] = useState(periodoActual())
   const [formCuenta, setFormCuenta] = useState<CuentaBancaria | 'nueva' | null>(null)
   const [importando, setImportando] = useState(false)
+  const [fondos, setFondos] = useState<'reserva' | 'caja' | null>(null)
 
   const cuentaActiva = cuentasBancarias.find((c) => c.id === cuentaId) ?? cuentasBancarias[0] ?? null
   const cuentaActivaId = cuentaActiva?.id
@@ -209,10 +212,35 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
             )}
           </>
         )}
+        {projectId && (
+          <>
+            <button onClick={() => setFondos('reserva')} style={btnSecundario}>Fondo de reserva</button>
+            <button onClick={() => setFondos('caja')} style={btnSecundario}>Caja chica</button>
+          </>
+        )}
         {puedeCrear && (
           <button onClick={() => setFormCuenta('nueva')} style={btnPrimario}>+ Cuenta bancaria</button>
         )}
       </div>
+
+      {fondos === 'reserva' && projectId && (
+        <FondoReservaModal
+          companyId={companyId}
+          projectId={projectId}
+          monedaBase={monedaBase}
+          puedeRegistrar={puedeCrear && puedeCambiarEstado}
+          onClose={() => setFondos(null)}
+        />
+      )}
+      {fondos === 'caja' && projectId && (
+        <CajaChicaModal
+          companyId={companyId}
+          projectId={projectId}
+          monedaBase={monedaBase}
+          puedeRegistrar={puedeCrear && puedeCambiarEstado}
+          onClose={() => setFondos(null)}
+        />
+      )}
 
       {cuentaActiva && estado && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>

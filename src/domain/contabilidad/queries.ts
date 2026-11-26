@@ -7,6 +7,8 @@ import { runQuery, runQueryAll } from '../queryFetch'
 import { contabilidadKeys } from './keys'
 import { normalizarMoneda } from './schemas'
 import type {
+  CajaChicaContable,
+  FondoReservaResumen,
   AsientoConLineas,
   AsientoContable,
   BalanzaFila,
@@ -630,6 +632,30 @@ export function useCxcAntiguedadQuery(companyId?: string, projectId?: string | n
         supabase
           .rpc('conta_cxc_antiguedad', { p_project_id: projectId ?? null, p_corte: corte || null })
           .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/** El fondo de reserva según su registro y según libros (solo ledger de proyecto). */
+export function useFondoReservaResumenQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.fondoReserva(companyId, projectId),
+    enabled: !!companyId && !!projectId,
+    queryFn: async () =>
+      ((await runQuery<FondoReservaResumen[]>((signal) =>
+        supabase.rpc('conta_fondo_reserva_resumen', { p_project_id: projectId! }).abortSignal(signal),
+      )) ?? [])[0] ?? null,
+  })
+}
+
+/** Cajas chicas del proyecto, con lo que cada una tiene pendiente de reponer. */
+export function useCajasChicasQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.cajasChicas(companyId, projectId),
+    enabled: !!companyId && !!projectId,
+    queryFn: async () =>
+      (await runQuery<CajaChicaContable[]>((signal) =>
+        supabase.rpc('conta_cajas_chicas', { p_project_id: projectId! }).abortSignal(signal),
       )) ?? [],
   })
 }

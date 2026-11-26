@@ -143,6 +143,10 @@ export const contabilidadKeys = {
       clienteId ?? null, unidadId ?? null] as const,
   saldoFavorDocumentos: (companyId?: string, origenId?: string | null) =>
     [...contabilidadKeys.all, 'saldosFavor', companyId ?? null, 'documentos', origenId ?? null] as const,
+  fondoReserva: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'fondoReserva', companyId ?? null, projectId ?? null] as const,
+  cajasChicas: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'cajasChicas', companyId ?? null, projectId ?? null] as const,
   unidadesLedger: (companyId?: string, projectId?: string | null) =>
     [...contabilidadKeys.all, 'unidadesLedger', companyId ?? null, projectId ?? null] as const,
   // Solicitudes de ajuste e incidencias de conciliación (20261011000000).

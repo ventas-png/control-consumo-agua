@@ -14,6 +14,8 @@ import { contabilidadKeys } from './keys'
 import { planificarCatalogo } from './importCuentas'
 import type { Json } from '../../types/database.types'
 import type {
+  FondoReservaTipo,
+  ReposicionCajaFila,
   CuotaSaldoInicialFila,
   CuotaSaldoInicialInput,
   DepreciacionFila,
@@ -611,6 +613,89 @@ export function useCuotasSaldoInicialMutation() {
       // Las cuotas nuevas también son de Condominios (cuotas, estado de cuenta, morosidad).
       void qc.invalidateQueries({ queryKey: ['condominios'] })
     },
+  })
+}
+
+// ── Fondo de reserva y caja chica ───────────────────────────────────────────
+// Cada movimiento deja su póliza (20261231000300). Los tres invalidan también
+// Condominios: escriben en el registro del fondo y en los movimientos de caja.
+
+function invalidarFondos(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: contabilidadKeys.all })
+  void qc.invalidateQueries({ queryKey: ['condominios'] })
+}
+
+export function useFondoReservaTrasladoMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      projectId: string
+      tipo: FondoReservaTipo
+      monto: number
+      fecha: string
+      concepto: string
+      cuentaFondoId: string
+      cuentaContraId: string
+      referencia: string | null
+    }) =>
+      ((await runQuery<Array<{ movimiento_id: string; asiento_id: string; saldo_fondo: number }>>((signal) =>
+        supabase
+          .rpc('conta_fondo_reserva_traslado', {
+            p_project_id: vars.projectId,
+            p_tipo: vars.tipo,
+            p_monto: vars.monto,
+            p_fecha: vars.fecha,
+            p_concepto: vars.concepto,
+            p_cuenta_fondo_id: vars.cuentaFondoId,
+            p_cuenta_contra_id: vars.cuentaContraId,
+            p_referencia: vars.referencia,
+          })
+          .abortSignal(signal),
+      )) ?? [])[0] ?? null,
+    onSuccess: () => invalidarFondos(qc),
+  })
+}
+
+export function useCajaChicaConstituirMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { cajaId: string; fecha: string; cuentaCajaId: string; cuentaBancoId: string }) =>
+      await runQuery<string>((signal) =>
+        supabase
+          .rpc('conta_caja_chica_constituir', {
+            p_caja_id: vars.cajaId,
+            p_fecha: vars.fecha,
+            p_cuenta_caja_id: vars.cuentaCajaId,
+            p_cuenta_banco_id: vars.cuentaBancoId,
+          })
+          .abortSignal(signal),
+      ),
+    onSuccess: () => invalidarFondos(qc),
+  })
+}
+
+export function useCajaChicaReponerMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      cajaId: string
+      fecha: string
+      cuentaBancoId: string
+      lineas: Array<{ movimiento_id: string; cuenta_gasto_id: string }>
+      aplicar: boolean
+    }) =>
+      await runQuery<ReposicionCajaFila[]>((signal) =>
+        supabase
+          .rpc('conta_caja_chica_reponer', {
+            p_caja_id: vars.cajaId,
+            p_fecha: vars.fecha,
+            p_cuenta_banco_id: vars.cuentaBancoId,
+            p_lineas: vars.lineas as unknown as Json,
+            p_aplicar: vars.aplicar,
+          })
+          .abortSignal(signal),
+      ),
+    onSuccess: (_data, vars) => { if (vars.aplicar) invalidarFondos(qc) },
   })
 }
 

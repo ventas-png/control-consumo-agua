@@ -26410,6 +26410,30 @@ export type Database = {
           razones: string
         }[]
       }
+      conta_fondo_reserva_resumen: {
+        Args: { p_project_id: string }
+        Returns: {
+          cuenta_contra_id: string | null
+          cuenta_fondo_id: string | null
+          movimientos: number
+          movimientos_sin_poliza: number
+          saldo_libros: number
+          saldo_registro: number
+        }[]
+      }
+      conta_fondo_reserva_traslado: {
+        Args: {
+          p_project_id: string
+          p_tipo: string
+          p_monto: number
+          p_fecha: string
+          p_concepto: string
+          p_cuenta_fondo_id: string
+          p_cuenta_contra_id: string
+          p_referencia?: string | null
+        }
+        Returns: { asiento_id: string; movimiento_id: string; saldo_fondo: number }[]
+      }
       conta_generar_asiento: {
         Args: {
           p_company_id: string
@@ -26467,6 +26491,46 @@ export type Database = {
           unidad_id: string | null
           unidad_nombre: string | null
           vencimiento_mas_antiguo: string | null
+        }[]
+      }
+      conta_caja_chica_constituir: {
+        Args: { p_caja_id: string; p_fecha: string; p_cuenta_caja_id: string; p_cuenta_banco_id: string }
+        Returns: string
+      }
+      conta_caja_chica_reponer: {
+        Args: {
+          p_caja_id: string
+          p_fecha: string
+          p_cuenta_banco_id: string
+          p_lineas?: Json
+          p_aplicar?: boolean
+        }
+        Returns: {
+          asiento_id: string | null
+          comprobante: string | null
+          concepto: string
+          cuenta_codigo: string | null
+          cuenta_gasto_id: string | null
+          cuenta_nombre: string | null
+          fecha: string
+          monto: number
+          motivo: string | null
+          movimiento_id: string
+          reposicion_id: string | null
+          resultado: string
+        }[]
+      }
+      conta_cajas_chicas: {
+        Args: { p_project_id: string }
+        Returns: {
+          caja_id: string
+          cuenta_caja_id: string | null
+          estado: string
+          fecha_apertura: string
+          monto_fondo: number
+          responsable: string
+          total_pendiente: number
+          vales_pendientes: number
         }[]
       }
       conta_cuotas_saldo_inicial: {
