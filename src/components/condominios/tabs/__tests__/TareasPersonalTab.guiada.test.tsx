@@ -569,6 +569,25 @@ describe('cerrar el turno', () => {
     expect([id, patch.estado, patch.puntaje_completitud]).toEqual(['blo1', 'completado', 50])
   })
 
+  // La base sólo guarda «completado» al cerrar: con obligatorias sin hacer, la tarjeta dice «Incompleto».
+  it('cerrado con pendientes confirmadas, la tarjeta dice Incompleto y no Completado', async () => {
+    montar('en_curso', [tarea('t1', 0), tarea('t2', 1)])
+    cerrarDesdeEncabezado()
+
+    await waitFor(() => expect(cierreDelTurno()).toHaveLength(1))
+    expect(await screen.findByText('Incompleto')).toBeTruthy()
+    expect(screen.queryByText('Completado')).toBeNull()
+  })
+
+  it('un turno ya cerrado se lee por lo que quedó: Incompleto con obligatorias pendientes, Completado si no', () => {
+    const { unmount } = montar('completado', [tarea('t1', 0), tarea('t2', 1, { estado: 'completada' })])
+    expect(screen.getByText('Incompleto')).toBeTruthy()
+    unmount()
+    montar('completado', [tarea('t1', 0, { estado: 'completada' }), tarea('t2', 1, { estado: 'omitida' }), tarea('t3', 2, { obligatoria: false })])
+    expect(screen.getByText('Completado')).toBeTruthy()
+    expect(screen.queryByText('Incompleto')).toBeNull()
+  })
+
   it('sin pendientes cierra de un toque, sin preguntar', async () => {
     montar('en_curso', [
       tarea('t1', 0, { estado: 'completada' }),

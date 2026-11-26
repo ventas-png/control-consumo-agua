@@ -49,6 +49,23 @@ export function puntajeCierre(tareas: Pick<TareaBloque, 'estado' | 'obligatoria'
 }
 
 /**
+ * El estado que se MUESTRA de un turno. La base sólo conoce `completado` para
+ * un turno cerrado (bloques_turno_estado_check no admite `incompleto`), así que
+ * uno cerrado con tareas obligatorias sin hacer se leía «Completado» aunque
+ * tuviera 0% —el «✓ Cerrar turno» del encabezado lo permite, con confirmación
+ * desde #1174—. Aquí se muestra «Incompleto». Lo anulado no cuenta: se declaró
+ * que no correspondía. La opcional sin hacer tampoco (no resta, ver puntajeCierre).
+ */
+export function estadoVisibleDelTurno<E extends string>(
+  estado: E,
+  tareas: Pick<TareaBloque, 'estado' | 'obligatoria' | 'anulada_en'>[],
+): E | 'incompleto' {
+  if (estado !== 'completado') return estado
+  const faltan = tareas.some(t => t.estado === 'pendiente' && !t.anulada_en && !tareaOpcional(t))
+  return faltan ? 'incompleto' : estado
+}
+
+/**
  * Una parada del recorrido: tareas CONSECUTIVAS de la misma área. Es la forma
  * en que las rutinas materializan su recorrido (área por área, en orden), y la
  * que tiene sentido caminando: si el turno vuelve más tarde a un área ya
