@@ -41,6 +41,7 @@ búsqueda, y «Marcar todas» / «Marcar las que se ven» marca de una vez lo li
 |---|---|
 | Migración (tabla de paradas, paso → parada, unicidad por área, RPC de guardado, materialización) | `supabase/migrations/20261102000000_rutinas_recorrido_por_areas.sql` |
 | Suite SQL (cadena completa, huella del auditor, forma desconocida de producción, purga, 9 mutantes) | `supabase/tests/rutinas_recorrido/` (`run.sh`, `fixture.sql`, `assert.sql`, `assert_purga.sql`) |
+| Crear sin editar: el primer recorrido de la rutina nueva (`20261225000000`) | `supabase/migrations/20261225000000_rutinas_recorrido_nueva_con_crear.sql`; suite `supabase/tests/rutinas_recorrido_crear/` (control negativo, huella exacta, dos sesiones a la vez, 7 mutantes) |
 | Guardas estáticas | `src/__tests__/rutinasRecorridoMigracion.test.ts`; `materializarRutinasRls.test.ts` e `insertSoloPendiente.test.ts` ahora vigilan la versión viva de la RPC |
 | Dominio puro (cada gesto del editor y el tiempo acumulado) | `src/domain/condominios/rutinasRecorrido.ts` (+ `__tests__/rutinasRecorrido.test.ts`) |
 | Datos | `fetchRutinasLimpieza` (trae `paradas`) en `tabQueries.ts`; `guardarRecorridoRutina` en `tabMutations.ts` |
@@ -67,10 +68,35 @@ búsqueda, y «Marcar todas» / «Marcar las que se ven» marca de una vez lo li
 - **`guardar_recorrido_rutina(p_rutina_id, p_recorrido jsonb)`** — **SECURITY INVOKER**: recibe la foto completa del
   recorrido y la reconcilia en una transacción por identidad natural (área; área + actividad): conserva lo que sigue
   (con sus notas), crea lo nuevo, borra lo que no viene. Valida la foto entera antes de escribir y bloquea la rutina
-  (`FOR UPDATE`) para que dos guardados no se mezclen.
+  (`FOR UPDATE`) para que dos guardados no se mezclen. Ver [Permisos](#permisos-crear-y-editar).
 - **`materializar_rutinas_turno`** — misma firma y controles; el área de cada tarea es la de su parada, el orden sigue
   al recorrido, la parada de un área dada de baja no genera trabajo nuevo y «ya existe» compara también el área.
 - `rutinas_limpieza.area_id` queda como **legado** (sólo aplica a pasos sin parada); el editor ya no lo ofrece.
+
+## Permisos: crear y editar
+
+Como en el resto de Recursos Humanos (`supabase/rls-acciones/recursos_humanos.json`), **crear** una rutina es de
+`canCreate` y **cambiar** una existente es de `canEdit` (`condominios.tab.prog_limpieza.create` / `.edit`):
+
+| Rol | «+ Nueva rutina» | Rutina existente |
+|---|---|---|
+| crear y editar | crea cabecera y recorrido | se edita |
+| crear, sin editar | crea cabecera y recorrido | «Ver recorrido»: sólo lectura |
+| editar, sin crear | no se ofrece | se edita |
+| sólo ver | no se ofrece | «Ver recorrido»: sólo lectura |
+
+Crear son dos escrituras: la cabecera (policy INSERT, `create`) y el primer recorrido. Hasta `20261225000000`, con
+crear y sin editar el editor se abría en sólo lectura y, por la API, el recorrido moría en
+`P0002 RUTINA_RECORRIDO: la rutina … no existe`: el `FOR UPDATE` de `guardar_recorrido_rutina` pide, bajo la RLS, la
+policy UPDATE de la rutina (`edit`). Ahora, si ese `FOR UPDATE` no encuentra la rutina, la RPC pregunta a
+`rutina_bloquear_si_nueva` (SECURITY DEFINER, sólo bloquea), que la bloquea si quien llama **puede crear**, **la creó él**
+(`creado_por`, que sella la base), es **de su empresa** y la rutina **sigue sin recorrido** —ni paradas ni pasos
+legados—. Esto último se mira después de bloquear, para que un guardado simultáneo de quien edita no se mezcle. Las
+escrituras siguen bajo la RLS de quien llama; con crear sólo se insertan paradas y pasos.
+
+Si el recorrido falla después de crear la cabecera, «Guardar» de nuevo reintenta sólo el recorrido; la cabecera se
+reescribe únicamente si cambió, y si la base no aplica ese cambio (con crear y sin editar, la cabecera creada ya no se
+cambia) el editor lo dice en vez de darlo por hecho.
 
 ## Despliegue: los índices de `tareas_bloque`
 
