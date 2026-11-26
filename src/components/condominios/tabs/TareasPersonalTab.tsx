@@ -1,5 +1,5 @@
 import { hoyLocalISO, formatFechaCalendario } from '../../../lib/format'
-import { useState, useEffect, useMemo, useCallback, type CSSProperties } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, type CSSProperties } from 'react'
 import { notify, confirm } from '../../shared/Dialog'
 import { openPromptDialog } from '../../shared/PromptDialog'
 import {
@@ -433,18 +433,41 @@ export function TareasPersonalTab({
     [pendientesDe, cantidades],
   )
 
+  // Cada toque manda la lista ENTERA, así que manda el orden en que la base
+  // escribe. Con red lenta, tres toques eran tres PATCH en paralelo y ganaba
+  // cualquiera: la pantalla mostraba los tres pasos, la fila quedaba en
+  // `[0, 1]` y el trigger rechazaba el cierre por «checklist a medias». Ahora
+  // se escriben de a uno por tarea, en el orden en que se tocaron.
+  const colaPasos = useRef<Record<string, Promise<unknown>>>({})
+  const pedidosPasos = useRef<Record<string, number>>({})
+
+  /** `ultimo`: si al responder seguía siendo la última lista pedida para la tarea. */
+  function escribirPasos(tareaId: string, pasos: number[]) {
+    const n = (pedidosPasos.current[tareaId] ?? 0) + 1
+    pedidosPasos.current[tareaId] = n
+    const escrito = (colaPasos.current[tareaId] ?? Promise.resolve())
+      .then(() => updateCondominioRow('tareas_bloque', tareaId, { checklist_completado: pasos }))
+    // Un guardado que revienta no corta la cola: el siguiente sale igual.
+    colaPasos.current[tareaId] = escrito.catch(() => {})
+    return escrito.then(({ error }) => ({ error, ultimo: pedidosPasos.current[tareaId] === n }))
+  }
+
   /** Marcar un paso se guarda al instante: es progreso, no un borrador. */
   async function togglePaso(t: TareaBloque, i: number) {
     const hechos = new Set(pasosDe(t))
     if (hechos.has(i)) hechos.delete(i); else hechos.add(i)
     const nuevos = [...hechos].sort((a, b) => a - b)
     setPasosLocales(m => ({ ...m, [t.id]: nuevos }))
-    const { error } = await updateCondominioRow('tareas_bloque', t.id, { checklist_completado: nuevos })
+    const { error, ultimo } = await escribirPasos(t.id, nuevos)
+    // Si ya se pidió otra lista, ésa sale detrás y la reemplaza entera: lo que
+    // pase con ésta no decide nada, y recargar ahora sólo traería un intermedio.
+    if (!ultimo) return
     if (error) {
       setPasosLocales(m => sin(m, t.id))
       notify({ variant: 'error', title: 'Error', text: error.message })
-      return
     }
+    // También tras el error: los guardados anteriores no recargaron, y la fila
+    // puede tener más de lo que muestra `tareas`.
     onRefresh()
   }
 
@@ -531,6 +554,16 @@ export function TareasPersonalTab({
           setEvidenciaDe(tareaId)
           notify({ variant: 'warning', title: 'Falta evidencia', text: chequeo.motivo })
           return false
+        }
+        // Lo mismo con los pasos: los que se ven marcados se escriben ANTES del
+        // cierre, detrás de los guardados que sigan en camino. Si no hay lista
+        // local igual se espera la cola, por si un guardado no respondió todavía.
+        const pasosEnPantalla = pasosLocales[t.id]
+        if (pasosEnPantalla) {
+          const { error } = await escribirPasos(t.id, pasosEnPantalla)
+          if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
+        } else {
+          await colaPasos.current[t.id]
         }
         // Un comentario escrito y todavía sin guardar (el blur y el clic llegan
         // juntos) se guarda ANTES del cierre: el trigger lee la fila, no la pantalla.

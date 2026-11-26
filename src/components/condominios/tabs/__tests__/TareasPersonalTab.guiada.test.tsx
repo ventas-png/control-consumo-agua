@@ -8,7 +8,7 @@
 // sólo si guardó, y que el final ofrezca cerrar el turno. Las reglas puras
 // están en domain/condominios/__tests__/ejecucionGuiada.test.ts.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within, act } from '@testing-library/react'
 import type {
   AreaCondominio, BloqueTurno, PersonalCondominio, PlantillaTareaCargo, TareaBloque,
 } from '../../../../types'
@@ -390,6 +390,151 @@ describe('en curso: una tarjeta por vez, por paradas', () => {
     expect(screen.getAllByTitle('Completada')).toHaveLength(3)
     fireEvent.click(screen.getByText('▶ Volver al paso a paso'))
     expect(screen.getByRole('region', { name: /^Parada 1 de 2/ })).toBeTruthy()
+  })
+})
+
+describe('pasos marcados con la red lenta', () => {
+  type Patch = Record<string, unknown>
+  const escritos = () => mocks.updateCondominioRow.mock.calls
+    .map(c => (c as unknown as [string, string, Patch])[2].checklist_completado)
+  /** Deja correr lo que esté en camino (promesas encadenadas, renders). */
+  const unRato = () => act(async () => { await new Promise(r => setTimeout(r, 0)) })
+
+  /**
+   * Cada PATCH queda colgado hasta que el test lo responde, y la base lo
+   * escribe al responderlo: el orden de las respuestas es el orden en que
+   * quedó escrito. `fallan` son los números de llamada (desde 0) que la base
+   * rechaza sin escribir.
+   */
+  function redLenta(fallan: number[] = []) {
+    const fila: { checklist_completado?: number[] } = {}
+    const colgados: Array<() => void> = []
+    let llamada = 0
+    mocks.updateCondominioRow.mockImplementation((...args: unknown[]) => {
+      const falla = fallan.includes(llamada++)
+      return new Promise(resolve => colgados.push(() => {
+        if (falla) { resolve({ error: { message: 'se cortó la red' } }); return }
+        Object.assign(fila, args[2] as Patch)
+        resolve({ error: null })
+      }))
+    })
+    /** Responde lo colgado, lo más nuevo primero, hasta que no salga nada más. */
+    const responderEnDesorden = () => act(async () => {
+      await new Promise(r => setTimeout(r, 0))
+      while (colgados.length > 0) {
+        colgados.splice(0).reverse().forEach(responder => responder())
+        await new Promise(r => setTimeout(r, 0))
+      }
+    })
+    return { fila, responderEnDesorden }
+  }
+
+  const vidrios = (over: Partial<TareaBloque> = {}) => tarea('t1', 0, {
+    titulo: 'Limpieza de vidrios', requiere_checklist: true,
+    checklist: ['Rociar', 'Pasar el paño', 'Secar'], checklist_completado: [], ...over,
+  })
+  const marcarLosTres = () => ['Rociar', 'Pasar el paño', 'Secar']
+    .forEach(paso => fireEvent.click(screen.getByLabelText(paso)))
+
+  it('tres pasos seguidos: lo último escrito es la lista entera, aunque la red responda al revés', async () => {
+    const red = redLenta()
+    montar('en_curso', [vidrios()])
+    abrir()
+    fireEvent.click(screen.getByText(/^Empezar en /))
+    marcarLosTres()
+
+    // De a uno: el segundo no sale hasta que responda el primero.
+    await unRato()
+    expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1)
+
+    await red.responderEnDesorden()
+    expect(escritos()).toEqual([[0], [0, 1], [0, 1, 2]])
+    expect(red.fila.checklist_completado).toEqual([0, 1, 2])
+  })
+
+  it('«Listo» con los guardados todavía en camino cierra igual: la fila ya tiene los tres pasos', async () => {
+    const red = redLenta()
+    // El trigger `exigir_evidencia_al_cerrar` lee la fila, no la pantalla.
+    mocks.cerrarTareaYConsumir.mockImplementation(async () => (red.fila.checklist_completado ?? []).length === 3
+      ? { data: { consumidos: 0, no_usados: 0, sin_stock: [] }, error: null }
+      : { data: null as never, error: { message: 'EVIDENCIA: la tarea tiene el checklist a medias' } })
+    montar('en_curso', [vidrios(), tarea('t2', 1)])
+    abrir()
+    fireEvent.click(screen.getByText(/^Empezar en /))
+    marcarLosTres()
+    listo()
+
+    await red.responderEnDesorden()
+    await waitFor(() => expect(tarjeta().getAttribute('aria-label')).toBe('Tarea 2 de 2: Tarea t2'))
+    expect(mocks.cerrarTareaYConsumir).toHaveBeenCalledWith('t1', [], undefined)
+    expect(mocks.notify).not.toHaveBeenCalled()
+  })
+
+  it('«Listo» guarda la lista de la pantalla y espera la respuesta antes de cerrar', async () => {
+    montar('en_curso', [tarea('t1', 0, { requiere_checklist: true, checklist: ['Barrer', 'Trapear'], checklist_completado: [] })])
+    abrir()
+    fireEvent.click(screen.getByText(/^Empezar en /))
+    fireEvent.click(screen.getByLabelText('Barrer'))
+    fireEvent.click(screen.getByLabelText('Trapear'))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(2))
+
+    // La recarga no volvió (`tareas` sigue sin pasos): lo que vale es la pantalla.
+    let responder!: () => void
+    mocks.updateCondominioRow.mockImplementationOnce(() => new Promise(r => { responder = () => r({ error: null }) }))
+    listo()
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(3))
+    expect(mocks.updateCondominioRow.mock.calls[2]).toEqual(['tareas_bloque', 't1', { checklist_completado: [0, 1] }])
+
+    await unRato()
+    expect(mocks.cerrarTareaYConsumir).not.toHaveBeenCalled()
+    await act(async () => { responder() })
+    await waitFor(() => expect(mocks.cerrarTareaYConsumir).toHaveBeenCalledWith('t1', [], undefined))
+  })
+
+  it('si no se pudieron guardar los pasos, no intenta cerrar y se queda en la tarea', async () => {
+    montar('en_curso', [tarea('t1', 0, { requiere_checklist: true, checklist: ['Barrer'], checklist_completado: [] }), tarea('t2', 1)])
+    abrir()
+    fireEvent.click(screen.getByText(/^Empezar en /))
+    fireEvent.click(screen.getByLabelText('Barrer'))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalledTimes(1))
+
+    mocks.updateCondominioRow.mockResolvedValueOnce({ error: { message: 'se cortó la red' } })
+    listo()
+    await waitFor(() => expect(mocks.notify).toHaveBeenCalled())
+    const [args] = mocks.notify.mock.calls[0] as unknown as [{ title: string; text: string }]
+    expect(args.text).toBe('se cortó la red')
+    expect(mocks.cerrarTareaYConsumir).not.toHaveBeenCalled()
+    expect(tarjeta().getAttribute('aria-label')).toBe('Tarea 1 de 2: Tarea t1')
+    // Lo marcado sigue a la vista: el próximo «Listo» lo vuelve a mandar.
+    expect((screen.getByLabelText('Barrer') as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('un guardado que falla y ya quedó detrás de otro no avisa ni desmarca', async () => {
+    const red = redLenta([0])
+    montar('en_curso', [vidrios()])
+    abrir()
+    fireEvent.click(screen.getByText(/^Empezar en /))
+    fireEvent.click(screen.getByLabelText('Rociar'))
+    fireEvent.click(screen.getByLabelText('Pasar el paño'))
+
+    await red.responderEnDesorden()
+    expect(red.fila.checklist_completado).toEqual([0, 1])
+    expect(mocks.notify).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('Rociar') as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByLabelText('Pasar el paño') as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('si falla el último guardado, avisa y la pantalla vuelve a lo de la fila', async () => {
+    const red = redLenta([1])
+    montar('en_curso', [vidrios()])
+    abrir()
+    fireEvent.click(screen.getByText(/^Empezar en /))
+    fireEvent.click(screen.getByLabelText('Rociar'))
+    fireEvent.click(screen.getByLabelText('Pasar el paño'))
+
+    await red.responderEnDesorden()
+    expect(mocks.notify).toHaveBeenCalledTimes(1)
+    expect((screen.getByLabelText('Pasar el paño') as HTMLInputElement).checked).toBe(false)
   })
 })
 
