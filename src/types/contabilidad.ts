@@ -333,6 +333,48 @@ export const DEPRECIACION_RESULTADO_LABELS: Record<DepreciacionResultado, string
   error: 'Error',
 }
 
+// ── Saldos iniciales por residente (RPC conta_cuotas_saldo_inicial) ─────────
+// Cada cuota pendiente del sistema anterior entra con su periodo y vencimiento,
+// y su póliza va contra la contrapartida de apertura, no contra ingreso.
+
+export type CuotaSaldoInicialResultado = 'previsualizacion' | 'cargada' | 'ya_existe' | 'rechazada' | 'error'
+
+/** Lo que se envía por fila. */
+export interface CuotaSaldoInicialInput {
+  unidad_id: string
+  periodo: string
+  monto: number
+  fecha_vencimiento?: string | null
+  mora?: number
+  tipo_cargo?: 'mantenimiento' | 'cuota_extraordinaria'
+}
+
+export interface CuotaSaldoInicialFila {
+  /** Posición (desde 1) dentro de lo enviado. */
+  fila: number
+  unidad_id: string | null
+  unidad_nombre: string | null
+  responsable_cliente_id: string | null
+  responsable_nombre: string | null
+  periodo: string | null
+  tipo_cargo: string | null
+  monto: number | null
+  mora: number
+  fecha_vencimiento: string | null
+  resultado: CuotaSaldoInicialResultado
+  motivo: string | null
+  cuota_id: string | null
+  asiento_id: string | null
+}
+
+export const CUOTA_SALDO_INICIAL_LABELS: Record<CuotaSaldoInicialResultado, string> = {
+  previsualizacion: 'Lista para cargar',
+  cargada: 'Cargada',
+  ya_existe: 'Ya existe',
+  rechazada: 'Rechazada',
+  error: 'Error',
+}
+
 // ── Reglas de imputación contable ───────────────────────────────────────────
 // Espejo de 20260926000000. Los destinos NO son códigos contables: son
 // etiquetas semánticas que la BD declara en `conta_destinos_imputacion()` y

@@ -26469,6 +26469,31 @@ export type Database = {
           vencimiento_mas_antiguo: string | null
         }[]
       }
+      conta_cuotas_saldo_inicial: {
+        Args: {
+          p_project_id: string
+          p_fecha: string
+          p_filas: Json
+          p_aplicar?: boolean
+          p_contrapartida_cuenta_id?: string | null
+        }
+        Returns: {
+          asiento_id: string | null
+          cuota_id: string | null
+          fecha_vencimiento: string | null
+          fila: number
+          monto: number | null
+          mora: number
+          motivo: string | null
+          periodo: string | null
+          responsable_cliente_id: string | null
+          responsable_nombre: string | null
+          resultado: string
+          tipo_cargo: string | null
+          unidad_id: string | null
+          unidad_nombre: string | null
+        }[]
+      }
       conta_depreciar_activos: {
         Args: { p_periodo: string; p_aplicar?: boolean; p_project_id?: string | null }
         Returns: {

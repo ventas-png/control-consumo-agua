@@ -12,7 +12,10 @@ import { supabase } from '../../lib/supabase'
 import { runQuery } from '../queryFetch'
 import { contabilidadKeys } from './keys'
 import { planificarCatalogo } from './importCuentas'
+import type { Json } from '../../types/database.types'
 import type {
+  CuotaSaldoInicialFila,
+  CuotaSaldoInicialInput,
   DepreciacionFila,
   AsientoContable,
   CuentaContable,
@@ -572,6 +575,41 @@ export function useDepreciarActivosMutation() {
       ),
     onSuccess: (_data, vars) => {
       if (vars.aplicar) void qc.invalidateQueries({ queryKey: contabilidadKeys.all })
+    },
+  })
+}
+
+// ── Saldos iniciales por residente ──────────────────────────────────────────
+// Carga las cuotas pendientes del sistema anterior (RPC conta_cuotas_saldo_inicial):
+// cada una con su póliza contra la contrapartida de apertura. La vista previa
+// valida fila por fila y no escribe.
+
+export function useCuotasSaldoInicialMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      projectId: string
+      fecha: string
+      filas: CuotaSaldoInicialInput[]
+      aplicar: boolean
+      contrapartidaCuentaId: string | null
+    }) =>
+      await runQuery<CuotaSaldoInicialFila[]>((signal) =>
+        supabase
+          .rpc('conta_cuotas_saldo_inicial', {
+            p_project_id: vars.projectId,
+            p_fecha: vars.fecha,
+            p_filas: vars.filas as unknown as Json,
+            p_aplicar: vars.aplicar,
+            p_contrapartida_cuenta_id: vars.contrapartidaCuentaId,
+          })
+          .abortSignal(signal),
+      ),
+    onSuccess: (_data, vars) => {
+      if (!vars.aplicar) return
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.all })
+      // Las cuotas nuevas también son de Condominios (cuotas, estado de cuenta, morosidad).
+      void qc.invalidateQueries({ queryKey: ['condominios'] })
     },
   })
 }

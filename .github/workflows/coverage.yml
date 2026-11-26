@@ -920,6 +920,18 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55784
         run: supabase/tests/conta_depreciacion_activos/run.sh
+      # 20261231000200: conta_cuotas_saldo_inicial. Saldos iniciales por
+      # residente: cada cuota pendiente histórica entra con su periodo y
+      # vencimiento y UNA póliza Dr por cobrar (auxiliar) / Cr contrapartida —
+      # el ingreso no se mueve—; el motor la reconoce como cualquier cuota
+      # (saldo por cobrar, antigüedad, reverso al eliminar); mora histórica sin
+      # recálculo automático; repetir no duplica; cada rechazo con su motivo;
+      # fecha futura, ejercicio cerrado, permisos, alcance y ACL.
+      - name: Contabilidad — saldos iniciales por residente (cuotas históricas)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55785
+        run: supabase/tests/conta_cuotas_saldo_inicial/run.sh
       # 20261221000000: en `rutas`, crear/editar/eliminar exigen agua.rutas.
       # create/edit/delete y el acceso al proyecto, y quien ejecuta la ruta
       # (asignado o con agua.lecturas.create) sólo puede darla por completada.
