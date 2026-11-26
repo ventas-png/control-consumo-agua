@@ -1213,6 +1213,18 @@ jobs:
           PGPORT_TEST: 55568
         run: supabase/tests/rutinas_recorrido/run.sh
 
+      # 20261225000000: con CREAR y sin EDITAR, guardar el recorrido de la
+      # rutina recién creada moría en P0002 (el FOR UPDATE pedía la policy
+      # UPDATE). Ahora se bloquea la rutina propia, de la empresa y todavía sin
+      # recorrido; la existente, la ajena y la de otra empresa siguen pidiendo
+      # editar. Cadena COMPLETA: control negativo, huella exacta, dos sesiones a
+      # la vez y siete mutantes.
+      - name: Rutinas — con crear se guarda el recorrido de la rutina nueva
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55703
+        run: supabase/tests/rutinas_recorrido_crear/run.sh
+
       # 20261103000000: calendario de limpieza. Tres RPC SECURITY DEFINER leen y
       # escriben saltándose la RLS: ver no alcanza para asignar, día pasado y
       # turno cerrado se rechazan, lo trabajado no se quita y el orden sigue al

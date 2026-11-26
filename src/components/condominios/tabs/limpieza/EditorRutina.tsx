@@ -37,6 +37,8 @@ import {
   createCondominioRowReturning,
   guardarRecorridoRutina,
   updateCondominioRow,
+  updateCondominioRowAfectando,
+  type RowError,
 } from '../../../../domain/condominios/tabMutations'
 import { etiquetaCargo } from '../../../../domain/condominios/rrhhCatalogos'
 import {
@@ -62,7 +64,10 @@ interface Props {
   cargos?: CargoCatalogo[]
   proyectoId: string
   companyId: string
-  /** Sin permiso de edición el editor es sólo una vista del recorrido. */
+  /**
+   * Sin el permiso que toca —editar la rutina existente, crear la nueva— el
+   * editor es sólo una vista del recorrido.
+   */
   soloLectura?: boolean
   onGuardado: () => void
   onCerrar: () => void
@@ -131,6 +136,12 @@ export function EditorRutina({
   const [rec, setRec] = useState<Recorrido>(recorridoInicial)
   /** Si la cabecera nueva ya se creó pero el recorrido falló, reintentar no la duplica. */
   const [rutinaId, setRutinaId] = useState<string | null>(rutina?.id ?? null)
+  /**
+   * La cabecera con la que se CREÓ la rutina nueva (JSON). Al reintentar el
+   * recorrido, si no cambió, no se vuelve a escribir: con crear y sin editar ese
+   * UPDATE no pasa la RLS y afectaría cero filas sin avisar.
+   */
+  const [cabeceraCreada, setCabeceraCreada] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   /** Área seleccionada: a dónde van las actividades que se agregan con «＋». */
@@ -318,21 +329,34 @@ export function EditorRutina({
       orden: Number(cabecera.orden) || 0,
     }
     let id = rutinaId
-    const { data, error } = id
-      ? { data: null, ...(await updateCondominioRow('rutinas_limpieza', id, payload)) }
-      : await createCondominioRowReturning('rutinas_limpieza', {
-          ...payload, company_id: companyId, project_id: proyectoId, servicio: 'limpieza',
-        }, 'id')
+    const huella = JSON.stringify(payload)
+    let data: Record<string, unknown> | null = null
+    let error: RowError = null
+    if (!id) {
+      ;({ data, error } = await createCondominioRowReturning('rutinas_limpieza', {
+        ...payload, company_id: companyId, project_id: proyectoId, servicio: 'limpieza',
+      }, 'id'))
+    } else if (rutina) {
+      ;({ error } = await updateCondominioRow('rutinas_limpieza', id, payload))
+    } else if (huella !== cabeceraCreada) {
+      // Reintento del recorrido de la rutina recién creada, con la cabecera
+      // cambiada: tiene que constar que la base la cambió.
+      ;({ error } = await updateCondominioRowAfectando('rutinas_limpieza', id, payload))
+    }
     if (error) {
       setSaving(false)
       // 23505 = el índice único por nombre normalizado. El mensaje crudo de
-      // Postgres no le dice nada a quien está capturando.
+      // Postgres no le dice nada a quien está capturando. SIN_FILAS = el
+      // reintento cambió la cabecera de la rutina recién creada y la base no lo
+      // aplicó (con crear y sin editar, la cabecera creada ya no se cambia).
       notify({
         variant: 'error',
-        title: error.code === '23505' ? 'Nombre repetido' : 'Error',
+        title: error.code === '23505' ? 'Nombre repetido' : error.code === 'SIN_FILAS' ? 'No se pudo cambiar la cabecera' : 'Error',
         text: error.code === '23505'
           ? 'Ya existe una rutina con ese nombre en este proyecto. Editá la que existe o elegí otro nombre.'
-          : error.message,
+          : error.code === 'SIN_FILAS'
+            ? 'La rutina ya quedó creada, pero el cambio de nombre, descripción, jornada u orden no se aplicó: hace falta permiso para editar. Dejá la cabecera como estaba y volvé a guardar para guardar el recorrido.'
+            : error.message,
       })
       return
     }
@@ -340,6 +364,7 @@ export function EditorRutina({
       id = (data?.id as string | undefined) ?? null
       setRutinaId(id)
     }
+    if (!rutina) setCabeceraCreada(huella)
     if (!id) {
       setSaving(false)
       notify({ variant: 'error', title: 'Error', text: 'La rutina se creó pero no se pudo leer su identificador. Recargá la vista.' })

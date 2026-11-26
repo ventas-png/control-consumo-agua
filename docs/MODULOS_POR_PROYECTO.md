@@ -36,6 +36,17 @@ módulos activos del proyecto.
   propiedades independientes, que no cuelgan de ningún proyecto.
 - **Portal del residente:** `portal_mis_unidades` cruza el servicio de la empresa con el módulo del proyecto de cada
   unidad. El residente de un proyecto de sólo Agua entra al portal de Agua, no al de Condominios.
+  - La sesión guarda cada servicio como `true` **o `false`** (`serviciosDelResidente`, `src/lib/portalServicios.ts`) y
+    `App` elige el portal con `portalDelCliente`. Antes un servicio que ninguna unidad tenía quedaba `undefined`, y
+    `servicio_agua !== false` lo leía como «tiene Agua»: el residente de un condominio sin Agua (o de una empresa que no
+    la contrata) seguía viendo el botón **Agua**. Si la lectura falla, el respaldo sigue siendo el portal de Agua.
+  - Con unidades en varios proyectos, cada portal muestra sólo las suyas: el de Condominios descarta las unidades con
+    `servicio_condominios = false`, y el de Agua descarta unidades, contadores, proyectos y lecturas de los proyectos
+    sin Agua (`proyectosSinServicio`).
+  - **Asambleas** y **Transparencia** del portal dependen del **plan** de la empresa del condominio (no de los
+    interruptores de módulo). El residente no tiene empresa, así que `my_feature_flags` le llega vacía: el portal
+    pregunta `company_has_feature` por la empresa de cada condominio y, sin la función, la pestaña no aparece (antes
+    salía siempre, con un «mejore su plan» que el residente no puede atender).
 - Las secciones compartidas (Clientes, Unidades, Comunicación, Contabilidad, Empresa, panel del dueño) siguen mostrando
   todos los proyectos.
 
@@ -57,6 +68,7 @@ módulos activos del proyecto.
 | Suite SQL (Postgres real, 20 comprobaciones, 4 mutantes) | `supabase/tests/modulos_por_proyecto/` |
 | Lógica pura | `src/lib/modulosProyecto.ts` |
 | Menú y rutas | `src/hooks/useModulosPorProyecto.ts`, `src/App.tsx`, `src/components/app/routes.tsx` |
+| Portal del residente | `src/lib/portalServicios.ts`, `src/lib/portalTabs.ts` (`TAB_FUNCION_PLAN`), `src/domain/auth/session.ts`, `src/components/portal/` |
 | Pantalla | `src/components/empresa/EmpresaProyectosSection.tsx` |
 | Recuperación | `scripts/reversion-modulos-por-proyecto.sql` |
 | CI | paso «Módulos por proyecto» en `coverage.yml` |
@@ -65,7 +77,7 @@ módulos activos del proyecto.
 
 ```bash
 supabase/tests/modulos_por_proyecto/run.sh
-npx vitest run src/lib/__tests__/modulosProyecto.test.ts src/hooks/__tests__/useModulosPorProyecto.test.ts src/components/empresa/__tests__/EmpresaProyectosSection.modulos.test.tsx src/__tests__/modulosPorProyectoMigracion.test.ts
+npx vitest run src/lib/__tests__/modulosProyecto.test.ts src/hooks/__tests__/useModulosPorProyecto.test.ts src/components/empresa/__tests__/EmpresaProyectosSection.modulos.test.tsx src/__tests__/modulosPorProyectoMigracion.test.ts src/lib/__tests__/portalServicios.test.ts src/lib/__tests__/portalTabs.test.ts src/components/portal/__tests__/CondominiosClientPortal.modulos.test.tsx
 ```
 
 ## Despliegue

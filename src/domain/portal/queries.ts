@@ -231,6 +231,35 @@ export async function fetchPortalUnidadesResidente(): Promise<unknown[] | null> 
   return (data as unknown[] | null)
 }
 
+/**
+ * Funciones de plan que tiene cada empresa (companyId → funciones incluidas),
+ * para las pestañas del portal que dependen del plan (Asambleas,
+ * Transparencia). Usa company_has_feature (SECURITY DEFINER, ejecutable por
+ * `authenticated`): el residente no tiene empresa propia, así que la vista
+ * my_feature_flags siempre le llega vacía, y billing_plans/subscriptions no son
+ * suyos para leer. Sólo responde sí/no por función: no expone el plan.
+ *
+ * Una lectura fallida cuenta como «no incluida» (no se ofrece lo que quizá no
+ * está contratado) y se reporta como degradada.
+ */
+export async function fetchPortalFuncionesPlan(
+  companyIds: readonly string[],
+  funciones: readonly string[],
+): Promise<Record<string, string[]>> {
+  const pares = [...new Set(companyIds.filter(Boolean))].flatMap(companyId => funciones.map(funcion => ({ companyId, funcion })))
+  const respuestas = await Promise.all(pares.map(async ({ companyId, funcion }) => {
+    const { data, error } = await db.rpc('company_has_feature', { p_company_id: companyId, p_feature_code: funcion })
+    reportDegradedQuery('portal.fetchPortalFuncionesPlan', error)
+    return { companyId, funcion, incluida: !error && data === true }
+  }))
+  const out: Record<string, string[]> = {}
+  for (const { companyId, funcion, incluida } of respuestas) {
+    out[companyId] ??= []
+    if (incluida) out[companyId].push(funcion)
+  }
+  return out
+}
+
 // ── CondominiosClientPortal ────────────────────────────────────────────────
 
 /** Datasets del portal de condominios (cruda; la UI parsea cada uno). */

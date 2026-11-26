@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { fetchAllRows } from '../../lib/fetchAllRows'
 import { APP_CONFIG } from '../../lib/config'
 import { storeSession } from '../../lib/authSession'
+import { serviciosDelResidente } from '../../lib/portalServicios'
 import type { UserSession, UserRole, AssignedRoleInfo } from '../../types'
 
 export async function buildSessionFromSupabase(
@@ -111,13 +112,17 @@ export async function buildSessionFromSupabase(
         // unidad_residentes) y ya trae los flags de la empresa. El filtro
         // anterior por unidades.cliente_id dejaba a un inquilino puro sin
         // servicio_condominios → ruteado al portal de agua equivocado.
-        type UnidadPortalFlags = { servicio_agua?: boolean; servicio_condominios?: boolean }
-        const { data: unidadesFlags } = await supabase.rpc('portal_mis_unidades')
-        if (unidadesFlags) {
-          for (const u of (unidadesFlags as UnidadPortalFlags[])) {
-            if (u.servicio_condominios) servicio_condominios = true
-            if (u.servicio_agua) servicio_agua = true
-          }
+        // Cada flag queda en true O EN FALSE: un servicio que ninguna unidad
+        // tiene (el proyecto lo apagó o la empresa no lo contrata) es un `false`
+        // explícito. Antes quedaba `undefined` y App lo leía como «tiene Agua»:
+        // el residente de un condominio sin Agua seguía viendo el botón Agua.
+        // Si la lectura falla, los flags siguen sin resolver (respaldo: Agua).
+        const { data: unidadesFlags, error: unidadesError } = await supabase.rpc('portal_mis_unidades')
+        reportDegradedQuery('auth.portal_mis_unidades', unidadesError)
+        const servicios = unidadesError ? null : serviciosDelResidente(unidadesFlags)
+        if (servicios) {
+          servicio_agua = servicios.servicio_agua
+          servicio_condominios = servicios.servicio_condominios
         }
       }
     })()

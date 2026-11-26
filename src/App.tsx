@@ -46,6 +46,7 @@ import { MfaGate } from './components/auth/MfaGate'
 import { necesitaAsistentePrimerProyecto } from './domain/empresa/usuarios'
 import { localStorageRutaEnCurso, leerRutaEnCurso, iniciarRutaEnCurso } from './lib/rutaEnCurso'
 import { esRutaDePendientes } from './lib/lecturasOmitidasReglas'
+import { portalDelCliente } from './lib/portalServicios'
 
 // F3.13: ComponentShowcase dev route (/dev/components). `lazy()` va a nivel de
 // módulo, no dentro del render: llamarlo en cada render crea un TIPO de componente
@@ -440,16 +441,18 @@ function AppShell() {
 
   // Cliente users get their own portal — no admin data needed
   if (currentUser.role === 'cliente') {
-    const tieneCondominios = !!currentUser.servicio_condominios
-    const tieneAgua = currentUser.servicio_agua !== false
-    if (tieneCondominios && tieneAgua) {
+    // Módulos del residente: los que su empresa contrata Y el proyecto de su
+    // unidad tiene encendidos (ver lib/portalServicios). Un servicio apagado no
+    // aparece en el selector Condominios / Agua.
+    const portal = portalDelCliente(currentUser)
+    if (portal === 'dual') {
       return (
         <Suspense fallback={<AuthSplash />}>
           <DualServicePortal currentUser={currentUser} onLogout={handleLogout} />
         </Suspense>
       )
     }
-    if (tieneCondominios) {
+    if (portal === 'condominios') {
       return (
         <Suspense fallback={<AuthSplash />}>
           <CondominiosClientPortal currentUser={currentUser} onLogout={handleLogout} />

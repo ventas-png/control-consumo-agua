@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { fetchCondominiosPortalData, fetchPortalUnidadesResidente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, marcarAnunciosLeidos } from '../../domain/portal/queries'
-import { PORTAL_TABS, tabsVisiblesPortal, normalizarTabsOcultos, type PortalTab } from '../../lib/portalTabs'
+import { fetchCondominiosPortalData, fetchPortalUnidadesResidente, fetchPortalPaymentConfig, fetchPortalRecargoTarjeta, fetchPortalFuncionesPlan, marcarAnunciosLeidos } from '../../domain/portal/queries'
+import { PORTAL_TABS, FUNCIONES_PLAN_PORTAL, tabsVisiblesPortal, normalizarTabsOcultos, type PortalTab } from '../../lib/portalTabs'
+import { unidadConServicio } from '../../lib/portalServicios'
 import { DIAS_AVISO_RENOVACION_DEFAULT, estaVencida, necesitaRenovacion, normalizarDiasAviso, tieneRenovacionSolicitada } from '../../lib/visitasFrecuentes'
 import type { RecargoTarjetaRow } from '../../lib/businessPagos'
 import { confirmarPagoCuota } from '../../domain/portal/mutations'
@@ -33,9 +34,6 @@ import { MediaScopeProvider }  from '../shared/MediaScopeContext'
 // F3.12: Portal residente ampliado (asambleas + transparencia)
 import { PortalAsambleasTab }     from '../condominios/tabs/PortalAsambleasTab'
 import { PortalTransparenciaTab } from '../condominios/tabs/PortalTransparenciaTab'
-// plat:P36: gating por plan
-import { FeatureGate } from '../../lib/featureFlags'
-import { UpgradeCTA } from '../shared/UpgradeCTA'
 import { avisoConfirmacionPago } from '../../domain/portal/avisoConfirmacionPago'
 
 interface Props {
@@ -140,6 +138,9 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   // Pestañas que la empresa apagó, por condominio (project_id → ids). Un
   // residente puede tener unidades en varios condominios con distinta config.
   const [pestanasOcultas, setPestanasOcultas]     = useState<Record<string, PortalTab[]>>({})
+  // Funciones del plan de la empresa de cada condominio (project_id → códigos):
+  // Asambleas y Transparencia sólo se ofrecen si el plan las incluye.
+  const [funcionesPlan, setFuncionesPlan]         = useState<Record<string, string[]>>({})
   // La barra de pestañas espera a la primera carga: antes no se sabe ni el rol
   // de la unidad ni qué apagó la empresa, y se verían pestañas que luego se van.
   const [pestanasListas, setPestanasListas]       = useState(false)
@@ -150,8 +151,11 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     try {
       // Batch 1: unidades del residente (RPC dual: incluye las que tiene como
       // inquilino vía unidad_residentes, no solo las propias por cliente_id).
+      // Sólo las unidades cuyo condominio opera en Condominios: la empresa lo
+      // contrata Y el proyecto lo tiene encendido (portal_mis_unidades ya trae
+      // el flag cruzado). Una unidad de un proyecto de sólo Agua no entra aquí.
       const uData = await fetchPortalUnidadesResidente()
-      const unidadesList = (uData as UnidadPortal[]) ?? []
+      const unidadesList = ((uData as UnidadPortal[]) ?? []).filter(u => unidadConServicio(u, 'condominios'))
       setUnidades(unidadesList)
 
       if (unidadesList.length === 0) return
@@ -170,7 +174,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         pestanasData,
       } = await fetchCondominiosPortalData(projectIds, unidadIds)
 
-      const proj = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null)?.[0]
+      const proyectos = (projData as { id: string; company_id: string; moneda_condominios: string | null; moneda: string }[] | null) ?? []
+      const proj = proyectos[0]
       if (proj) {
         setMoneda(proj.moneda_condominios ?? proj.moneda ?? 'Q')
         // Resolve company_id from project when client doesn't have one set directly
@@ -203,6 +208,10 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
         ((pestanasData as { id: string; visitas_frecuentes_dias_aviso?: unknown }[] | null) ?? [])
           .map(p => [p.id, normalizarDiasAviso(p.visitas_frecuentes_dias_aviso)]),
       ))
+      // El plan es de la empresa del condominio (no del residente, que no tiene
+      // empresa): se pregunta por cada empresa y se reparte por proyecto.
+      const porEmpresa = await fetchPortalFuncionesPlan(proyectos.map(p => p.company_id), FUNCIONES_PLAN_PORTAL)
+      setFuncionesPlan(Object.fromEntries(proyectos.map(p => [p.id, porEmpresa[p.company_id] ?? []])))
     } finally {
       setLoading(false)
       setPestanasListas(true)
@@ -269,15 +278,23 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     void marcarAnunciosLeidos(visibles, clienteId, resolvedCompanyId)
   }, [tab, loading, anuncios, unidades, selectedUnidadId, clienteId, resolvedCompanyId])
 
+  // Pestañas que ve el residente en una unidad: por su rol, por lo que la
+  // empresa apagó en ese condominio y por lo que incluye el plan de la empresa.
+  // Mientras no se sabe el plan, las que dependen de él no se ofrecen.
+  const visiblesDe = useCallback((u: UnidadPortal | null | undefined) => {
+    const pid = u?.project_id ?? ''
+    return tabsVisiblesPortal(u?.rol, pestanasOcultas[pid], funcionesPlan[pid] ?? [])
+  }, [pestanasOcultas, funcionesPlan])
+
   // Paquetes de las unidades cuyo condominio muestra Paquetería. Si la empresa
   // apagó la pestaña, el aviso al entrar tampoco sale: llevaría a un lugar que
   // el residente no tiene.
   const paquetesAvisables = useMemo(() => {
     const conPaqueteria = new Set(unidades
-      .filter(u => tabsVisiblesPortal(u.rol, pestanasOcultas[u.project_id ?? '']).includes('paquetes'))
+      .filter(u => visiblesDe(u).includes('paquetes'))
       .map(u => u.id))
     return paquetes.filter(p => !!p.unidad_id && conPaqueteria.has(p.unidad_id))
-  }, [paquetes, unidades, pestanasOcultas])
+  }, [paquetes, unidades, visiblesDe])
 
   // Aviso al entrar (una vez por sesión): visitas frecuentes del residente que
   // ya vencieron o vencen dentro de los días de aviso de su condominio y aún
@@ -287,7 +304,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
     const vistos = leerIdsVistos(() => sessionStorage, VF_RENOVACION_VISTOS)
     const porRenovar = visitasFrecuentes.filter(v => {
       const u = unidades.find(x => x.id === v.unidad_id)
-      if (!u || !tabsVisiblesPortal(u.rol, pestanasOcultas[u.project_id ?? '']).includes('visitantes')) return false
+      if (!u || !visiblesDe(u).includes('visitantes')) return false
       return necesitaRenovacion(v, diasAvisoPorProyecto[u.project_id ?? ''] ?? DIAS_AVISO_RENOVACION_DEFAULT) && !tieneRenovacionSolicitada(v) && !vistos.includes(v.id)
     })
     if (porRenovar.length === 0) return
@@ -297,7 +314,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
       ? `${primera.nombre} ${estaVencida(primera) ? 'ya venció' : `vence el ${primera.vigente_hasta?.slice(0, 10)}`}. Solicite la renovación en Visitantes → Visitas frecuentes para que siga entrando sin consulta.`
       : `${porRenovar.length} autorizaciones vencieron o están por vencer. Solicite su renovación en Visitantes → Visitas frecuentes.`
     notify({ variant: 'warning', title: 'Visitas frecuentes por renovar', text: texto, duration: 12000 })
-  }, [loading, visitasFrecuentes, unidades, pestanasOcultas, diasAvisoPorProyecto])
+  }, [loading, visitasFrecuentes, unidades, visiblesDe, diasAvisoPorProyecto])
 
   // Pop-up de aviso: los envíos que esperan al residente en portería (una vez
   // por sesión) y los que él dejó para un tercero y ya se retiraron (una sola
@@ -319,8 +336,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   // resto de caminos.
   useEffect(() => {
     const u = unidades.find(x => x.id === selectedUnidadId) ?? unidades[0]
-    if (!tabsVisiblesPortal(u?.rol, pestanasOcultas[u?.project_id ?? '']).includes(tab)) setTab('mi_unidad')
-  }, [tab, unidades, selectedUnidadId, pestanasOcultas])
+    if (!visiblesDe(u).includes(tab)) setTab('mi_unidad')
+  }, [tab, unidades, selectedUnidadId, visiblesDe])
 
   // No services guard (only after initial load)
   if (!loading && unidades.length === 0) {
@@ -370,8 +387,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
 
   // Tabs visibles según el rol del residente en ESTA unidad (propietario ve
   // todo; inquilino/familiar solo lo operativo) menos las que la empresa apagó
-  // en su condominio — ver lib/portalTabs.
-  const idsVisibles   = tabsVisiblesPortal(unidad?.rol, pestanasOcultas[proyectoId])
+  // en su condominio y las que su plan no incluye — ver lib/portalTabs.
+  const idsVisibles   = visiblesDe(unidad)
   const tabsVisibles  = PORTAL_TABS.filter(t => idsVisibles.includes(t.id))
 
   // Data filtered to selected unit
@@ -705,36 +722,17 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
                 esPropietario={(unidad.rol ?? 'propietario') === 'propietario'}
               />
             )}
+            {/* Asambleas y Transparencia sólo llegan aquí si el plan de la
+                empresa del condominio las incluye (visiblesDe): el residente
+                no ve un «mejore su plan» que no le toca atender. */}
             {tab === 'asambleas' && (
-              <FeatureGate
-                feature="asambleas_digitales"
-                fallback={
-                  <UpgradeCTA
-                    feature="Asambleas digitales"
-                    description="Vota digitalmente en asambleas del condominio, consulta resultados en tiempo real y accede al histórico de actas."
-                    requiredPlan="Solo Condominios o Bundle Completo"
-                  />
-                }
-              >
-                <PortalAsambleasTab unidadId={selectedUnidadId} />
-              </FeatureGate>
+              <PortalAsambleasTab unidadId={selectedUnidadId} />
             )}
             {tab === 'transparencia' && (
-              <FeatureGate
-                feature="transparencia_financiera"
-                fallback={
-                  <UpgradeCTA
-                    feature="Transparencia financiera"
-                    description="Consulta el presupuesto, gastos por categoría y fondo de reserva del condominio en tiempo real."
-                    requiredPlan="Solo Condominios o Bundle Completo"
-                  />
-                }
-              >
-                <PortalTransparenciaTab
-                  proyectoId={proyectoId}
-                  moneda={moneda}
-                />
-              </FeatureGate>
+              <PortalTransparenciaTab
+                proyectoId={proyectoId}
+                moneda={moneda}
+              />
             )}
           </div>
         )}
