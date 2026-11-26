@@ -3,8 +3,8 @@
 import { describe, it, expect } from 'vitest'
 import type { AreaCondominio, HerramientaDelTurno, TareaBloque, TareaBloqueSuministro } from '../../../types'
 import {
-  duracionLegible, itemsPorConfirmar, paradaDe, paradasDelTurno, preparacionDelTurno, puntajeCierre,
-  siguientePendiente, tareaHecha, tareaOpcional,
+  duracionLegible, estadoVisibleDelTurno, itemsPorConfirmar, paradaDe, paradasDelTurno, preparacionDelTurno,
+  puntajeCierre, siguientePendiente, tareaHecha, tareaOpcional,
 } from '../ejecucionGuiada'
 
 function t(id: string, orden: number, over: Partial<TareaBloque> = {}): TareaBloque {
@@ -166,5 +166,23 @@ describe('puntajeCierre', () => {
   it('hecha es completa o con observación; omitida no', () => {
     expect(['completada', 'con_observacion', 'omitida', 'pendiente'].map(e => tareaHecha(e as TareaBloque['estado'])))
       .toEqual([true, true, false, false])
+  })
+})
+
+describe('estadoVisibleDelTurno', () => {
+  it('cerrado con una obligatoria sin hacer se muestra Incompleto, no Completado', () => {
+    expect(estadoVisibleDelTurno('completado', [t('1', 0, { estado: 'completada' }), t('2', 1)])).toBe('incompleto')
+    expect(estadoVisibleDelTurno('completado', [t('1', 0), t('2', 1), t('3', 2)])).toBe('incompleto')
+  })
+  it('cerrado sin obligatorias pendientes sigue Completado: omitir, observar, anular u opcional no lo vuelven incompleto', () => {
+    expect(estadoVisibleDelTurno('completado', [
+      t('1', 0, { estado: 'completada' }), t('2', 1, { estado: 'con_observacion' }), t('3', 2, { estado: 'omitida' }),
+      t('4', 3, { anulada_en: '2026-11-26T10:00:00Z' }), t('5', 4, { obligatoria: false }),
+    ])).toBe('completado')
+    expect(estadoVisibleDelTurno('completado', [])).toBe('completado')
+  })
+  it('lo abierto no cambia: pendiente y en curso se muestran tal cual', () => {
+    expect(estadoVisibleDelTurno('en_curso', [t('1', 0)])).toBe('en_curso')
+    expect(estadoVisibleDelTurno('pendiente', [t('1', 0)])).toBe('pendiente')
   })
 })

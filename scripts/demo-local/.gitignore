@@ -1,0 +1,9 @@
+# Todo lo que genera la copia local al correr: secretos, binario, archivos subidos, capturas y logs.
+.credenciales
+.jwt_secret
+.postgrest.conf
+.pid-*
+bin/
+storage/
+fotos/
+*.log

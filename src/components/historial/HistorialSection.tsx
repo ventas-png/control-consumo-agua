@@ -19,7 +19,10 @@ import {
 import { tint } from '../shared/statusTone'
 import { fetchHistorialLecturasProyectoResultado, type HistorialLectura } from '../../domain/agua/historialLecturas'
 import { filasDeHistorial, ESTADO_HISTORICO, type FilaLectura } from '../../lib/historialImportado'
+import { TabStrip } from '../shared/TabStrip'
 
+// La pestaña de análisis trae Chart.js: se baja sólo cuando se abre.
+const AnalisisLecturasPanel = lazy(() => import('./AnalisisLecturasPanel').then(m => ({ default: m.AnalisisLecturasPanel })))
 const CargaMasivaLecturasModal = lazy(() => import('../lecturas/CargaMasivaLecturasModal').then(m => ({ default: m.CargaMasivaLecturasModal })))
 const ImportHistorialLecturasModal = lazy(() => import('../contadores/ImportHistorialLecturasModal').then(m => ({ default: m.ImportHistorialLecturasModal })))
 
@@ -89,6 +92,16 @@ export function HistorialSection({
   onRegistroAdded,
   onContadorUpdated,
 }: Props) {
+  // «Lecturas» es la tabla de siempre; «Análisis gráfico» las grafica por
+  // proyecto, unidad o contador sin tener que bajar el Excel.
+  const [vista, setVista] = useState<'lecturas' | 'analisis'>('lecturas')
+  // Una vez abierto, el análisis se queda montado (oculto en la otra pestaña)
+  // para no perder sus filtros al ir y volver de la tabla.
+  const [analisisAbierto, setAnalisisAbierto] = useState(false)
+  function cambiarVista(v: 'lecturas' | 'analisis') {
+    setVista(v)
+    if (v === 'analisis') setAnalisisAbierto(true)
+  }
   const [filtroTexto, setFiltroTexto] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [filtroProyecto, setFiltroProyecto] = useState('')
@@ -433,9 +446,10 @@ export function HistorialSection({
       {/* Header: en el teléfono el título va en su propia línea y los botones
           en una fila que puede partirse (antes el título ocupaba tres líneas y
           el botón PDF quedaba cortado). */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20, paddingBottom: 12, borderBottom: '2px solid var(--at-line)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <span style={{ fontSize: 20, fontWeight: 700, flex: '1 1 240px', minWidth: 0 }}>📊 Historial de Lecturas</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {/* Las acciones son de la tabla: en el análisis no aplican. */}
+        {vista === 'lecturas' && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {puedeCarga && (
             <button
               type="button"
@@ -484,9 +498,36 @@ export function HistorialSection({
             }}
             style={{ padding: '10px 20px', background: 'var(--at-chip)', color: 'var(--at-ink-2)', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap' }}
           >📄 PDF</button>
-        </div>
+        </div>}
       </div>
 
+      <TabStrip
+        items={[
+          { id: 'lecturas', label: 'Lecturas', icon: '📋' },
+          { id: 'analisis', label: 'Análisis gráfico', icon: '📈' },
+        ]}
+        value={vista}
+        onChange={cambiarVista}
+        ariaLabel="Vistas del historial de lecturas"
+        marginBottom={20}
+      />
+
+      {analisisAbierto && (
+        <div hidden={vista !== 'analisis'}>
+          <Suspense fallback={<p role="status" style={{ color: 'var(--at-ink-3)', fontSize: 14 }}>Cargando el análisis…</p>}>
+            <AnalisisLecturasPanel
+              registros={registros}
+              contadores={contadores}
+              unidades={unidades}
+              clientes={clientes}
+              proyectos={proyectos}
+              tiposAgua={TIPO_AGUA_LABELS}
+            />
+          </Suspense>
+        </div>
+      )}
+
+      {vista === 'lecturas' && <>
       {/* Stats — derivados del filtered set. Tres por fila en escritorio
           (totales arriba, por estado abajo) y dos en el teléfono: uno por fila
           eran seis tarjetas altas antes de la primera lectura. */}
@@ -661,6 +702,7 @@ export function HistorialSection({
           onChange={setCurrentPage}
         />
       )}
+      </>}
 
       {/* Detalle de la lectura en ventana (antes se desplegaba dentro de la
           fila y en el teléfono se salía por la derecha). */}
