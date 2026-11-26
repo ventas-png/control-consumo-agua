@@ -166,4 +166,18 @@ describe('cuentaBancariaFormSchema', () => {
       cuenta_contable_id: 'no-uuid', notas: null,
     }).success).toBe(false)
   })
+
+  it('el saldo inicial es opcional (0), admite sobregiro y exige su fecha', () => {
+    const base = {
+      nombre: 'BI GTQ', banco: 'Banco Industrial', numero_mascara: null, moneda: null,
+      cuenta_contable_id: '11111111-1111-4111-8111-111111111111', notas: null,
+    }
+    expect(cuentaBancariaFormSchema.parse(base)).toMatchObject({ saldo_inicial: 0, saldo_inicial_fecha: null })
+    expect(cuentaBancariaFormSchema.parse({ ...base, saldo_inicial: '-250.75', saldo_inicial_fecha: '2026-05-31' }))
+      .toMatchObject({ saldo_inicial: -250.75, saldo_inicial_fecha: '2026-05-31' })
+    const sinFecha = cuentaBancariaFormSchema.safeParse({ ...base, saldo_inicial: '10000', saldo_inicial_fecha: null })
+    expect(sinFecha.success).toBe(false)
+    expect(sinFecha.success ? '' : sinFecha.error.issues[0].message).toMatch(/a qué fecha/)
+    expect(cuentaBancariaFormSchema.safeParse({ ...base, saldo_inicial: 'abc', saldo_inicial_fecha: '2026-05-31' }).success).toBe(false)
+  })
 })

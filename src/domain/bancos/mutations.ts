@@ -109,6 +109,23 @@ export function useConciliarMutation() {
   })
 }
 
+/** Un movimiento contra uno o varios documentos cuya suma es su importe (RPC). */
+export function useConciliarVariosMutation() {
+  const invalidar = useInvalidarBancos()
+  return useMutation({
+    mutationFn: async (vars: { movimientoId: string; documentoIds: string[] }) =>
+      await runQuery<BancoMovimiento>((signal) =>
+        supabase
+          .rpc('banco_conciliar_varios', {
+            p_movimiento_id: vars.movimientoId,
+            p_documentos: vars.documentoIds.map((id) => ({ id })),
+          })
+          .abortSignal(signal),
+      ),
+    onSuccess: () => invalidar(),
+  })
+}
+
 export function useDesconciliarMutation() {
   const invalidar = useInvalidarBancos()
   return useMutation({

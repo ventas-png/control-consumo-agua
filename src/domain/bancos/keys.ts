@@ -8,6 +8,8 @@ export const bancosKeys = {
     [...bancosKeys.all, 'movimientos', cuentaBancariaId ?? null, estado ?? null] as const,
   sugerencias: (cuentaBancariaId?: string) =>
     [...bancosKeys.all, 'sugerencias', cuentaBancariaId ?? null] as const,
+  candidatos: (movimientoId?: string, buscar?: string) =>
+    [...bancosKeys.all, 'candidatos', movimientoId ?? null, buscar ?? ''] as const,
   estadoConciliacion: (cuentaBancariaId?: string, periodo?: string) =>
     [...bancosKeys.all, 'estado-conciliacion', cuentaBancariaId ?? null, periodo ?? null] as const,
 } as const

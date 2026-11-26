@@ -11,6 +11,12 @@ export const cuentaBancariaFormSchema = z.object({
   moneda: z.string().trim().toUpperCase().length(3, 'Código ISO de 3 letras').nullable(),
   cuenta_contable_id: z.string().uuid('Selecciona la cuenta contable del banco'),
   notas: z.string().trim().max(500).nullable(),
+  // Saldo según el banco a una fecha: el punto de partida de la conciliación. Puede ser negativo (sobregiro).
+  saldo_inicial: z.coerce.number().finite('El saldo inicial debe ser un número').default(0),
+  saldo_inicial_fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida').nullable().default(null),
+}).refine((v) => v.saldo_inicial === 0 || v.saldo_inicial_fecha !== null, {
+  message: 'Indica a qué fecha corresponde el saldo inicial',
+  path: ['saldo_inicial_fecha'],
 })
 
 export type CuentaBancariaFormInput = z.infer<typeof cuentaBancariaFormSchema>

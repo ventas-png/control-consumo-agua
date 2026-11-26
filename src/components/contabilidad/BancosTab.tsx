@@ -31,6 +31,7 @@ import {
 import { Campo, btnLink, btnPrimario, btnSecundario, input , usePermisosContabilidad } from './ui'
 import { FondoReservaModal } from './FondoReservaModal'
 import { CajaChicaModal } from './CajaChicaModal'
+import { ConciliarVariosModal } from './ConciliarVariosModal'
 
 interface Props {
   companyId: string
@@ -56,6 +57,7 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
   const [formCuenta, setFormCuenta] = useState<CuentaBancaria | 'nueva' | null>(null)
   const [importando, setImportando] = useState(false)
   const [fondos, setFondos] = useState<'reserva' | 'caja' | null>(null)
+  const [elegirPara, setElegirPara] = useState<BancoMovimiento | null>(null)
 
   const cuentaActiva = cuentasBancarias.find((c) => c.id === cuentaId) ?? cuentasBancarias[0] ?? null
   const cuentaActivaId = cuentaActiva?.id
@@ -144,6 +146,9 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
             ))}
             {m.estado === 'pendiente' && puedeCambiarEstado && (
               <>
+                <button onClick={() => setElegirPara(m)} style={btnLink} title="Elegir a mano uno o varios documentos cuya suma sea este movimiento">
+                  Elegir documentos
+                </button>
                 <button
                   onClick={() => {
                     void (async () => {
@@ -177,7 +182,7 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
           </div>
         )
       },
-      width: 260,
+      width: 340,
     },
   ]
 
@@ -223,6 +228,9 @@ export function BancosTab({ companyId, projectId, monedaBase }: Props) {
         )}
       </div>
 
+      {elegirPara && (
+        <ConciliarVariosModal movimiento={elegirPara} moneda={monedaCuenta} onClose={() => setElegirPara(null)} />
+      )}
       {fondos === 'reserva' && projectId && (
         <FondoReservaModal
           companyId={companyId}
@@ -362,6 +370,8 @@ function CuentaBancariaModal({ companyId, projectId, monedaBase, cuenta, onClose
     moneda: cuenta?.moneda ?? '',
     cuenta_contable_id: cuenta?.cuenta_contable_id ?? '',
     notas: cuenta?.notas ?? '',
+    saldo_inicial: cuenta && cuenta.saldo_inicial !== 0 ? String(cuenta.saldo_inicial) : '',
+    saldo_inicial_fecha: cuenta?.saldo_inicial_fecha ?? '',
   })
 
   const elegibles = useMemo(
@@ -377,6 +387,8 @@ function CuentaBancariaModal({ companyId, projectId, monedaBase, cuenta, onClose
       moneda: f.moneda.trim() || null,
       cuenta_contable_id: f.cuenta_contable_id,
       notas: f.notas.trim() || null,
+      saldo_inicial: f.saldo_inicial.trim() ? f.saldo_inicial.replace(/,/g, '') : 0,
+      saldo_inicial_fecha: f.saldo_inicial_fecha || null,
     })
     if (!parsed.success) {
       notify({ variant: 'warning', title: 'Atención', text: parsed.error.issues[0]?.message ?? 'Datos inválidos.' })
@@ -421,6 +433,18 @@ function CuentaBancariaModal({ companyId, projectId, monedaBase, cuenta, onClose
             {elegibles.map((c) => <option key={c.id} value={c.id}>{c.codigo} — {c.nombre}{c.moneda ? ` (${c.moneda})` : ''}</option>)}
           </select>
         </Campo>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <Campo label="Saldo inicial según el banco">
+            <input value={f.saldo_inicial} onChange={(e) => setF({ ...f, saldo_inicial: e.target.value })} style={input} inputMode="decimal" placeholder="0.00" aria-label="Saldo inicial según el banco" />
+          </Campo>
+          <Campo label="Al día">
+            <input type="date" value={f.saldo_inicial_fecha} onChange={(e) => setF({ ...f, saldo_inicial_fecha: e.target.value })} style={input} aria-label="Fecha del saldo inicial" />
+          </Campo>
+        </div>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--at-ink-3)', lineHeight: 1.5 }}>
+          El saldo que mostraba el estado de cuenta del banco ese día. La conciliación parte de ahí: los movimientos
+          importados con esa fecha o anterior ya están dentro y no se suman otra vez.
+        </p>
         <Campo label="Notas">
           <textarea value={f.notas} onChange={(e) => setF({ ...f, notas: e.target.value })} style={{ ...input, minHeight: 50 }} />
         </Campo>

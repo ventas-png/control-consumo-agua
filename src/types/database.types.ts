@@ -7616,6 +7616,8 @@ export type Database = {
           notas: string | null
           numero_mascara: string | null
           project_id: string | null
+          saldo_inicial: number
+          saldo_inicial_fecha: string | null
           updated_at: string
         }
         Insert: {
@@ -7630,6 +7632,8 @@ export type Database = {
           notas?: string | null
           numero_mascara?: string | null
           project_id?: string | null
+          saldo_inicial?: number
+          saldo_inicial_fecha?: string | null
           updated_at?: string
         }
         Update: {
@@ -7644,6 +7648,8 @@ export type Database = {
           notas?: string | null
           numero_mascara?: string | null
           project_id?: string | null
+          saldo_inicial?: number
+          saldo_inicial_fecha?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -25373,6 +25379,21 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      banco_candidatos_conciliacion: {
+        Args: { p_movimiento_id: string; p_buscar?: string | null }
+        Returns: {
+          candidato_id: string
+          candidato_tipo: string
+          descripcion: string | null
+          fecha: string
+          monto: number
+          referencia: string | null
+        }[]
+      }
+      banco_conciliar_varios: {
+        Args: { p_movimiento_id: string; p_documentos: Json }
+        Returns: Database["public"]["Tables"]["banco_movimientos"]["Row"]
       }
       banco_conciliar_movimiento: {
         Args: {

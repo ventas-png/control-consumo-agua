@@ -944,6 +944,17 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55786
         run: supabase/tests/conta_fondo_caja/run.sh
+      # 20261231000400: conciliación bancaria en grupo, elección manual y saldo
+      # inicial. Un depósito contra varios cobros (y un retiro contra varias
+      # órdenes) sólo si la suma es su importe; un documento, una sola
+      # conciliación (ni en otro grupo ni uno-a-uno); lo conciliado deja de
+      # sugerirse; desconciliar libera el grupo; el saldo inicial del banco
+      # entra al saldo según banco sin sumar dos veces lo anterior; RLS y ACL.
+      - name: Bancos — conciliación contra varios documentos y saldo inicial
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55787
+        run: supabase/tests/banco_conciliacion_varios/run.sh
       # 20261221000000: en `rutas`, crear/editar/eliminar exigen agua.rutas.
       # create/edit/delete y el acceso al proyecto, y quien ejecuta la ruta
       # (asignado o con agua.lecturas.create) sólo puede darla por completada.
