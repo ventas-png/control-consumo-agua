@@ -29,6 +29,7 @@ import type {
   DocumentoFueraDeSaldo,
   EstadoCuenta,
   SujetoEstadoCuenta,
+  AsientoOmitido,
 } from '../../types/contabilidad'
 
 /** Moneda base contable de la empresa (ISO, espejo de conta_moneda_base). */
@@ -412,6 +413,24 @@ export function useCargosPendientesQuery(params: {
       const lista = filas ?? []
       return { filas: lista, total: lista[0]?.total_filas ?? 0 }
     },
+  })
+}
+
+/**
+ * Documentos VIGENTES sin póliza por el camino general (recibos de agua, cuotas
+ * sin clasificar, cobros, gastos sin factura, pagos a proveedor, recepciones…)
+ * en la contabilidad activa. Los registra la envoltura de
+ * `conta_generar_asiento` (20261227000000) cada vez que el generador no pudo
+ * asentar; desaparecen solos cuando el documento se asienta o se anula.
+ */
+export function useOmitidosQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.omitidos(companyId, projectId),
+    enabled: !!companyId,
+    queryFn: async () =>
+      (await runQuery<AsientoOmitido[]>((signal) =>
+        supabase.rpc('conta_omitidos_pendientes', { p_project_id: projectId ?? null }).abortSignal(signal),
+      )) ?? [],
   })
 }
 

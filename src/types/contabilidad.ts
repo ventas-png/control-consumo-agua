@@ -826,3 +826,64 @@ export interface ConciliacionEstadoCuenta {
     diferencia: number
   }>
 }
+
+// ── Documentos sin póliza por el camino general (20261227000000) ─────────────
+
+/** Por qué el generador no pudo asentar el documento. */
+export type CodigoOmitido = 'sin_mapeo' | 'cuenta_invalida' | 'error'
+
+export const CODIGO_OMITIDO_LABELS: Record<CodigoOmitido, string> = {
+  sin_mapeo: 'Sin cuenta asignada',
+  cuenta_invalida: 'Cuenta inválida',
+  error: 'No se pudo generar',
+}
+
+/** Una fila de `conta_omitidos_pendientes`: un documento vigente sin asiento. */
+export interface AsientoOmitido {
+  id: string
+  origen_tabla: string
+  origen_id: string
+  evento: string
+  fecha: string | null
+  concepto: string
+  importe: number
+  moneda_doc: string | null
+  codigo: CodigoOmitido
+  motivo: string
+  /** Eventos de mapeo a los que les falta cuenta (vacío si el motivo es otro). */
+  eventos_faltan: string[]
+  intentos: number
+  primer_intento: string
+  ultimo_intento: string
+}
+
+/** Respuesta de `conta_omitido_reprocesar`. */
+export interface RespuestaReprocesoOmitido {
+  resultado: 'contabilizado' | 'pendiente' | 'ya_resuelto'
+  codigo: CodigoOmitido | null
+  motivo: string | null
+  asiento_id: string | null
+  asiento_numero: number | null
+}
+
+/** Cómo se le dice a contabilidad cada tabla de origen. */
+export const ORIGEN_OMITIDO_LABELS: Record<string, string> = {
+  registros: 'Recibo de agua',
+  cuotas_condominio: 'Cuota',
+  cargos_adicionales_unidad: 'Cargo adicional',
+  pagos: 'Cobro',
+  gastos_condominio: 'Gasto',
+  ordenes_pago: 'Pago a proveedor',
+  recepciones: 'Recepción de compra',
+  banco_movimientos: 'Ajuste bancario',
+  conta_notas_credito: 'Nota de crédito',
+  conta_saldo_favor_aplicaciones: 'Aplicación de saldo a favor',
+}
+
+/** Etiqueta en pantalla de un evento de mapeo o de una cuenta especial. */
+export function etiquetaEventoContable(evento: string): string {
+  const mapeo = EVENTOS_MAPEO.find((e) => e.evento === evento)
+  if (mapeo) return `${mapeo.grupo} › ${mapeo.label}`
+  const especial = CUENTAS_ESPECIALES.find((e) => e.evento === evento)
+  return especial ? `Cuenta especial › ${especial.label}` : evento
+}

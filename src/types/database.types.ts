@@ -26448,6 +26448,35 @@ export type Database = {
         Args: { p_periodo: string; p_project_id: string }
         Returns: boolean
       }
+      conta_omitido_reprocesar: {
+        Args: { p_id: string }
+        Returns: {
+          asiento_id: string | null
+          asiento_numero: number | null
+          codigo: string | null
+          motivo: string | null
+          resultado: string
+        }[]
+      }
+      conta_omitidos_pendientes: {
+        Args: { p_project_id: string | null }
+        Returns: {
+          codigo: string
+          concepto: string
+          evento: string
+          eventos_faltan: string[]
+          fecha: string | null
+          id: string
+          importe: number
+          intentos: number
+          moneda_doc: string | null
+          motivo: string
+          origen_id: string
+          origen_tabla: string
+          primer_intento: string
+          ultimo_intento: string
+        }[]
+      }
       conta_poliza_manual_guardar: {
         Args: {
           p_asiento_id: string | null

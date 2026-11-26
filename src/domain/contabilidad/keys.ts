@@ -77,6 +77,11 @@ export const contabilidadKeys = {
       codigo ?? null, busqueda ?? null, pagina ?? 0] as const,
   cargosPendientesDeEmpresa: (companyId?: string) =>
     [...contabilidadKeys.all, 'cargosPendientes', companyId ?? null] as const,
+  // Documentos sin póliza por el camino general (agua, gastos, pagos, recepciones…).
+  omitidos: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'omitidos', companyId ?? null, projectId ?? null] as const,
+  omitidosDeEmpresa: (companyId?: string) =>
+    [...contabilidadKeys.all, 'omitidos', companyId ?? null] as const,
   // Configuración por tipo de cargo: por ledger, con prefijo de empresa para
   // invalidar los dos ledgers a la vez (misma razón que `mapeoDeEmpresa`).
   configTiposCargo: (companyId?: string, projectId?: string | null) =>

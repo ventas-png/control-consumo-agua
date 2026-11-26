@@ -22,6 +22,7 @@ import type {
   ConfigTipoCargoInput,
   OrigenCargo,
   RespuestaReprocesoCargo,
+  RespuestaReprocesoOmitido,
 } from '../../types/contabilidad'
 import type { AsientoFormInput, CuentaFormInput, TipoCambioFormInput } from './schemas'
 import type { CuentaExistenteRef, CuentaImportFila, CuentaOmitida } from './importCuentas'
@@ -662,6 +663,32 @@ export function useReprocesarCargoMutation(companyId?: string) {
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: contabilidadKeys.cargosPendientesDeEmpresa(companyId) })
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.estadoCuentaDeEmpresa(companyId) })
+      // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })
+      void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'balanza'] })
+    },
+  })
+}
+
+/**
+ * Reprocesa un documento sin póliza del camino general: el servidor repite la
+ * llamada al generador que guardó al omitirlo. Si la causa ya se corrigió,
+ * asienta y la fila sale de la bandeja; si no, vuelve con el motivo vigente.
+ */
+export function useReprocesarOmitidoMutation(companyId?: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string): Promise<RespuestaReprocesoOmitido> => {
+      const filas = await runQuery<RespuestaReprocesoOmitido[]>((signal) =>
+        supabase.rpc('conta_omitido_reprocesar', { p_id: id }).abortSignal(signal),
+      )
+      const fila = filas?.[0]
+      if (!fila) throw new Error('El servidor no devolvió resultado del reproceso.')
+      return fila
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: contabilidadKeys.omitidosDeEmpresa(companyId) })
       void qc.invalidateQueries({ queryKey: contabilidadKeys.estadoCuentaDeEmpresa(companyId) })
       // Un asiento nuevo cambia pólizas y saldos de todos los reportes.
       void qc.invalidateQueries({ queryKey: [...contabilidadKeys.all, 'asientos'] })

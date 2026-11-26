@@ -12,6 +12,7 @@ import { TiposCargoTab } from './TiposCargoTab'
 import { AuxiliaresTab } from './AuxiliaresTab'
 import { PendientesContabilizacionTab } from './PendientesContabilizacionTab'
 import { CargosPendientesTab } from './CargosPendientesTab'
+import { OtrosPendientesTab } from './OtrosPendientesTab'
 import { EstadoCuentaTab } from './EstadoCuentaTab'
 import { AjustesTab } from './AjustesTab'
 import { ProveedoresTab } from './ProveedoresTab'
@@ -189,6 +190,16 @@ export function ContabilidadSection() {
               projectId={ledgerProjectId}
               monedaBase={monedaBase}
               onIrATiposCargo={() => setTab('tiposcargo')}
+            />
+          </section>
+          <section aria-labelledby="pendientes-otros">
+            <h3 id="pendientes-otros" style={{ margin: '0 0 8px', fontSize: 15 }}>Otros documentos</h3>
+            <OtrosPendientesTab
+              companyId={companyId}
+              projectId={ledgerProjectId}
+              monedaBase={monedaBase}
+              onIrAConfiguracion={() => setTab('configuracion')}
+              onIrACatalogo={() => setTab('catalogo')}
             />
           </section>
         </div>
