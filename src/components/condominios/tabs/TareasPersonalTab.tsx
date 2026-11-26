@@ -92,6 +92,9 @@ const campoTarea: CSSProperties = {
   borderRadius: '8px', fontSize: '13.5px', background: 'var(--at-warning-tint)',
 }
 
+/** Las columnas de la tarea que se guardan al instante, cada vez la lista entera. */
+type ColumnaEnOrden = 'checklist_completado' | 'foto_urls'
+
 /** El mapa sin esa clave (para soltar lo local de una tarea). */
 function sin<T>(m: Record<string, T>, clave: string): Record<string, T> {
   if (!(clave in m)) return m
@@ -363,6 +366,15 @@ export function TareasPersonalTab({
   const [fotosLocales, setFotosLocales] = useState<Record<string, string[]>>({})
   const pasosDe = (t: TareaBloque) => pasosLocales[t.id] ?? t.checklist_completado ?? []
   const fotosDe = (t: TareaBloque) => fotosLocales[t.id] ?? t.foto_urls ?? []
+  // Una foto a medio subir todavía no está en ninguna lista: cerrar en ese
+  // momento la dejaba afuera (o decía «Falta evidencia» con la foto en camino),
+  // y la subida terminaba escribiendo sobre una tarea ya cerrada.
+  const [subiendoFotos, setSubiendoFotos] = useState<Record<string, number>>({})
+  const subiendoFoto = (tareaId: string) => (subiendoFotos[tareaId] ?? 0) > 0
+  const marcarSubida = (tareaId: string) => (subiendo: boolean) => setSubiendoFotos(m => {
+    const n = Math.max(0, (m[tareaId] ?? 0) + (subiendo ? 1 : -1))
+    return n > 0 ? { ...m, [tareaId]: n } : sin(m, tareaId)
+  })
   useEffect(() => {
     // Cuando la recarga trae lo mismo, lo local sobra.
     const igual = (a: unknown[] = [], b: unknown[] = []) => a.length === b.length && a.every((x, k) => x === b[k])
@@ -433,23 +445,38 @@ export function TareasPersonalTab({
     [pendientesDe, cantidades],
   )
 
-  // Cada toque manda la lista ENTERA, así que manda el orden en que la base
-  // escribe. Con red lenta, tres toques eran tres PATCH en paralelo y ganaba
-  // cualquiera: la pantalla mostraba los tres pasos, la fila quedaba en
-  // `[0, 1]` y el trigger rechazaba el cierre por «checklist a medias». Ahora
-  // se escriben de a uno por tarea, en el orden en que se tocaron.
-  const colaPasos = useRef<Record<string, Promise<unknown>>>({})
-  const pedidosPasos = useRef<Record<string, number>>({})
+  // Pasos y fotos se guardan al instante, y cada guardado manda la lista ENTERA
+  // de su columna: manda el orden en que la base escribe. Con red lenta, tres
+  // pasos tocados seguidos eran tres PATCH en paralelo y ganaba cualquiera (la
+  // pantalla con los tres, la fila en `[0, 1]` y el trigger rechazando el
+  // cierre); con las fotos, quitar una y enseguida otra podía dejar en la fila
+  // una foto cuyo archivo ya se había borrado del bucket. Ahora cada columna de
+  // cada tarea se escribe de a una vez, en el orden en que se pidió.
+  const colas = useRef<Record<string, Promise<unknown>>>({})
+  const pedidos = useRef<Record<string, number>>({})
+  const claveCola = (tareaId: string, columna: ColumnaEnOrden) => `${tareaId}:${columna}`
 
-  /** `ultimo`: si al responder seguía siendo la última lista pedida para la tarea. */
-  function escribirPasos(tareaId: string, pasos: number[]) {
-    const n = (pedidosPasos.current[tareaId] ?? 0) + 1
-    pedidosPasos.current[tareaId] = n
-    const escrito = (colaPasos.current[tareaId] ?? Promise.resolve())
-      .then(() => updateCondominioRow('tareas_bloque', tareaId, { checklist_completado: pasos }))
+  /** `ultimo`: si al responder seguía siendo la última lista pedida para esa columna. */
+  function escribirEnOrden(tareaId: string, columna: ColumnaEnOrden, lista: unknown[]) {
+    const clave = claveCola(tareaId, columna)
+    const n = (pedidos.current[clave] ?? 0) + 1
+    pedidos.current[clave] = n
+    const escrito = (colas.current[clave] ?? Promise.resolve())
+      .then(() => updateCondominioRow('tareas_bloque', tareaId, { [columna]: lista }))
     // Un guardado que revienta no corta la cola: el siguiente sale igual.
-    colaPasos.current[tareaId] = escrito.catch(() => {})
-    return escrito.then(({ error }) => ({ error, ultimo: pedidosPasos.current[tareaId] === n }))
+    colas.current[clave] = escrito.catch(() => {})
+    return escrito.then(({ error }) => ({ error, ultimo: pedidos.current[clave] === n }))
+  }
+
+  /**
+   * Deja en la fila lo que la pantalla muestra de una columna, antes del cierre:
+   * la lista local si la hay (detrás de los guardados en camino) y, si no,
+   * espera a que esos guardados terminen.
+   */
+  async function asentar(tareaId: string, columna: ColumnaEnOrden, enPantalla: unknown[] | undefined) {
+    if (enPantalla) return (await escribirEnOrden(tareaId, columna, enPantalla)).error
+    await colas.current[claveCola(tareaId, columna)]
+    return null
   }
 
   /** Marcar un paso se guarda al instante: es progreso, no un borrador. */
@@ -458,7 +485,7 @@ export function TareasPersonalTab({
     if (hechos.has(i)) hechos.delete(i); else hechos.add(i)
     const nuevos = [...hechos].sort((a, b) => a - b)
     setPasosLocales(m => ({ ...m, [t.id]: nuevos }))
-    const { error, ultimo } = await escribirPasos(t.id, nuevos)
+    const { error, ultimo } = await escribirEnOrden(t.id, 'checklist_completado', nuevos)
     // Si ya se pidió otra lista, ésa sale detrás y la reemplaza entera: lo que
     // pase con ésta no decide nada, y recargar ahora sólo traería un intermedio.
     if (!ultimo) return
@@ -471,13 +498,14 @@ export function TareasPersonalTab({
     onRefresh()
   }
 
+  /** Igual que los pasos: la lista entera, en orden, y sólo cuenta la última. */
   async function guardarFotos(t: TareaBloque, urls: string[]) {
     setFotosLocales(m => ({ ...m, [t.id]: urls }))
-    const { error } = await updateCondominioRow('tareas_bloque', t.id, { foto_urls: urls })
+    const { error, ultimo } = await escribirEnOrden(t.id, 'foto_urls', urls)
+    if (!ultimo) return
     if (error) {
       setFotosLocales(m => sin(m, t.id))
       notify({ variant: 'error', title: 'Error', text: error.message })
-      return
     }
     onRefresh()
   }
@@ -541,6 +569,11 @@ export function TareasPersonalTab({
       // sigue pendiente y el stock no cambió.
       const t = tareas.find(x => x.id === tareaId)
       if (t) {
+        // Antes que la evidencia: con la foto en camino, «falta foto» sería mentira.
+        if (subiendoFoto(t.id)) {
+          notify({ variant: 'warning', title: 'Subiendo foto', text: 'Esperá a que termine de subir la foto: después se puede cerrar.' })
+          return false
+        }
         // Cortesía de UI: el rechazo con contexto ANTES del viaje a la base.
         // El control real es el trigger, dentro de la transacción del RPC.
         const chequeo = evidenciaSuficiente(t, {
@@ -555,16 +588,15 @@ export function TareasPersonalTab({
           notify({ variant: 'warning', title: 'Falta evidencia', text: chequeo.motivo })
           return false
         }
-        // Lo mismo con los pasos: los que se ven marcados se escriben ANTES del
-        // cierre, detrás de los guardados que sigan en camino. Si no hay lista
-        // local igual se espera la cola, por si un guardado no respondió todavía.
-        const pasosEnPantalla = pasosLocales[t.id]
-        if (pasosEnPantalla) {
-          const { error } = await escribirPasos(t.id, pasosEnPantalla)
-          if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
-        } else {
-          await colaPasos.current[t.id]
-        }
+        // Lo mismo con pasos y fotos: lo que se ve se escribe ANTES del cierre,
+        // detrás de los guardados que sigan en camino. Son columnas distintas,
+        // así que van a la par.
+        const errores = await Promise.all([
+          asentar(t.id, 'checklist_completado', pasosLocales[t.id]),
+          asentar(t.id, 'foto_urls', fotosLocales[t.id]),
+        ])
+        const error = errores.find(e => e)
+        if (error) { notify({ variant: 'error', title: 'Error', text: error.message }); return false }
         // Un comentario escrito y todavía sin guardar (el blur y el clic llegan
         // juntos) se guarda ANTES del cierre: el trigger lee la fila, no la pantalla.
         const escrito = comentarios[t.id]
@@ -773,6 +805,7 @@ export function TareasPersonalTab({
             <MultiImageUploader
               values={fotosDe(t)}
               onChange={urls => { void guardarFotos(t, urls) }}
+              onSubiendo={marcarSubida(t.id)}
               folder="tareas"
               label="Evidencia"
               maxFiles={6}
@@ -1007,6 +1040,7 @@ export function TareasPersonalTab({
                           paradaEmpezada={clave => empezadas.includes(clave)}
                           puedeEjecutar={canEdit}
                           guardando={guardandoTarea}
+                          subiendoFoto={subiendoFoto}
                           aviso={aviso}
                           onIr={id => irA(bloque.id, id)}
                           onEmpezarParada={clave => setParadasEmpezadas(m => ({ ...m, [bloque.id]: [...(m[bloque.id] ?? []), clave] }))}

@@ -23,6 +23,8 @@ interface Props {
   paradaEmpezada: (clave: string) => boolean
   puedeEjecutar: boolean
   guardando: boolean
+  /** Hay una foto de esa tarea a medio subir: «Listo» espera a que termine. */
+  subiendoFoto?: (tareaId: string) => boolean
   /** Lo último que pasó, para lectores de pantalla y para quien no miró. */
   aviso: string
   onIr: (tareaId: string | null) => void
@@ -49,7 +51,7 @@ const boton = (fondo: string, borde: string, color: string): CSSProperties => ({
 })
 
 export function EjecucionGuiada({
-  tareas, paradas, actualId, paradaEmpezada, puedeEjecutar, guardando, aviso,
+  tareas, paradas, actualId, paradaEmpezada, puedeEjecutar, guardando, subiendoFoto = () => false, aviso,
   onIr, onEmpezarParada, onListo, onObservacion, onOmitir, onCerrarTurno, onVerLista, panel,
 }: Props) {
   const titulo = useRef<HTMLHeadingElement>(null)
@@ -228,9 +230,9 @@ export function EjecucionGuiada({
                   style={boton('var(--at-accent-tint-2)', 'var(--at-accent-soft-2)', 'var(--at-accent-hover)')}>
                   ⏭ Omitir
                 </button>
-                <button onClick={() => onListo(actual)} disabled={guardando}
+                <button onClick={() => onListo(actual)} disabled={guardando || subiendoFoto(actual.id)}
                   style={{ ...boton('var(--at-success)', 'var(--at-success)', 'var(--at-on-status)'), flex: '1 1 220px', maxWidth: '320px', fontWeight: 700 }}>
-                  {guardando ? 'Guardando…' : '✓ Listo · Siguiente ›'}
+                  {guardando ? 'Guardando…' : subiendoFoto(actual.id) ? 'Subiendo foto…' : '✓ Listo · Siguiente ›'}
                 </button>
               </>
             ) : (
