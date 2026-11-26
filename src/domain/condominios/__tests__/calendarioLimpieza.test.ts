@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest'
 import type { PlantillaTareaCargo, RutinaActividad, RutinaArea, RutinaLimpieza, TurnoCalendarioLimpieza } from '../../../types'
 import {
   avisoAsignacion, cargaDelTurno, duracionPorRutina, kpisLimpieza, motivoNoProgramable,
-  porEmpleado, rutinaQuitable, turnoProgramable,
+  porEmpleado, rutinaCumplida, rutinaQuitable, tareasQueCuentan, turnoProgramable,
 } from '../calendarioLimpieza'
 
 const HOY = '2026-10-21'
@@ -103,6 +103,40 @@ describe('indicadores', () => {
       turno({ personal_id: 'p4', estado: 'cancelado' }),
     ], HOY, '2026-10-14')
     expect(k).toEqual({ atrasadas: 2, pendientesHoy: 3, totalHoy: 6, hechasHoy: 3, turnosHoySinRutina: 1 })
+  })
+
+  // 20261226000100: `pendientes` ya viene sin las opcionales (lo cuenta la base),
+  // y el total de hoy saca las opcionales sin hacer: suman sólo si se hacen.
+  it('el opcional sin hacer no está en Pendientes, ni en Atrasadas, ni en el total de hoy', () => {
+    const k = kpisLimpieza([
+      // ayer: 1 obligatoria pendiente y 2 opcionales sin hacer → atrasada sólo 1
+      turno({ fecha: '2026-10-20', rutinas: [{ ...r('a', 4, 1, 1), opcionales_sin_hacer: 2 }] }),
+      // hoy: 5 tareas, 2 opcionales (una hecha, una no) y 3 obligatorias (2 hechas)
+      turno({ rutinas: [{ ...r('a', 5, 1, 3), opcionales_sin_hacer: 1 }] }),
+    ], HOY, '2026-10-14')
+    expect(k).toMatchObject({ atrasadas: 1, pendientesHoy: 1, totalHoy: 4, hechasHoy: 3 })
+  })
+
+  it('sin el dato (respuesta anterior a la migración) todo cuenta, como antes', () => {
+    expect(kpisLimpieza([turno({ rutinas: [r('a', 3, 2, 1)] })], HOY, '2026-10-14').totalHoy).toBe(3)
+  })
+})
+
+describe('qué cuenta de una rutina en el turno', () => {
+  it('las obligatorias y las opcionales hechas', () => {
+    expect(tareasQueCuentan({ ...r('a', 5, 1, 3), opcionales_sin_hacer: 1 })).toBe(4)
+    expect(tareasQueCuentan(r('a', 3, 3, 0))).toBe(3)
+  })
+
+  it('cumplida es todo lo que cuenta hecho; el opcional sin hacer no la deja a medias', () => {
+    expect(rutinaCumplida({ ...r('a', 3, 0, 2), opcionales_sin_hacer: 1 })).toBe(true)
+    expect(rutinaCumplida({ ...r('a', 3, 1, 1), opcionales_sin_hacer: 1 })).toBe(false)
+    expect(rutinaCumplida(r('a', 2, 0, 2))).toBe(true)
+  })
+
+  it('una rutina de sólo opcionales no se da por cumplida antes de hacer algo', () => {
+    expect(rutinaCumplida({ ...r('a', 2, 0, 0), opcionales_sin_hacer: 2 })).toBe(false)
+    expect(rutinaCumplida({ ...r('a', 2, 0, 1), opcionales_sin_hacer: 1 })).toBe(true)
   })
 })
 

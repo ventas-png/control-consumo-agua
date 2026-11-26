@@ -332,6 +332,36 @@ describe('en curso: una tarjeta por vez, por paradas', () => {
     await waitFor(() => expect(screen.queryByText('✓ Cerrar turno')).toBeNull())
   })
 
+  // 20261226000100: el paso opcional de la rutina llega a la tarea.
+  it('la tarjeta dice «Opcional» cuando la tarea lo es, y sólo entonces', async () => {
+    montar('en_curso', [tarea('t1', 0), tarea('t2', 1, { obligatoria: false })])
+    abrir()
+    // La parada anuncia cuál de sus tareas es opcional antes de empezar.
+    expect(screen.getAllByText('Opcional')).toHaveLength(1)
+    fireEvent.click(screen.getByText(/^Empezar en /))
+    expect(tarjeta().getAttribute('aria-label')).toBe('Tarea 1 de 2: Tarea t1')
+    expect(within(tarjeta()).queryByText('Opcional')).toBeNull()
+
+    listo()
+    await waitFor(() => expect(tarjeta().getAttribute('aria-label')).toBe('Tarea 2 de 2: Tarea t2'))
+    const chip = within(tarjeta()).getByText('Opcional')
+    expect(chip.getAttribute('title')).toMatch(/no queda pendiente ni baja el puntaje/)
+  })
+
+  it('al cerrar, la opcional sin hacer no baja el puntaje', async () => {
+    montar('en_curso', [tarea('t1', 0), tarea('t2', 1, { obligatoria: false, estado: 'omitida' })])
+    abrir()
+    fireEvent.click(screen.getByText(/^Empezar en /))
+    listo()
+
+    const fin = await screen.findByRole('region', { name: 'Recorrido terminado' })
+    fireEvent.click(within(fin).getByText('✓ Cerrar turno'))
+    await waitFor(() => expect(mocks.updateCondominioRow).toHaveBeenCalled())
+    const [tabla, , patch] = mocks.updateCondominioRow.mock.calls[0] as unknown as [string, string, Record<string, unknown>]
+    // 100 y no 50: suma si se hace, no resta si no.
+    expect([tabla, patch.puntaje_completitud]).toEqual(['bloques_turno', 100])
+  })
+
   it('«Anterior» deja ver lo ya hecho, sin acciones de ejecutar', async () => {
     montar('en_curso', [tarea('t1', 0, { estado: 'completada' }), tarea('t2', 1)])
     abrir()
@@ -407,6 +437,31 @@ describe('cerrar el turno', () => {
     const [, , patch] = cierreDelTurno()[0] as unknown as [string, string, Record<string, unknown>]
     expect(patch.estado).toBe('completado')
     await waitFor(() => expect(screen.queryByText('✓ Cerrar turno')).toBeNull())
+  })
+
+  // 20261226000100: la opcional sin hacer no pasa a atrasadas ni baja el puntaje.
+  it('si sólo quedan opcionales, cierra sin preguntar y con el puntaje entero', async () => {
+    montar('en_curso', [
+      tarea('t1', 0, { estado: 'completada' }),
+      tarea('t2', 1, { obligatoria: false }),
+    ])
+    cerrarDesdeEncabezado()
+
+    await waitFor(() => expect(cierreDelTurno()).toHaveLength(1))
+    expect(mocks.confirm).not.toHaveBeenCalled()
+    const [, , patch] = cierreDelTurno()[0] as unknown as [string, string, Record<string, unknown>]
+    expect([patch.estado, patch.puntaje_completitud]).toEqual(['completado', 100])
+  })
+
+  it('la pregunta cuenta sólo las obligatorias pendientes', async () => {
+    mocks.confirm.mockResolvedValueOnce({ isConfirmed: false })
+    montar('en_curso', [tarea('t1', 0), tarea('t2', 1, { obligatoria: false }), tarea('t3', 2, { obligatoria: false })])
+    cerrarDesdeEncabezado()
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1))
+    const [opts] = mocks.confirm.mock.calls[0] as unknown as [{ text: string }]
+    expect(opts.text).toMatch(/Queda 1 tarea pendiente/)
+    expect(cierreDelTurno()).toHaveLength(0)
   })
 
   it('el resumen con tareas sin resolver también pregunta antes de cerrar', async () => {

@@ -10,8 +10,9 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import type { TareaBloque } from '../../../../types'
 import {
-  duracionLegible, paradaDe, tareaResuelta, type ParadaGuiada,
+  duracionLegible, paradaDe, tareaOpcional, tareaResuelta, type ParadaGuiada,
 } from '../../../../domain/condominios/ejecucionGuiada'
+import { AYUDA_OPCIONAL, chipOpcional } from './opcional'
 
 interface Props {
   /** Las tareas del turno en orden, con el estado que ya se guardó aplicado. */
@@ -158,6 +159,7 @@ export function EjecucionGuiada({
             {parada.tareas.map(t => (
               <li key={t.id} style={{ marginBottom: '4px', opacity: tareaResuelta(t.estado) ? 0.55 : 1 }}>
                 {t.titulo}
+                {tareaOpcional(t) && <span title={AYUDA_OPCIONAL} style={{ ...chipOpcional, marginLeft: '6px' }}>Opcional</span>}
                 <span style={{ fontSize: '11.5px', color: 'var(--at-ink-3)' }}>
                   {t.duracion_estimada_min != null && ` · ⏱ ${t.duracion_estimada_min} min`}
                   {t.requiere_foto && ' · 📷 foto'}
@@ -191,6 +193,7 @@ export function EjecucionGuiada({
           </h3>
           {actual.descripcion && <p style={{ margin: '0 0 6px', fontSize: '13.5px', color: 'var(--at-ink-2)' }}>{actual.descripcion}</p>}
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--at-ink-3)', marginBottom: '10px' }}>
+            {tareaOpcional(actual) && <span title={AYUDA_OPCIONAL} style={chipOpcional}>Opcional</span>}
             {actual.duracion_estimada_min != null && <span>⏱ {actual.duracion_estimada_min} min</span>}
             {actual.requiere_foto && <span style={{ color: 'var(--at-accent-hover)' }}>📷 Requiere foto</span>}
             {actual.requiere_comentario && <span style={{ color: 'var(--at-accent-hover)' }}>💬 Requiere comentario</span>}

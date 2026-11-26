@@ -65,6 +65,19 @@ export function motivoNoProgramable(t: TurnoCalendarioLimpieza, hoy: string): st
   return null
 }
 
+/**
+ * Las tareas de la rutina que CUENTAN en el turno: las obligatorias y las
+ * opcionales hechas (20261226000100). El opcional sin hacer no falta: la rutina
+ * se da por cumplida sin él, así que sale del total.
+ */
+export const tareasQueCuentan = (r: RutinaEnTurno): number => r.tareas - (r.opcionales_sin_hacer ?? 0)
+
+/**
+ * La rutina está cumplida en el turno: todo lo que cuenta está hecho. Pide algo
+ * hecho: una rutina de sólo opcionales no se pinta ✓ antes de empezar.
+ */
+export const rutinaCumplida = (r: RutinaEnTurno): boolean => r.hechas > 0 && r.hechas === tareasQueCuentan(r)
+
 /** ¿Se puede quitar esta rutina del turno? Mientras nada suyo se haya trabajado. */
 export function rutinaQuitable(t: TurnoCalendarioLimpieza, r: RutinaEnTurno, hoy: string): boolean {
   return turnoProgramable(t, hoy) && r.trabajadas === 0
@@ -122,9 +135,14 @@ export function cargaDelTurno(t: TurnoCalendarioLimpieza, duraciones: Map<string
 }
 
 export interface KpisLimpieza {
-  /** Tareas de rutina que quedaron pendientes en días anteriores (desde `desdeAtraso`). */
+  /**
+   * Tareas de rutina que quedaron pendientes en días anteriores (desde
+   * `desdeAtraso`). Sólo obligatorias: el opcional sin hacer no se atrasa.
+   */
   atrasadas: number
+  /** Obligatorias de hoy sin hacer. */
   pendientesHoy: number
+  /** Las de hoy que cuentan: obligatorias y opcionales hechas (`tareasQueCuentan`). */
   totalHoy: number
   hechasHoy: number
   /**
@@ -144,7 +162,7 @@ export function kpisLimpieza(turnos: TurnoCalendarioLimpieza[], hoy: string, des
     if (t.fecha < hoy && t.fecha >= desdeAtraso) {
       k.atrasadas += t.rutinas.reduce((s, r) => s + r.pendientes, 0)
     } else if (t.fecha === hoy) {
-      k.totalHoy += t.rutinas.reduce((s, r) => s + r.tareas, 0)
+      k.totalHoy += t.rutinas.reduce((s, r) => s + tareasQueCuentan(r), 0)
       k.pendientesHoy += t.rutinas.reduce((s, r) => s + r.pendientes, 0)
       k.hechasHoy += t.rutinas.reduce((s, r) => s + r.hechas, 0)
       if (t.rutinas.length === 0 && hacenRutinas.has(t.personal_id)) k.turnosHoySinRutina++
