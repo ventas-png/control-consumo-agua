@@ -41,7 +41,7 @@ vi.mock('../../../domain/contabilidad/queries', () => ({
 }))
 
 vi.mock('../../../domain/contabilidad/mutations', () => ({
-  useCrearAsientoBorradorMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useGuardarPolizaManualMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   usePublicarAsientoMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useGuardarMapeoMutation: () => ({
     mutateAsync: async (v: { evento: string; cuentaId: string; projectId?: string | null }) => {

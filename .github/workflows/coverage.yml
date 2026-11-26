@@ -874,6 +874,31 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55701
         run: supabase/tests/conta_revaluar_cierre_rbac/run.sh
+      # 20261230000000: conta_poliza_manual_guardar. La póliza manual (cabecera,
+      # líneas y publicación) en UNA transacción, y el borrador editable. Sobre
+      # la cadena entera: atomicidad (seis rechazos no dejan cabecera ni línea;
+      # una edición rechazada deja el borrador intacto), no edita lo publicado,
+      # lo automático, lo ajeno ni lo de otro ledger, cada acción con SU
+      # permiso, proyecto sin alcance fuera, ACL e idempotencia.
+      - name: Contabilidad — póliza manual en una transacción y borrador editable
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55781
+        run: supabase/tests/conta_poliza_manual/run.sh
+      # 20261230000100: conta_asientos_omitidos. Todo documento vigente que el
+      # generador no pudo asentar queda registrado con su motivo y con la
+      # llamada completa, y se reprocesa. Sobre TODA la cadena, también las
+      # migraciones posteriores: si una reescribe conta_generar_asiento y pisa
+      # la envoltura, esta suite falla. Un gasto real sin cuenta: no asienta,
+      # queda en la bandeja, se corrige y asienta; anular o borrar retira la
+      # omisión; lo asentado, lo duplicado, un ledger sin catálogo y las
+      # facturas de proveedor no dejan omisión; el rastro nunca rompe la
+      # operación; permisos, aislamiento y ACL.
+      - name: Contabilidad — todo documento sin póliza queda a la vista y se reprocesa
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55782
+        run: supabase/tests/conta_asientos_omitidos/run.sh
       # 20261221000000: en `rutas`, crear/editar/eliminar exigen agua.rutas.
       # create/edit/delete y el acceso al proyecto, y quien ejecuta la ruta
       # (asignado o con agua.lecturas.create) sólo puede darla por completada.

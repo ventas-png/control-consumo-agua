@@ -4,7 +4,7 @@ import { FilterChips } from '../shared/FilterChips'
 import { StatusBadge } from '../shared/StatusBadge'
 import { useAsientosQuery, useHayAperturaQuery } from '../../domain/contabilidad/queries'
 import { formatCurrency, formatDateShort, mesLocalISO } from '../../lib/format'
-import { TIPO_ASIENTO_LABELS, type AsientoContable } from '../../types/contabilidad'
+import { TIPO_ASIENTO_LABELS, type AsientoConLineas, type AsientoContable } from '../../types/contabilidad'
 import { AsientoFormModal } from './AsientoFormModal'
 import { AsientoDetalleModal } from './AsientoDetalleModal'
 import { AperturaSaldosModal } from './AperturaSaldosModal'
@@ -32,6 +32,7 @@ export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
   const [nuevo, setNuevo] = useState(false)
   const [apertura, setApertura] = useState(false)
   const [detalleId, setDetalleId] = useState<string | null>(null)
+  const [editando, setEditando] = useState<AsientoConLineas | null>(null)
 
   const { data: asientos = [], isLoading } = useAsientosQuery(companyId, {
     periodo: periodo || undefined,
@@ -162,6 +163,17 @@ export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
           asientoId={detalleId}
           monedaBase={monedaBase}
           onClose={() => setDetalleId(null)}
+          onEditar={(a) => { setDetalleId(null); setEditando(a) }}
+        />
+      )}
+      {editando && (
+        <AsientoFormModal
+          key={editando.id}
+          companyId={companyId}
+          projectId={projectId}
+          monedaBase={monedaBase}
+          borrador={editando}
+          onClose={() => setEditando(null)}
         />
       )}
     </div>

@@ -37,7 +37,7 @@ vi.mock('../../../domain/contabilidad/tiposCambio', async (orig) => ({
   useMonedaEmpresaQuery: () => ({ data: 'GTQ' }),
 }))
 vi.mock('../../../domain/contabilidad/mutations', () => ({
-  useCrearAsientoBorradorMutation: () => ({ mutateAsync: h.crear, isPending: false }),
+  useGuardarPolizaManualMutation: () => ({ mutateAsync: h.crear, isPending: false }),
   usePublicarAsientoMutation: () => ({ mutateAsync: h.publicar, isPending: false }),
 }))
 
@@ -109,6 +109,59 @@ describe('AsientoFormModal · tasa manual (B1)', () => {
     expect(h.crear.mock.calls[0][0]).toMatchObject({
       tipo_cambio_motivo: 'Tasa pactada con el banco',
       lineas: expect.arrayContaining([expect.objectContaining({ moneda_origen: 'USD', tipo_cambio: 7.75, monto_origen: 100 })]),
+    })
+  })
+})
+
+describe('AsientoFormModal · una sola llamada y edición de borrador', () => {
+  it('«Guardar y publicar» hace UNA llamada con publicar=true (ya no crea y luego publica)', async () => {
+    armar('100', '780')
+    fireEvent.click(screen.getByText('Guardar y publicar'))
+    await vi.waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
+    expect(h.crear.mock.calls[0][0]).toMatchObject({ publicar: true, asiento_id: null, project_id: null })
+    expect(h.publicar).not.toHaveBeenCalled()
+  })
+
+  it('si el servidor rechaza, reintentar NO manda un borrador nuevo: la misma póliza, otra vez completa', async () => {
+    h.crear.mockRejectedValueOnce(new Error('El periodo 2026-09 de este proyecto está cerrado.'))
+    armar('100', '780')
+    fireEvent.click(screen.getByText('Guardar y publicar'))
+    await vi.waitFor(() => expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({ variant: 'error' })))
+    fireEvent.click(screen.getByText('Guardar y publicar'))
+    await vi.waitFor(() => expect(h.crear).toHaveBeenCalledTimes(2))
+    // Las dos llamadas son idénticas y ninguna trae id: el rechazo no dejó nada que editar ni que duplicar.
+    expect(h.crear.mock.calls[1][0]).toEqual(h.crear.mock.calls[0][0])
+    expect(h.crear.mock.calls[1][0]).toMatchObject({ asiento_id: null, publicar: true })
+  })
+
+  it('editar un borrador abre con sus datos (monto de ORIGEN y su tasa) y guarda sobre el mismo id', async () => {
+    const borrador = {
+      id: 'b0000000-0000-4000-8000-000000000001', company_id: 'c1', project_id: null, numero: null,
+      fecha: '2026-09-10', periodo: '2026-09', tipo: 'ingreso', concepto: 'Depósito pendiente de revisar',
+      estado: 'borrador', origen: 'manual', tipo_cambio_motivo: 'Tasa pactada con el banco',
+      conta_asiento_lineas: [
+        { id: 'l2', asiento_id: 'x', cuenta_id: '22222222-2222-4222-8222-222222222222', orden: 2, descripcion: null,
+          debe: 0, haber: 790, moneda_origen: null, monto_origen: null, tipo_cambio: null },
+        { id: 'l1', asiento_id: 'x', cuenta_id: '11111111-1111-4111-8111-111111111111', orden: 1, descripcion: 'USD',
+          debe: 790, haber: 0, moneda_origen: 'USD', monto_origen: 100, tipo_cambio: 7.9 },
+      ],
+    } as unknown as import('../../../types/contabilidad').AsientoConLineas
+    render(<AsientoFormModal companyId="c1" projectId={null} monedaBase="GTQ" borrador={borrador} onClose={() => {}} />)
+    expect(screen.getByText('Editar póliza (borrador)')).toBeTruthy()
+    expect((screen.getByPlaceholderText('Descripción de la operación') as HTMLInputElement).value).toBe('Depósito pendiente de revisar')
+    // Línea 1 = la de orden 1, con el monto en USD y la tasa que se guardó (no la mensual 7.8).
+    expect((screen.getByLabelText('Tipo de cambio de la línea 1') as HTMLInputElement).value).toBe('7.9')
+    expect((screen.getByLabelText('Motivo de la tasa distinta de la mensual') as HTMLInputElement).value).toBe('Tasa pactada con el banco')
+    expect(screen.getByText(/Debe .*790\.00/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Guardar borrador'))
+    await vi.waitFor(() => expect(h.crear).toHaveBeenCalledTimes(1))
+    expect(h.crear.mock.calls[0][0]).toMatchObject({
+      asiento_id: 'b0000000-0000-4000-8000-000000000001', publicar: false, tipo: 'ingreso', fecha: '2026-09-10',
+      tipo_cambio_motivo: 'Tasa pactada con el banco',
+      lineas: [
+        expect.objectContaining({ debe: 790, haber: 0, moneda_origen: 'USD', monto_origen: 100, tipo_cambio: 7.9 }),
+        expect.objectContaining({ debe: 0, haber: 790, moneda_origen: null }),
+      ],
     })
   })
 })
