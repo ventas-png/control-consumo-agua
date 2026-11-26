@@ -72,6 +72,10 @@ UPDATE public.cuotas_condominio q SET estado = 'pagado', cuota_estado = 'pagada'
        metodo_pago = 'deposito', pago_id = p.id
   FROM pagadas p WHERE q.id = p.cuota_id;
 
+-- Un cargo cuyo tipo aún no tiene cuentas configuradas: es lo que el manual muestra en «Pendientes».
+INSERT INTO public.cargos_adicionales_unidad (company_id, project_id, unidad_id, concepto, categoria, monto, fecha_cargo, fecha_vencimiento)
+  SELECT pg_temp.e(), pg_temp.p(), u, 'Reparación de portón dañado', 'reparacion', 350, CURRENT_DATE - 5, CURRENT_DATE + 10 FROM casas WHERE n = 8;
+
 -- ── Banco: la cuenta y su extracto ──────────────────────────────────────────
 INSERT INTO public.cuentas_bancarias (company_id, project_id, nombre, banco, numero_mascara, cuenta_contable_id)
 VALUES (pg_temp.e(), pg_temp.p(), 'BI monetaria', 'Banco Industrial', '4321', pg_temp.c('1102'));
