@@ -20,11 +20,26 @@ function simularPlataforma(plataforma: 'web' | 'android' | 'ios') {
   capacitor.getPlatform.mockReturnValue(plataforma)
 }
 
+/**
+ * Simula la web instalada como app (PWA): el navegador reporta
+ * `display-mode: standalone`. jsdom no trae matchMedia; sin él, lib/pwaInstall
+ * da por hecho una pestaña normal.
+ */
+function simularAppInstalada() {
+  window.matchMedia = vi.fn((q: string) => ({
+    matches: q === '(display-mode: standalone)', media: q, onchange: null,
+    addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia
+}
+const matchMediaOriginal = window.matchMedia
+
 import { LandingPage } from '../LandingPage'
 import { checkA11y } from '../../../test/a11y'
 
 beforeEach(() => {
   cleanup()
+  window.matchMedia = matchMediaOriginal
   // El test "switches copy to English" persiste lang=en en la URL — limpiar
   // para que los siguientes tests vuelvan al español por defecto.
   window.history.replaceState({}, '', '/')
@@ -152,6 +167,31 @@ describe('LandingPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByText('Bienvenido de vuelta')).toBeNull()
+  })
+
+  // Web instalada como app (PWA): quien la abre desde su pantalla de inicio viene
+  // a entrar. A diferencia de la app nativa sigue siendo la web: la landing y
+  // los precios están permitidos y quedan detrás del login.
+  describe('instalada como app (PWA)', () => {
+    it('abre con el login a la vista, sin tocar «Iniciar sesión»', () => {
+      simularAppInstalada()
+      setup()
+      expect(screen.getByText('Bienvenido de vuelta')).toBeTruthy()
+    })
+
+    it('el login se puede cerrar y detrás está la landing con sus precios', () => {
+      simularAppInstalada()
+      const { container } = setup()
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      expect(screen.queryByText('Bienvenido de vuelta')).toBeNull()
+      expect(screen.getByText('Administra agua,')).toBeTruthy()
+      expect(container.querySelector('#pricing')).not.toBeNull()
+    })
+
+    it('en una pestaña normal del navegador el login sigue cerrado al entrar', () => {
+      setup()
+      expect(screen.queryByText('Bienvenido de vuelta')).toBeNull()
+    })
   })
 
   describe('Sign in with Apple (VITE_APPLE_SIGN_IN=true)', () => {

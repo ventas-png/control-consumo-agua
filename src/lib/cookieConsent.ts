@@ -10,6 +10,7 @@
 // son necesarias para prestar el servicio. Solo "analítica" y "funcionales" son opcionales.
 
 import { setAnalyticsConsent } from './analytics'
+import { notifyCookieConsentSaved } from './cookieConsentChannel'
 
 export interface CookieConsent {
   analytics: boolean
@@ -48,6 +49,7 @@ export function saveConsent(consent: CookieConsent): void {
     /* almacenamiento no disponible (modo privado): el banner reaparecerá la próxima vez */
   }
   setAnalyticsConsent(consent.analytics)
+  notifyCookieConsentSaved()
 }
 
 /** Aplica el consentimiento ya guardado. Llamar una vez al arrancar, tras initAnalytics(). */

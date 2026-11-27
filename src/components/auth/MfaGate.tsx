@@ -157,7 +157,7 @@ export function MfaGate({ onSatisfied, onLogout }: Props) {
 
 function Screen({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--at-bg)', padding: 20 }}>
+    <div className="at-bajo-barra-estado" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--at-bg)', padding: 20 }}>
       <div style={{ background: 'var(--at-surface)', border: '1px solid var(--at-line)', borderRadius: 16, padding: '32px 28px', maxWidth: 420, width: '100%', textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.12)' }}>
         {children}
       </div>

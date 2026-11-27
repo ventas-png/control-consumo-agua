@@ -171,7 +171,9 @@
   font-weight: 500;
 }
 .btn-apple:hover { background: #1a1a1a; }
-.link-quiet { color: var(--c-primary); font-size: 13px; }
+/* Es un <button> (¿Olvidaste tu contraseña?, cancelar 2FA): sin quitarle el
+   fondo y el borde del navegador se ve como una caja gris, no como un enlace. */
+.link-quiet { background: transparent; border: 0; padding: 0; color: var(--c-primary); font-size: 13px; }
 .link-quiet:hover { text-decoration: underline; }
 .link-bold {
   background: transparent; border: 0; color: var(--c-primary);
@@ -2008,10 +2010,18 @@
 
 /* ─── Dark theme (landing/login) ──────────────────────────────────────────
    Los tokens --c-* heredan el modo oscuro vía --at-* (index.css); aquí sólo se
-   declara color-scheme para el scope del landing. */
-[data-theme="dark"] .at-root,
-html:not([data-theme="light"]) .at-root {
+   declara color-scheme para el scope del landing. Mismos dos casos que allí:
+   oscuro forzado, o automático CON el sistema en oscuro. Sin el @media, el
+   automático declaraba oscuro también con el sistema en claro, y los controles
+   del navegador (casillas, barras de desplazamiento) salían oscuros sobre la
+   página clara. */
+[data-theme="dark"] .at-root {
   color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) .at-root {
+    color-scheme: dark;
+  }
 }
 
 /* ─── Teléfonos: que nada del landing ensanche el documento ───────────────
@@ -2047,8 +2057,16 @@ html:not([data-theme="light"]) .at-root {
    * propios: se recorta dentro de su caja en vez de empujar el documento. */
   .modules-visual { overflow-x: hidden; }
 
-  /* iOS con viewport-fit=cover: la página arranca DEBAJO de la barra de
-   * estado, que es transparente. Sin esto el logo y el botón de "Iniciar
-   * sesión" quedaban tapados por la hora y la batería. */
-  .site-nav { padding-top: env(safe-area-inset-top, 0); }
+}
+
+/* iOS con viewport-fit=cover: la página arranca DEBAJO de la barra de estado,
+ * que es transparente. Sin esto el logo y el botón de "Iniciar sesión" quedaban
+ * tapados por la hora y la batería. Va fuera de los @media porque también
+ * aplica en un iPad con la web instalada como app; en una pestaña normal del
+ * navegador el hueco vale 0. Ver "Barra de estado" en index.css. */
+.site-nav { padding-top: var(--at-inset-top, 0px); }
+/* Teléfono en horizontal: la muesca tapa un lado de la pantalla. */
+.at-root {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }

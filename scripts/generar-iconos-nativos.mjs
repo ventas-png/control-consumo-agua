@@ -1,5 +1,6 @@
 // Íconos y splash de la app nativa (iOS y Android), más los gráficos de la ficha de
-// Google Play, a partir del logo de la marca.
+// Google Play y el ícono de pantalla de inicio de la web instalada en iPhone/iPad
+// (PWA), a partir del logo de la marca.
 //
 // El logo es la cuadrícula 3×3 de public/favicon.svg sobre verde #1B3B36 (el mismo de
 // la web y de la PWA). Este script lo dibuja en vector con Chromium y escribe cada PNG
@@ -162,6 +163,11 @@ const trabajos = [
   // captura de pantalla de Chromium omite el canal alfa cuando todo es opaco, así que
   // este se exporta desde un <canvas>, que siempre lo incluye.
   { ruta: 'docs/tiendas/play-icono-512.png', ancho: 512, alto: 512, svgRgba: iconoIos(512) },
+  // Web instalada en iPhone/iPad (<link rel="apple-touch-icon"> de index.html).
+  // Mismas reglas que el ícono de la app: cuadrado a sangre y sin transparencia.
+  // iOS pinta de NEGRO lo transparente, así que un ícono con las esquinas ya
+  // redondeadas deja picos negros asomando bajo la máscara del sistema.
+  { ruta: 'public/apple-touch-icon.png', ancho: 180, alto: 180, html: pagina(iconoIos(180)) },
 ]
 
 /** PNG RGBA de un SVG, exportado desde un <canvas> de la página. */

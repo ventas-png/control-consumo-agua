@@ -16,3 +16,20 @@ export function onOpenCookieSettings(handler: () => void): () => void {
   window.addEventListener(OPEN_COOKIE_SETTINGS_EVENT, handler)
   return () => window.removeEventListener(OPEN_COOKIE_SETTINGS_EVENT, handler)
 }
+
+export const COOKIE_CONSENT_SAVED_EVENT = 'at:cookie-consent-saved'
+
+/** Avisa de que el usuario ya eligió (lo dispara saveConsent). */
+export function notifyCookieConsentSaved(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(COOKIE_CONSENT_SAVED_EVENT))
+}
+
+/**
+ * Para quien espera a que el banner de cookies se cierre antes de mostrar otra
+ * cosa en el mismo sitio (el aviso de instalar la app).
+ */
+export function onCookieConsentSaved(handler: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(COOKIE_CONSENT_SAVED_EVENT, handler)
+  return () => window.removeEventListener(COOKIE_CONSENT_SAVED_EVENT, handler)
+}

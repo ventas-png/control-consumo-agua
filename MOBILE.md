@@ -8,6 +8,10 @@ detrás de `isNative()`, de modo que **la web no cambia en nada**.
 Los proyectos `android/` e `ios/` **ya están en el repo**, generados y
 preconfigurados (permisos y deep link incluidos). No hace falta `cap add`.
 
+Mientras las apps no estén en las tiendas, la web se puede instalar tal cual
+como app (PWA) en teléfonos, tablets y computadoras: ver
+`docs/PWA_INSTALACION.md`.
+
 ---
 
 ## 1. Requisitos

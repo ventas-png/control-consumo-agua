@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../types/database.types'
 import { extractOAuthCallbackError, type OAuthCallbackError } from '../domain/auth/oauthCallbackError'
 import { isNative } from './platform'
+import { almacenDeSesion } from './authStorage'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
@@ -10,24 +11,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Check your .env file.')
 }
 
-// Almacenamiento de la sesión según plataforma:
-//   - Web: sessionStorage. Endurecimiento anti-XSS (nunca localStorage) — la sesión
-//     no sobrevive al cierre de la pestaña, decisión de seguridad previa.
-//   - Nativo (Capacitor): sessionStorage se vacía al terminar el proceso del
-//     WebView, así que la sesión no sobreviviría a cerrar la app; localStorage sí
-//     persiste entre aperturas y es SÍNCRONO.
-//
-// Aquí hubo un adaptador asíncrono sobre @capacitor/preferences. Se revirtió: en
-// un iPhone real el login se colgaba: el token llegaba (respuesta HTTP correcta)
-// pero `signInWithPassword` nunca resolvía porque el guardado de sesión se quedaba
-// pendiente, y el usuario solo veía "la conexión tardó demasiado" a los 20 s.
-// Un storage síncrono no puede introducir ese cuelgue.
-//
-// El cambio no debilita la defensa que motivó sessionStorage en web: allí protege
-// frente a XSS con contenido de terceros, mientras que en la app nativa el WebView
-// solo carga nuestro propio bundle empaquetado (no hay contenido remoto), y
-// Preferences tampoco aportaba aislamiento real frente a ese código.
-const nativeSessionStorage = isNative() ? window.localStorage : window.sessionStorage
+// Dónde se guarda la sesión: sessionStorage en una pestaña del navegador (no
+// sobrevive al cierre) y localStorage en la app nativa y en la web instalada
+// como app, donde tiene que sobrevivir a cerrarla. El porqué de cada caso, y por
+// qué el almacén debe ser síncrono, está en lib/authStorage.ts.
+const authStorage = almacenDeSesion()
 
 // Intercept Gmail OAuth callbacks BEFORE Supabase initializes.
 // With detectSessionInUrl: true, Supabase would try to exchange any ?code= param
@@ -78,7 +66,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storage: nativeSessionStorage,
+    storage: authStorage,
     // PKCE SOLO en nativo. El deep link del login con Google vuelve con ?code=
     // y src/lib/nativeAuth.ts lo canjea con exchangeCodeForSession, que exige
     // PKCE; con el flujo implícito (default de supabase-js) GoTrue devolvería
@@ -86,7 +74,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // En web se mantiene el implícito a propósito: PKCE exige guardar un
     // code_verifier en el mismo storage, y la web usa sessionStorage — abrir el
     // enlace de recuperación de contraseña en otra pestaña o navegador se
-    // quedaría sin verifier y rompería el flujo.
+    // quedaría sin verifier y rompería el flujo. La web instalada como app
+    // sigue igual: el enlace del correo se abre en el navegador, no en la app.
     flowType: isNative() ? 'pkce' : 'implicit',
   },
   global: {

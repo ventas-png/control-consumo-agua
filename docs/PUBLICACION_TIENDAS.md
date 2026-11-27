@@ -175,6 +175,7 @@ al tamaño exacto de cada plataforma:
 | `android/app/src/main/res/drawable*/splash.png` | Splash de Android hasta la versión 11. Desde Android 12 el sistema muestra el ícono sobre `windowSplashScreenBackground` (`values/styles.xml`), también en el verde de la marca. |
 | `docs/tiendas/play-icono-512.png` | Ícono de alta resolución para la ficha de Play: 512×512, PNG de 32 bits. |
 | `docs/tiendas/play-grafico-funciones-1024x500.png` | Gráfico de funciones de la ficha de Play (obligatorio): logo, nombre y lema de la web. Se puede cambiar por uno propio del mismo tamaño. |
+| `public/apple-touch-icon.png` | Ícono de pantalla de inicio de la **web instalada** en iPhone/iPad (PWA, `docs/PWA_INSTALACION.md`): 180×180, cuadrado y sin transparencia, como el de la app. |
 
 Para cambiar el logo o el color, editar el script (colores y proporciones van
 al principio) y volver a correrlo:

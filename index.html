@@ -17,7 +17,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- PWA: iOS muestra apple-touch-icon en home-screen; Android usa manifest.icons -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Abrir a pantalla completa al instalarla. `mobile-web-app-capable` es el
+         nombre estándar; el de Apple se conserva para iOS anteriores. -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- black-translucent: instalada en iPhone/iPad la página se dibuja DEBAJO de
+         la barra de estado (hora, batería), cuyo texto es siempre blanco. La
+         franja verde que la hace legible y los huecos que evitan tapar el
+         contenido están en src/index.css ("Barra de estado"). Cambiar este valor
+         no afecta a quien ya la instaló: iOS lo fija al agregarla a inicio. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="AdministraTodo" />
 

@@ -464,7 +464,7 @@ export function CustomerPortal({ currentUser, onLogout }: Props) {
 
   // ── Full portal ──────────────────────────────────────────
   return (
-    <div data-context="resident" style={{ minHeight: '100vh', background: 'var(--at-primary-tint)' }}>
+    <div data-context="resident" className="portal-root" style={{ minHeight: '100vh', background: 'var(--at-primary-tint)' }}>
       {/* Estilos .kpi-skeleton/.portal-* (y keyframes) en src/styles/runtime.css (I24). */}
 
       {/* Header */}

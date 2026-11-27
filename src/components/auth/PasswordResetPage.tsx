@@ -95,7 +95,7 @@ export function PasswordResetPage({ onBack }: Props) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)' }}>
+    <div className="at-bajo-barra-estado" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)' }}>
       <div style={cardStyle}>
         <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '24px' }}>Restablecer Contraseña</h2>
 
