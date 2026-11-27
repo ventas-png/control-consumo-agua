@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { runQuery, runQueryAll } from '../queryFetch'
 import { bancosKeys } from './keys'
 import type {
+  CandidatoConciliacion,
   BancoMovimiento,
   CuentaBancaria,
   EstadoConciliacion,
@@ -56,6 +57,20 @@ export function useSugerenciasQuery(cuentaBancariaId?: string) {
       (await runQuery<SugerenciaConciliacion[]>((signal) =>
         supabase
           .rpc('banco_sugerencias_conciliacion', { p_cuenta_bancaria_id: cuentaBancariaId! })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/** Documentos sin conciliar entre los que se puede elegir para un movimiento (RPC). */
+export function useCandidatosConciliacionQuery(movimientoId?: string, buscar?: string) {
+  return useQuery({
+    queryKey: bancosKeys.candidatos(movimientoId, buscar),
+    enabled: !!movimientoId,
+    queryFn: async () =>
+      (await runQuery<CandidatoConciliacion[]>((signal) =>
+        supabase
+          .rpc('banco_candidatos_conciliacion', { p_movimiento_id: movimientoId!, p_buscar: buscar?.trim() || null })
           .abortSignal(signal),
       )) ?? [],
   })

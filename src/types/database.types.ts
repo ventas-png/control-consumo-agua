@@ -7616,6 +7616,8 @@ export type Database = {
           notas: string | null
           numero_mascara: string | null
           project_id: string | null
+          saldo_inicial: number
+          saldo_inicial_fecha: string | null
           updated_at: string
         }
         Insert: {
@@ -7630,6 +7632,8 @@ export type Database = {
           notas?: string | null
           numero_mascara?: string | null
           project_id?: string | null
+          saldo_inicial?: number
+          saldo_inicial_fecha?: string | null
           updated_at?: string
         }
         Update: {
@@ -7644,6 +7648,8 @@ export type Database = {
           notas?: string | null
           numero_mascara?: string | null
           project_id?: string | null
+          saldo_inicial?: number
+          saldo_inicial_fecha?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -25374,6 +25380,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      banco_candidatos_conciliacion: {
+        Args: { p_movimiento_id: string; p_buscar?: string | null }
+        Returns: {
+          candidato_id: string
+          candidato_tipo: string
+          descripcion: string | null
+          fecha: string
+          monto: number
+          referencia: string | null
+        }[]
+      }
+      banco_conciliar_varios: {
+        Args: { p_movimiento_id: string; p_documentos: Json }
+        Returns: Database["public"]["Tables"]["banco_movimientos"]["Row"]
+      }
       banco_conciliar_movimiento: {
         Args: {
           p_match_id: string
@@ -26410,6 +26431,30 @@ export type Database = {
           razones: string
         }[]
       }
+      conta_fondo_reserva_resumen: {
+        Args: { p_project_id: string }
+        Returns: {
+          cuenta_contra_id: string | null
+          cuenta_fondo_id: string | null
+          movimientos: number
+          movimientos_sin_poliza: number
+          saldo_libros: number
+          saldo_registro: number
+        }[]
+      }
+      conta_fondo_reserva_traslado: {
+        Args: {
+          p_project_id: string
+          p_tipo: string
+          p_monto: number
+          p_fecha: string
+          p_concepto: string
+          p_cuenta_fondo_id: string
+          p_cuenta_contra_id: string
+          p_referencia?: string | null
+        }
+        Returns: { asiento_id: string; movimiento_id: string; saldo_fondo: number }[]
+      }
       conta_generar_asiento: {
         Args: {
           p_company_id: string
@@ -26450,6 +26495,108 @@ export type Database = {
       conta_periodo_cerrado: {
         Args: { p_periodo: string; p_project_id: string }
         Returns: boolean
+      }
+      conta_cxc_antiguedad: {
+        Args: { p_project_id: string | null; p_corte?: string | null }
+        Returns: {
+          cliente_id: string | null
+          cliente_nombre: string | null
+          codigo_auxiliar: string | null
+          d1_30: number
+          d31_60: number
+          d61_90: number
+          d90_mas: number
+          por_vencer: number
+          sin_asignar: number
+          total: number
+          unidad_id: string | null
+          unidad_nombre: string | null
+          vencimiento_mas_antiguo: string | null
+        }[]
+      }
+      conta_caja_chica_constituir: {
+        Args: { p_caja_id: string; p_fecha: string; p_cuenta_caja_id: string; p_cuenta_banco_id: string }
+        Returns: string
+      }
+      conta_caja_chica_reponer: {
+        Args: {
+          p_caja_id: string
+          p_fecha: string
+          p_cuenta_banco_id: string
+          p_lineas?: Json
+          p_aplicar?: boolean
+        }
+        Returns: {
+          asiento_id: string | null
+          comprobante: string | null
+          concepto: string
+          cuenta_codigo: string | null
+          cuenta_gasto_id: string | null
+          cuenta_nombre: string | null
+          fecha: string
+          monto: number
+          motivo: string | null
+          movimiento_id: string
+          reposicion_id: string | null
+          resultado: string
+        }[]
+      }
+      conta_cajas_chicas: {
+        Args: { p_project_id: string }
+        Returns: {
+          caja_id: string
+          cuenta_caja_id: string | null
+          estado: string
+          fecha_apertura: string
+          monto_fondo: number
+          responsable: string
+          total_pendiente: number
+          vales_pendientes: number
+        }[]
+      }
+      conta_cuotas_saldo_inicial: {
+        Args: {
+          p_project_id: string
+          p_fecha: string
+          p_filas: Json
+          p_aplicar?: boolean
+          p_contrapartida_cuenta_id?: string | null
+        }
+        Returns: {
+          asiento_id: string | null
+          cuota_id: string | null
+          fecha_vencimiento: string | null
+          fila: number
+          monto: number | null
+          mora: number
+          motivo: string | null
+          periodo: string | null
+          responsable_cliente_id: string | null
+          responsable_nombre: string | null
+          resultado: string
+          tipo_cargo: string | null
+          unidad_id: string | null
+          unidad_nombre: string | null
+        }[]
+      }
+      conta_depreciar_activos: {
+        Args: { p_periodo: string; p_aplicar?: boolean; p_project_id?: string | null }
+        Returns: {
+          activo_id: string
+          acumulada_antes: number
+          asiento_id: string | null
+          codigo: string
+          costo: number
+          depreciacion: number
+          fecha_alta: string
+          meses_previos_sin_depreciar: number
+          motivo: string | null
+          nombre: string
+          resultado: string
+          valor_en_libros: number
+          valor_residual: number
+          vida_util_meses: number
+        }[]
       }
       conta_omitido_reprocesar: {
         Args: { p_id: string }

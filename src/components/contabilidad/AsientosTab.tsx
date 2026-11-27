@@ -8,6 +8,7 @@ import { TIPO_ASIENTO_LABELS, type AsientoConLineas, type AsientoContable } from
 import { AsientoFormModal } from './AsientoFormModal'
 import { AsientoDetalleModal } from './AsientoDetalleModal'
 import { AperturaSaldosModal } from './AperturaSaldosModal'
+import { SaldosInicialesResidenteModal } from './SaldosInicialesResidenteModal'
 import { btnPrimario, btnSecundario, input, usePermisosContabilidad } from './ui'
 
 interface Props {
@@ -26,11 +27,12 @@ function periodoActual(): string {
 const TONO_ESTADO = { borrador: 'warning', publicado: 'success', anulado: 'neutral' } as const
 
 export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
-  const { puedeCrear } = usePermisosContabilidad()
+  const { puedeCrear, puedeCambiarEstado } = usePermisosContabilidad()
   const [periodo, setPeriodo] = useState(periodoActual())
   const [estado, setEstado] = useState<FiltroEstado>('todos')
   const [nuevo, setNuevo] = useState(false)
   const [apertura, setApertura] = useState(false)
+  const [saldosResidente, setSaldosResidente] = useState(false)
   const [detalleId, setDetalleId] = useState<string | null>(null)
   const [editando, setEditando] = useState<AsientoConLineas | null>(null)
 
@@ -131,6 +133,11 @@ export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
                 Saldos iniciales
               </button>
             )}
+            {projectId && puedeCrear && (
+              <button onClick={() => setSaldosResidente(true)} style={btnSecundario}>
+                Saldos por residente
+              </button>
+            )}
             {puedeCrear && (
               <button onClick={() => setNuevo(true)} style={btnPrimario}>+ Nueva póliza</button>
             )}
@@ -156,6 +163,15 @@ export function AsientosTab({ companyId, projectId, monedaBase }: Props) {
           projectId={projectId}
           monedaBase={monedaBase}
           onClose={() => setApertura(false)}
+        />
+      )}
+      {saldosResidente && projectId && (
+        <SaldosInicialesResidenteModal
+          companyId={companyId}
+          projectId={projectId}
+          monedaBase={monedaBase}
+          puedeAplicar={puedeCrear && puedeCambiarEstado}
+          onClose={() => setSaldosResidente(false)}
         />
       )}
       {detalleId && (

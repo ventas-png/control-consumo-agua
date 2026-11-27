@@ -27,9 +27,12 @@
 // consulta se conserva la página anterior, rotulada «Actualizando…».
 import { useEffect, useMemo, useState } from 'react'
 import { StatusBadge } from '../shared/StatusBadge'
+import { FilterChips } from '../shared/FilterChips'
+import { notify } from '../shared/Dialog'
 import {
   ESTADO_CUENTA_POR_PAGINA,
   FUERA_DE_SALDO_POR_PAGINA,
+  fetchEstadoCuentaCompleto,
   useAuxiliaresQuery,
   useEstadoCuentaConciliacionQuery,
   useEstadoCuentaFueraQuery,
@@ -47,6 +50,8 @@ import {
 } from '../../types/contabilidad'
 import { AsientoDetalleModal } from './AsientoDetalleModal'
 import { SaldosFavorPanel } from './SaldosFavorPanel'
+import { AntiguedadCxcPanel } from './AntiguedadCxcPanel'
+import { descargarEstadoCuentaPdf } from './estadoCuentaPdf'
 import { Campo, btnLink, btnSecundario, input } from './ui'
 
 interface Props {
@@ -54,7 +59,11 @@ interface Props {
   /** Ledger activo: null = contabilidad de la empresa (sin unidades). */
   projectId: string | null
   monedaBase: string
+  /** Nombre de la contabilidad activa; encabeza el PDF del estado de cuenta. */
+  ledgerNombre?: string
 }
+
+type Vista = 'estado' | 'antiguedad'
 
 type Modo = 'cliente' | 'unidad'
 
@@ -93,7 +102,9 @@ export function marcaReverso(m: Pick<MovimientoEstadoCuenta,
   return null
 }
 
-export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
+export function EstadoCuentaTab({ companyId, projectId, monedaBase, ledgerNombre }: Props) {
+  const [vista, setVista] = useState<Vista>('estado')
+  const [generandoPdf, setGenerandoPdf] = useState(false)
   const [modo, setModo] = useState<Modo>('cliente')
   const [textoCliente, setTextoCliente] = useState('')
   const [busquedaCliente, setBusquedaCliente] = useState('')
@@ -159,8 +170,61 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
   const paginasFuera = Math.max(1, Math.ceil(totalFuera / FUERA_DE_SALDO_POR_PAGINA))
   const dinero = (v: number | null | undefined) => formatCurrency(v, monedaBase)
 
+  /** De la antigüedad al estado de cuenta de esa fila: por unidad si la tiene; si no, por auxiliar. */
+  function verEstadoDe(f: { cliente_id: string | null; cliente_nombre: string | null; unidad_id: string | null }) {
+    if (f.unidad_id && projectId) {
+      setModo('unidad')
+      setUnidadId(f.unidad_id)
+    } else if (f.cliente_id) {
+      // La lista de auxiliares es una búsqueda acotada: se busca por su nombre para que el elegido esté en ella.
+      setModo('cliente')
+      setTextoCliente(f.cliente_nombre ?? '')
+      setBusquedaCliente((f.cliente_nombre ?? '').trim())
+      setClienteId(f.cliente_id)
+    } else {
+      return
+    }
+    setVista('estado')
+  }
+
+  /** El PDF lleva TODOS los movimientos del rango, no solo la página en pantalla. */
+  async function descargarPdf() {
+    if (!sujeto || generandoPdf) return
+    setGenerandoPdf(true)
+    try {
+      const completo = await fetchEstadoCuentaCompleto({ projectId, sujeto, desde: desde || null, hasta: hasta || null })
+      descargarEstadoCuentaPdf({ entidadNombre: ledgerNombre ?? 'Contabilidad', monedaBase, estado: completo })
+    } catch (e) {
+      notify({ variant: 'error', title: 'No se pudo generar el PDF', text: e instanceof Error ? e.message : 'Intenta de nuevo.' })
+    } finally {
+      setGenerandoPdf(false)
+    }
+  }
+
+  const chips = (
+    <FilterChips<Vista>
+      ariaLabel="Vista de cuentas por cobrar"
+      options={[
+        { value: 'estado', label: 'Estado de cuenta' },
+        { value: 'antiguedad', label: 'Antigüedad de saldos' },
+      ]}
+      value={vista}
+      onChange={setVista}
+    />
+  )
+
+  if (vista === 'antiguedad') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-4)' }}>
+        {chips}
+        <AntiguedadCxcPanel companyId={companyId} projectId={projectId} monedaBase={monedaBase} onVerEstado={verEstadoDe} />
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--at-space-4)' }}>
+      {chips}
       <p style={{ margin: 0, color: 'var(--at-ink-soft)', fontSize: 13 }}>
         Cargos, cobros y reversos <strong>contabilizados</strong> de un auxiliar o de una unidad en
         esta contabilidad. Cada movimiento conserva el responsable que tenía al emitirse: cambiar el
@@ -261,6 +325,16 @@ export function EstadoCuentaTab({ companyId, projectId, monedaBase }: Props) {
       ) : (
         <>
           <section aria-labelledby="ec-resumen">
+            {/* El botón va flotado, no envolviendo el título: el título sigue siendo hijo directo de su sección. */}
+            <button
+              type="button"
+              style={{ ...btnSecundario, float: 'right', marginLeft: 12 }}
+              disabled={generandoPdf}
+              aria-busy={generandoPdf}
+              onClick={() => void descargarPdf()}
+            >
+              {generandoPdf ? 'Generando PDF…' : '📄 Descargar PDF'}
+            </button>
             <h3 id="ec-resumen" style={{ margin: '0 0 8px', fontSize: 15 }}>
               {datos.sujeto?.nombre ?? 'Estado de cuenta'}
               {datos.sujeto?.codigo_auxiliar ? ` · ${datos.sujeto.codigo_auxiliar}` : ''}

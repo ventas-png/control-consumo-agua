@@ -18,6 +18,10 @@ export interface CuentaBancaria {
   cuenta_contable_id: string
   activa: boolean
   notas: string | null
+  /** Saldo según el banco a `saldo_inicial_fecha`, en la moneda de la cuenta. Punto de partida de la conciliación. */
+  saldo_inicial: number
+  /** Los movimientos del extracto con esta fecha o anterior ya están dentro del saldo inicial. */
+  saldo_inicial_fecha: string | null
   created_at: string
   updated_at: string
 }
@@ -76,4 +80,15 @@ export const MATCH_TIPO_LABELS: Record<MatchTipoBanco, string> = {
   pago: 'Pago de cliente',
   orden_pago: 'Pago a proveedor',
   ajuste: 'Ajuste contable',
+}
+
+/** Fila de banco_candidatos_conciliacion (RPC): un documento sin conciliar que se puede elegir. */
+export interface CandidatoConciliacion {
+  candidato_tipo: 'pago' | 'orden_pago'
+  candidato_id: string
+  fecha: string
+  /** Siempre positivo. */
+  monto: number
+  descripcion: string | null
+  referencia: string | null
 }

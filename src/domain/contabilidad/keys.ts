@@ -80,6 +80,8 @@ export const contabilidadKeys = {
   // Documentos sin póliza por el camino general (agua, gastos, pagos, recepciones…).
   omitidos: (companyId?: string, projectId?: string | null) =>
     [...contabilidadKeys.all, 'omitidos', companyId ?? null, projectId ?? null] as const,
+  cxcAntiguedad: (companyId?: string, projectId?: string | null, corte?: string | null) =>
+    [...contabilidadKeys.all, 'estadoCuenta', companyId ?? null, 'antiguedad', projectId ?? null, corte ?? null] as const,
   omitidosDeEmpresa: (companyId?: string) =>
     [...contabilidadKeys.all, 'omitidos', companyId ?? null] as const,
   // Configuración por tipo de cargo: por ledger, con prefijo de empresa para
@@ -141,6 +143,10 @@ export const contabilidadKeys = {
       clienteId ?? null, unidadId ?? null] as const,
   saldoFavorDocumentos: (companyId?: string, origenId?: string | null) =>
     [...contabilidadKeys.all, 'saldosFavor', companyId ?? null, 'documentos', origenId ?? null] as const,
+  fondoReserva: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'fondoReserva', companyId ?? null, projectId ?? null] as const,
+  cajasChicas: (companyId?: string, projectId?: string | null) =>
+    [...contabilidadKeys.all, 'cajasChicas', companyId ?? null, projectId ?? null] as const,
   unidadesLedger: (companyId?: string, projectId?: string | null) =>
     [...contabilidadKeys.all, 'unidadesLedger', companyId ?? null, projectId ?? null] as const,
   // Solicitudes de ajuste e incidencias de conciliación (20261011000000).

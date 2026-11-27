@@ -152,8 +152,10 @@ export function ContabilidadSection() {
       </div>
 
       {/* Qué le falta a ESTA contabilidad para operar; desaparece cuando está completa. `key` por ledger, como las
-          pestañas: «ocultar pasos» de una contabilidad no se arrastra a otra. */}
-      <PuestaEnMarchaPanel key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} onIrA={setTab} />
+          pestañas: «ocultar pasos» de una contabilidad no se arrastra a otra. La clave lleva prefijo propio: es
+          HERMANA de la pestaña activa, que usa `ledgerKeyUI` tal cual, y con la misma clave React conservaba el
+          panel de la contabilidad anterior al cambiar (se veían dos). */}
+      <PuestaEnMarchaPanel key={`puesta-en-marcha:${ledgerKeyUI}`} companyId={companyId} projectId={ledgerProjectId} onIrA={setTab} />
 
       {/* Sub-menú con el mismo patrón que Condominios: una sola fila con scroll
           horizontal. Con `flex-wrap` estas 9 pestañas ocupaban cuatro líneas en
@@ -208,7 +210,7 @@ export function ContabilidadSection() {
         <AjustesTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} />
       )}
       {tab === 'estadocuenta' && (
-        <EstadoCuentaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />
+        <EstadoCuentaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} ledgerNombre={ledgerNombre} />
       )}
       {tab === 'balanza' && (
         <BalanzaTab key={ledgerKeyUI} companyId={companyId} projectId={ledgerProjectId} monedaBase={monedaBase} />

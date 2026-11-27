@@ -7,6 +7,8 @@ import { runQuery, runQueryAll } from '../queryFetch'
 import { contabilidadKeys } from './keys'
 import { normalizarMoneda } from './schemas'
 import type {
+  CajaChicaContable,
+  FondoReservaResumen,
   AsientoConLineas,
   AsientoContable,
   BalanzaFila,
@@ -30,6 +32,7 @@ import type {
   EstadoCuenta,
   SujetoEstadoCuenta,
   AsientoOmitido,
+  AntiguedadCxcFila,
 } from '../../types/contabilidad'
 
 /** Moneda base contable de la empresa (ISO, espejo de conta_moneda_base). */
@@ -576,6 +579,84 @@ export function useEstadoCuentaQuery(params: {
           })
           .abortSignal(signal),
       )) as EstadoCuenta,
+  })
+}
+
+/**
+ * El estado de cuenta COMPLETO del rango (todas sus páginas), para imprimirlo.
+ * La pantalla pagina de 50 en 50; un PDF con solo la página visible sería un
+ * estado de cuenta incompleto que parece completo. Pide de 500 en 500 hasta
+ * juntar los movimientos que el propio resumen dice que hay.
+ */
+export async function fetchEstadoCuentaCompleto(params: {
+  projectId: string | null
+  sujeto: SujetoEstadoCuenta
+  desde: string | null
+  hasta: string | null
+}): Promise<EstadoCuenta> {
+  const POR_LOTE = 500
+  let base: EstadoCuenta | null = null
+  const movimientos: EstadoCuenta['movimientos'] = []
+  for (let offset = 0; ; offset += POR_LOTE) {
+    const lote = (await runQuery<EstadoCuenta>((signal) =>
+      supabase
+        .rpc('conta_estado_cuenta', {
+          p_project_id: params.projectId,
+          ...argsSujeto(params.sujeto),
+          p_desde: params.desde,
+          p_hasta: params.hasta,
+          p_limite: POR_LOTE,
+          p_offset: offset,
+        })
+        .abortSignal(signal),
+    )) as EstadoCuenta | null
+    if (!lote) throw new Error('El servidor no devolvió el estado de cuenta.')
+    base ??= lote
+    movimientos.push(...lote.movimientos)
+    if (lote.movimientos.length < POR_LOTE || movimientos.length >= lote.resumen.movimientos) break
+  }
+  return { ...base, movimientos }
+}
+
+/**
+ * Antigüedad de saldos por cobrar de la contabilidad activa al corte: el saldo
+ * CONTABLE de cada auxiliar y unidad repartido por tramos (PEPS). Lo calcula el
+ * servidor desde las mismas líneas publicadas que el estado de cuenta.
+ */
+export function useCxcAntiguedadQuery(companyId?: string, projectId?: string | null, corte?: string | null, enabled = true) {
+  return useQuery({
+    queryKey: contabilidadKeys.cxcAntiguedad(companyId, projectId, corte),
+    enabled: !!companyId && enabled,
+    queryFn: async () =>
+      (await runQuery<AntiguedadCxcFila[]>((signal) =>
+        supabase
+          .rpc('conta_cxc_antiguedad', { p_project_id: projectId ?? null, p_corte: corte || null })
+          .abortSignal(signal),
+      )) ?? [],
+  })
+}
+
+/** El fondo de reserva según su registro y según libros (solo ledger de proyecto). */
+export function useFondoReservaResumenQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.fondoReserva(companyId, projectId),
+    enabled: !!companyId && !!projectId,
+    queryFn: async () =>
+      ((await runQuery<FondoReservaResumen[]>((signal) =>
+        supabase.rpc('conta_fondo_reserva_resumen', { p_project_id: projectId! }).abortSignal(signal),
+      )) ?? [])[0] ?? null,
+  })
+}
+
+/** Cajas chicas del proyecto, con lo que cada una tiene pendiente de reponer. */
+export function useCajasChicasQuery(companyId?: string, projectId?: string | null) {
+  return useQuery({
+    queryKey: contabilidadKeys.cajasChicas(companyId, projectId),
+    enabled: !!companyId && !!projectId,
+    queryFn: async () =>
+      (await runQuery<CajaChicaContable[]>((signal) =>
+        supabase.rpc('conta_cajas_chicas', { p_project_id: projectId! }).abortSignal(signal),
+      )) ?? [],
   })
 }
 

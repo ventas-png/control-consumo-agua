@@ -899,6 +899,62 @@ jobs:
           PGBIN: ${{ steps.pg.outputs.bin }}
           PGPORT_TEST: 55782
         run: supabase/tests/conta_asientos_omitidos/run.sh
+      # 20261231000000: conta_cxc_antiguedad. La antigüedad de saldos por cobrar
+      # sale de los libros (las líneas publicadas de la CxC) y reparte por PEPS:
+      # los abonos cubren primero los cargos más antiguos; usa el vencimiento
+      # del documento; un corte anterior ignora lo posterior; un reverso es un
+      # abono; el sobrepago queda a la vista en «sin asignar»; la suma ES el
+      # saldo de la cuenta por cobrar; permisos, alcance y ACL.
+      - name: Contabilidad — antigüedad de saldos por cobrar desde los libros
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55783
+        run: supabase/tests/conta_cxc_antiguedad/run.sh
+      # 20261231000100: conta_depreciar_activos. Depreciación mensual en línea
+      # recta desde el mes siguiente al alta: la vista previa no escribe; una
+      # póliza por activo y mes (repetir no duplica); el último mes absorbe el
+      # resto y cierra exacta en el valor residual; un mes reversado se avisa;
+      # mes futuro, ejercicio cerrado, permisos, alcance y ACL.
+      - name: Contabilidad — depreciación mensual de activos fijos
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55784
+        run: supabase/tests/conta_depreciacion_activos/run.sh
+      # 20261231000200: conta_cuotas_saldo_inicial. Saldos iniciales por
+      # residente: cada cuota pendiente histórica entra con su periodo y
+      # vencimiento y UNA póliza Dr por cobrar (auxiliar) / Cr contrapartida —
+      # el ingreso no se mueve—; el motor la reconoce como cualquier cuota
+      # (saldo por cobrar, antigüedad, reverso al eliminar); mora histórica sin
+      # recálculo automático; repetir no duplica; cada rechazo con su motivo;
+      # fecha futura, ejercicio cerrado, permisos, alcance y ACL.
+      - name: Contabilidad — saldos iniciales por residente (cuotas históricas)
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55785
+        run: supabase/tests/conta_cuotas_saldo_inicial/run.sh
+      # 20261231000300: fondo de reserva con póliza y caja chica de fondo fijo.
+      # Fondo: aportación / rendimiento / retiro dejan movimiento y UNA póliza
+      # con el sentido correcto; un retiro no supera el saldo en libros; el
+      # resumen delata lo capturado sin póliza. Caja chica: el fondo se
+      # constituye una vez; la reposición previsualiza, lleva los vales al gasto
+      # en una póliza contra el banco sin mover la cuenta de caja, no duplica y
+      # sella los vales repuestos; permisos, alcance, RLS y ACL.
+      - name: Contabilidad — fondo de reserva y caja chica en libros
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55786
+        run: supabase/tests/conta_fondo_caja/run.sh
+      # 20261231000400: conciliación bancaria en grupo, elección manual y saldo
+      # inicial. Un depósito contra varios cobros (y un retiro contra varias
+      # órdenes) sólo si la suma es su importe; un documento, una sola
+      # conciliación (ni en otro grupo ni uno-a-uno); lo conciliado deja de
+      # sugerirse; desconciliar libera el grupo; el saldo inicial del banco
+      # entra al saldo según banco sin sumar dos veces lo anterior; RLS y ACL.
+      - name: Bancos — conciliación contra varios documentos y saldo inicial
+        env:
+          PGBIN: ${{ steps.pg.outputs.bin }}
+          PGPORT_TEST: 55787
+        run: supabase/tests/banco_conciliacion_varios/run.sh
       # 20261221000000: en `rutas`, crear/editar/eliminar exigen agua.rutas.
       # create/edit/delete y el acceso al proyecto, y quien ejecuta la ruta
       # (asignado o con agua.lecturas.create) sólo puede darla por completada.

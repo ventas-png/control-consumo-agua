@@ -289,6 +289,142 @@ export const REVALUACION_RESULTADO_LABELS: Record<RevaluacionFxResultado, string
   sin_tasa: 'Sin tipo de cambio',
 }
 
+// ── Depreciación de activos fijos (RPC conta_depreciar_activos) ─────────────
+// Línea recta mensual: (costo − valor residual) / vida útil, desde el mes
+// siguiente al alta. Una póliza por activo y mes; el último mes absorbe el resto.
+
+export type DepreciacionResultado =
+  | 'previsualizacion'
+  | 'aplicado'
+  | 'ya_depreciado'
+  | 'no_iniciado'
+  | 'totalmente_depreciado'
+  | 'sin_cambio'
+  | 'sin_cuentas'
+  | 'reversado'
+  | 'error'
+
+export interface DepreciacionFila {
+  activo_id: string
+  codigo: string
+  nombre: string
+  fecha_alta: string
+  costo: number
+  valor_residual: number
+  vida_util_meses: number
+  acumulada_antes: number
+  depreciacion: number
+  valor_en_libros: number
+  meses_previos_sin_depreciar: number
+  resultado: DepreciacionResultado
+  motivo: string | null
+  asiento_id: string | null
+}
+
+export const DEPRECIACION_RESULTADO_LABELS: Record<DepreciacionResultado, string> = {
+  previsualizacion: 'Por depreciar',
+  aplicado: 'Depreciado',
+  ya_depreciado: 'Ya depreciado',
+  no_iniciado: 'Aún no inicia',
+  totalmente_depreciado: 'Totalmente depreciado',
+  sin_cambio: 'Sin importe',
+  sin_cuentas: 'Faltan cuentas',
+  reversado: 'Mes reversado',
+  error: 'Error',
+}
+
+// ── Saldos iniciales por residente (RPC conta_cuotas_saldo_inicial) ─────────
+// Cada cuota pendiente del sistema anterior entra con su periodo y vencimiento,
+// y su póliza va contra la contrapartida de apertura, no contra ingreso.
+
+export type CuotaSaldoInicialResultado = 'previsualizacion' | 'cargada' | 'ya_existe' | 'rechazada' | 'error'
+
+/** Lo que se envía por fila. */
+export interface CuotaSaldoInicialInput {
+  unidad_id: string
+  periodo: string
+  monto: number
+  fecha_vencimiento?: string | null
+  mora?: number
+  tipo_cargo?: 'mantenimiento' | 'cuota_extraordinaria'
+}
+
+export interface CuotaSaldoInicialFila {
+  /** Posición (desde 1) dentro de lo enviado. */
+  fila: number
+  unidad_id: string | null
+  unidad_nombre: string | null
+  responsable_cliente_id: string | null
+  responsable_nombre: string | null
+  periodo: string | null
+  tipo_cargo: string | null
+  monto: number | null
+  mora: number
+  fecha_vencimiento: string | null
+  resultado: CuotaSaldoInicialResultado
+  motivo: string | null
+  cuota_id: string | null
+  asiento_id: string | null
+}
+
+export const CUOTA_SALDO_INICIAL_LABELS: Record<CuotaSaldoInicialResultado, string> = {
+  previsualizacion: 'Lista para cargar',
+  cargada: 'Cargada',
+  ya_existe: 'Ya existe',
+  rechazada: 'Rechazada',
+  error: 'Error',
+}
+
+// ── Fondo de reserva y caja chica en libros (20261231000300) ────────────────
+
+export type FondoReservaTipo = 'aportacion' | 'retiro' | 'rendimiento'
+
+export const FONDO_RESERVA_TIPO_LABELS: Record<FondoReservaTipo, string> = {
+  aportacion: 'Aportación',
+  retiro: 'Retiro',
+  rendimiento: 'Rendimiento',
+}
+
+/** El fondo según su registro (Condominios) y según libros. */
+export interface FondoReservaResumen {
+  /** Cuentas usadas la última vez; null si aún no hay ningún movimiento con póliza. */
+  cuenta_fondo_id: string | null
+  cuenta_contra_id: string | null
+  saldo_registro: number
+  saldo_libros: number
+  movimientos: number
+  movimientos_sin_poliza: number
+}
+
+export interface CajaChicaContable {
+  caja_id: string
+  responsable: string
+  fecha_apertura: string
+  monto_fondo: number
+  estado: 'abierta' | 'cerrada'
+  /** null = el fondo aún no está constituido en libros. */
+  cuenta_caja_id: string | null
+  vales_pendientes: number
+  total_pendiente: number
+}
+
+export type ReposicionCajaResultado = 'previsualizacion' | 'repuesto' | 'sin_cuenta'
+
+export interface ReposicionCajaFila {
+  movimiento_id: string
+  fecha: string
+  concepto: string
+  comprobante: string | null
+  monto: number
+  cuenta_gasto_id: string | null
+  cuenta_codigo: string | null
+  cuenta_nombre: string | null
+  resultado: ReposicionCajaResultado
+  motivo: string | null
+  reposicion_id: string | null
+  asiento_id: string | null
+}
+
 // ── Reglas de imputación contable ───────────────────────────────────────────
 // Espejo de 20260926000000. Los destinos NO son códigos contables: son
 // etiquetas semánticas que la BD declara en `conta_destinos_imputacion()` y
@@ -887,3 +1023,36 @@ export function etiquetaEventoContable(evento: string): string {
   const especial = CUENTAS_ESPECIALES.find((e) => e.evento === evento)
   return especial ? `Cuenta especial › ${especial.label}` : evento
 }
+
+// ── Antigüedad de saldos por cobrar (20261231000000) ────────────────────────
+
+/**
+ * Una fila de `conta_cxc_antiguedad`: el saldo CONTABLE de un auxiliar y unidad
+ * al corte, repartido por antigüedad (PEPS). Los tramos más `sin_asignar` suman
+ * `total`, y `total` es su saldo en la cuenta por cobrar de los libros.
+ */
+export interface AntiguedadCxcFila {
+  cliente_id: string | null
+  cliente_nombre: string | null
+  codigo_auxiliar: string | null
+  unidad_id: string | null
+  unidad_nombre: string | null
+  por_vencer: number
+  d1_30: number
+  d31_60: number
+  d61_90: number
+  d90_mas: number
+  /** Lo que no se pudo atribuir a un cargo: negativo = pagó de más. */
+  sin_asignar: number
+  total: number
+  vencimiento_mas_antiguo: string | null
+}
+
+/** Tramos de la antigüedad, en el orden en que se muestran. */
+export const TRAMOS_ANTIGUEDAD_CXC = [
+  { clave: 'por_vencer', label: 'Por vencer' },
+  { clave: 'd1_30', label: '1–30 días' },
+  { clave: 'd31_60', label: '31–60' },
+  { clave: 'd61_90', label: '61–90' },
+  { clave: 'd90_mas', label: '+90' },
+] as const satisfies ReadonlyArray<{ clave: keyof AntiguedadCxcFila; label: string }>
