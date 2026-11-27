@@ -12,6 +12,7 @@ import { queryClient } from './domain/queryClient'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { PwaUpdatePrompt } from './components/PwaUpdatePrompt'
 import { CookieConsent } from './components/shared/CookieConsent'
+import { InstalarAppAviso } from './components/shared/InstalarApp'
 import { DialogProvider } from './components/shared/Dialog'
 import { PromptDialogRoot } from './components/shared/PromptDialog'
 import { I18nProvider } from './lib/i18n'
@@ -22,6 +23,7 @@ import { applyStoredConsent } from './lib/cookieConsent'
 import { isNative } from './lib/platform'
 import { initNativeApp } from './lib/nativeApp'
 import { initNativeAuthListener } from './lib/nativeAuth'
+import { initPwaInstall } from './lib/pwaInstall'
 
 // Error monitoring + product analytics. Both no-op without their env vars.
 // PostHog arranca OPTED-OUT (RGPD); aplicamos el consentimiento ya guardado para que
@@ -29,6 +31,11 @@ import { initNativeAuthListener } from './lib/nativeAuth'
 initMonitoring()
 initAnalytics()
 applyStoredConsent()
+
+// Instalación como app (PWA): hay que escuchar al navegador ANTES de montar
+// React, porque Chromium avisa una sola vez de que la web es instalable. No-op
+// en la app nativa. Ver src/lib/pwaInstall.ts.
+initPwaInstall()
 
 // Chunks viejos tras un deploy (Sentry PINK-RIBBON-1/-7): un tab abierto con el
 // index.html anterior intenta lazy-load un chunk hasheado que ya no existe y el
@@ -81,6 +88,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               {!isNative() && <PwaUpdatePrompt />}
               <PromptDialogRoot />
               <CookieConsent />
+              {/* «Instala AdministraTodo»: solo en la web, en teléfonos y tablets,
+                  y nunca dentro de la app ya instalada. */}
+              {!isNative() && <InstalarAppAviso />}
             </DialogProvider>
           </FeatureFlagsProvider>
         </I18nProvider>

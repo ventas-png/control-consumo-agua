@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { mostrarVentaDePlanes } from '../../lib/ventaDePlanes'
+import { estaInstalada } from '../../lib/pwaInstall'
 import { COPY, type Lang } from './i18n'
 import { warmUpSupabase } from '../../lib/supabase'
 import { Nav, LoginModal } from './Nav'
@@ -31,7 +32,11 @@ function initialLang(): Lang {
 }
 
 export function LandingPage({ onLogin, onLoginWithGoogle, onLoginWithApple, onForgotPassword, onRegister, onSignupCompany, mfaChallenge, onVerifyMfa, onCancelMfa, initialAuthError }: LandingPageProps) {
-  const [loginOpen, setLoginOpen] = useState(false)
+  // Instalada como app (PWA): quien la abre desde su pantalla de inicio ya viene
+  // a entrar, así que arranca con el login abierto en vez de la página comercial.
+  // A diferencia de la app nativa (ver `soloLogin` abajo) el modal se puede
+  // cerrar: en la web sí está permitido mostrar precios y vender el plan.
+  const [loginOpen, setLoginOpen] = useState(estaInstalada)
   const [lang, setLang] = useState<Lang>(initialLang)
 
   // Si hay un challenge MFA activo, asegurarnos de que el modal de login esté

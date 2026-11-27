@@ -2,9 +2,11 @@
 // «Eliminar mi cuenta» que exigen las tiendas (App Store 5.1.1 v / Google Play «Account deletion»).
 import type { PortalCtx } from './ctx'
 import { EliminarCuenta } from '../../perfil/EliminarCuenta'
+import { InstalarAppOpcion, useInstalacion } from '../../shared/InstalarApp'
 
 export function PerfilTab({ ctx }: { ctx: PortalCtx }) {
   const { currentUser, contactoEdit, setContactoEdit, savingContacto, contactoMsg, guardarContacto } = ctx
+  const instalacion = useInstalacion()
   return (
           <div>
             <div style={{
@@ -104,6 +106,18 @@ export function PerfilTab({ ctx }: { ctx: PortalCtx }) {
                 </button>
               </div>
             </div>
+
+            {/* Instalar la web como app (PWA): solo donde el navegador puede hacerlo;
+                oculta dentro de la app ya instalada y de la nativa. */}
+            {instalacion.via && (
+              <section aria-labelledby="instalar-app-titulo" style={{
+                marginTop: '16px', background: 'var(--at-surface)', borderRadius: '16px', padding: '24px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)', maxWidth: '520px',
+              }}>
+                <h2 id="instalar-app-titulo" style={{ margin: '0 0 10px', fontSize: '16px', fontWeight: 700, color: 'var(--at-ink)' }}>Instalar la app</h2>
+                <InstalarAppOpcion />
+              </section>
+            )}
 
             <div style={{ marginTop: '16px' }}>
               <EliminarCuenta currentUser={currentUser} variant="seccion" />

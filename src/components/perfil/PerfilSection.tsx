@@ -32,6 +32,7 @@ import { SesionesActivas } from './SesionesActivas'
 import { LegalYPrivacidad } from './LegalYPrivacidad'
 import { MisLlamadasAtencion } from './MisLlamadasAtencion'
 import { EliminarCuenta } from './EliminarCuenta'
+import { InstalarAppOpcion, useInstalacion } from '../shared/InstalarApp'
 import { tint } from '../shared/statusTone'
 
 interface Props {
@@ -151,6 +152,7 @@ function SubmitBtn({ loading, label, color = 'var(--at-primary)' }: { loading: b
 
 export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
   const [isOAuthUser, setIsOAuthUser] = useState(false)
+  const instalacion = useInstalacion()
 
   useEffect(() => {
     void fetchCurrentAuthProvider().then(provider => {
@@ -745,6 +747,14 @@ export function PerfilSection({ currentUser, onUpdateProfile }: Props) {
         <Card title="Sesiones activas">
           <SesionesActivas />
         </Card>
+
+        {/* Card — Instalar la web como app (PWA). Solo donde el navegador puede
+            instalarla; oculta dentro de la app ya instalada y de la nativa. */}
+        {instalacion.via && (
+          <Card title="Instalar la app">
+            <InstalarAppOpcion />
+          </Card>
+        )}
 
         {/* Card 2d — Legal y privacidad (plat:P33/P34) */}
         <Card title="Legal y privacidad">

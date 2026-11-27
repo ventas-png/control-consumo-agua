@@ -21,6 +21,7 @@ import { PortalCargosSaldoFavor } from './PortalCargosSaldoFavor'
 import { PortalMisTicketsTab } from '../condominios/tabs/PortalMisTicketsTab'
 import { PortalMiUnidadTab }   from '../condominios/tabs/PortalMiUnidadTab'
 import { EliminarCuenta } from '../perfil/EliminarCuenta'
+import { InstalarAppEnlace } from '../shared/InstalarApp'
 import { PortalVisitantesTab } from '../condominios/tabs/PortalVisitantesTab'
 import { PortalAnunciosTab }   from '../condominios/tabs/PortalAnunciosTab'
 import { PortalRentasTab }     from '../condominios/tabs/PortalRentasTab'
@@ -452,7 +453,7 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
   return (
     /* infra:I14 — provides the resident's unit project_id to condominios-media uploaders. */
     <MediaScopeProvider projectId={proyectoId}>
-    <div style={{ minHeight: '100vh', background: 'var(--at-accent-tint-2)' }}>
+    <div className="portal-root" style={{ minHeight: '100vh', background: 'var(--at-accent-tint-2)' }}>
 
       {/* Header */}
       <div style={{
@@ -744,6 +745,8 @@ export function CondominiosClientPortal({ currentUser, onLogout }: Props) {
           padding: '18px 4px 8px', fontSize: '12.5px', color: 'var(--at-ink-3)',
         }}>
           <span>Sesión: {currentUser.email}</span>
+          {/* Instalar la web como app (PWA); no aparece dentro de la app ya instalada. */}
+          <InstalarAppEnlace separador={<span aria-hidden="true">·</span>} />
           <span aria-hidden="true">·</span>
           <EliminarCuenta currentUser={currentUser} variant="enlace" />
         </footer>
