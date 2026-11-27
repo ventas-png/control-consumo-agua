@@ -108,7 +108,10 @@
     flex-wrap: wrap;
     gap: 6px 8px;
     padding: 8px 14px !important;
-    padding-top: max(8px, env(safe-area-inset-top, 0px), var(--at-safe-top, 0px)) !important;
+    /* 8px + el hueco de la barra de estado, no el mayor de los dos: ese hueco lo
+     * ocupa una franja opaca (ver "Barra de estado" en index.css) y los botones
+     * quedaban pegados a ella. */
+    padding-top: calc(8px + max(env(safe-area-inset-top, 0px), var(--at-safe-top, 0px))) !important;
   }
   .app-topbar > div:last-child { margin-left: auto; }
   .app-breadcrumbs { padding: 7px 14px !important; }
@@ -215,17 +218,24 @@
 }
 
 /* ── SignupCompanyScreen ────────────────────────────────────────────────── */
+/* Centrado con `margin: auto` en la tarjeta, no con `align-items: center`: cuando
+ * la tarjeta no cabe (teléfono pequeño), el centrado de flexbox la desborda
+ * también por ARRIBA, donde el scroll no llega, y «← Volver» quedaba cortado.
+ * Con márgenes automáticos se centra si sobra sitio y si no, empieza arriba.
+ * El padding superior deja libre la barra de estado (ver index.css). */
 .signup-screen {
   position: fixed; inset: 0; z-index: 2000;
   background: linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-accent-2) 100%);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: center;
   overflow: auto; padding: 20px;
+  padding-top: calc(20px + var(--at-inset-top, 0px));
 }
 .signup-card {
   background: var(--at-surface); border-radius: 20px;
   box-shadow: 0 30px 80px rgba(0,0,0,.3);
   width: 100%; max-width: 480px; padding: 32px;
   position: relative;
+  margin: auto;
 }
 .signup-card.success { text-align: center; }
 .signup-back {
@@ -315,17 +325,20 @@
 }
 
 /* ── AcceptInvitationPage ───────────────────────────────────────────────── */
+/* Mismo centrado que .signup-screen (margin: auto en la tarjeta): ver ahí. */
 .invite-screen {
   position: fixed; inset: 0; z-index: 2000;
   background: linear-gradient(135deg, var(--at-primary-hover) 0%, var(--at-accent-2) 100%);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: center;
   overflow: auto; padding: 20px;
+  padding-top: calc(20px + var(--at-inset-top, 0px));
 }
 .invite-card {
   background: var(--at-surface); border-radius: 20px;
   box-shadow: 0 30px 80px rgba(0,0,0,.3);
   width: 100%; max-width: 460px; padding: 32px;
   position: relative;
+  margin: auto;
 }
 .invite-logo { display: flex; justify-content: center; margin-bottom: 14px; margin-top: 4px; }
 .invite-card h1 { font-size: 21px; font-weight: 800; color: var(--at-ink); margin: 0 0 6px; text-align: center; }

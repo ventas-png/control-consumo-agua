@@ -615,11 +615,96 @@ button:focus:not(:focus-visible) {
   }
 }
 
+/* ─── Barra de estado y bordes de la pantalla (áreas seguras) ───────────────
+ *
+ * Instalada como app en iPhone o iPad (PWA con `black-translucent`, ver
+ * index.html) la página se dibuja DEBAJO de la barra de estado, que es
+ * transparente y lleva siempre el texto en blanco. Dos consecuencias:
+ *
+ *   1. Sobre una cabecera clara (la del panel, la landing) la hora y la batería
+ *      no se ven. `body::before` pinta en ese hueco una franja con el verde de la
+ *      marca, igual que la app nativa (StatusBar en capacitor.config.ts). Mide lo
+ *      que mida el hueco: en una pestaña normal del navegador —donde vale 0— no
+ *      existe, así que no hace falta preguntar si la app está instalada.
+ *   2. Lo que quede más arriba en cada pantalla tiene que reservar ese hueco, o
+ *      queda tapado por la franja. El bloque ≤767px lo hace para el teléfono;
+ *      el de ≥768px de aquí, para la disposición de tablet y escritorio, que es
+ *      la que ve un iPad instalado.
+ *
+ * `--at-safe-top` es la medida que publica la app nativa (lib/nativeApp.ts)
+ * cuando su WebView no expone `env()`; en la web no está definida y manda
+ * `env()`. Así la franja cubre también el Android nativo, que dibuja de borde a
+ * borde con la barra de estado transparente.
+ *
+ * Los bordes laterales importan con el teléfono en horizontal: la muesca tapa
+ * unos 50px de un lado. Todo teléfono con muesca mide ≥812px de ancho en
+ * horizontal, así que siempre cae en la disposición de ≥768px. */
+:root {
+  --at-inset-top: max(env(safe-area-inset-top, 0px), var(--at-safe-top, 0px));
+}
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--at-inset-top);
+  background: #1B3B36;
+  /* Por encima de todo, diálogos incluidos (9999): es la barra del sistema. */
+  z-index: 10000;
+  pointer-events: none;
+}
+/* Pantallas completas con una tarjeta centrada (registro, 2FA, restablecer
+ * contraseña…): llevan su padding inline, así que el hueco de la barra de estado
+ * se suma con un borde transparente. El fondo sigue pintándose debajo y, con
+ * `box-sizing: border-box`, el `min-height: 100vh` no crece. */
+.at-bajo-barra-estado {
+  border-top: var(--at-inset-top) solid transparent;
+}
+@media (min-width: 768px) {
+  /* La barra lateral se alarga bajo la muesca (su fondo la rellena) y mete su
+   * contenido hacia dentro. El ancho va inline en Sidebar.tsx. */
+  .app-sidebar {
+    padding-top: var(--at-inset-top);
+    padding-left: env(safe-area-inset-left, 0px);
+    width: calc(256px + env(safe-area-inset-left, 0px)) !important;
+    min-width: calc(256px + env(safe-area-inset-left, 0px)) !important;
+  }
+  /* El alto (62px) y el padding van inline en Topbar.tsx. */
+  .app-topbar {
+    height: calc(62px + var(--at-inset-top)) !important;
+    padding-top: var(--at-inset-top) !important;
+  }
+  .app-shell {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  /* Indicador de inicio del iPad: el final del contenido no queda debajo. */
+  .app-main {
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  /* Portales de residentes: mismos huecos que en el bloque ≤767px. */
+  .portal-service-switch {
+    padding-top: calc(8px + var(--at-inset-top)) !important;
+  }
+  .portal-header {
+    padding-top: calc(16px + var(--at-inset-top)) !important;
+  }
+  .portal-service-switch ~ * .portal-header {
+    padding-top: 16px !important;
+  }
+  .portal-root {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+}
+
 /* ─── Tablet Layout (768px - 1024px) ────────────────────────────────────── */
+/* Barra lateral más angosta. Va DESPUÉS del bloque anterior porque pisa su
+ * ancho; el `env()` es el mismo borde de la muesca (0 en una tablet). */
 @media (min-width: 768px) and (max-width: 1024px) {
   .app-sidebar {
-    width: 210px !important;
-    min-width: 210px !important;
+    width: calc(210px + env(safe-area-inset-left, 0px)) !important;
+    min-width: calc(210px + env(safe-area-inset-left, 0px)) !important;
   }
 }
 

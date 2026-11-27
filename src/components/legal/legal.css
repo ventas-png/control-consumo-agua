@@ -24,6 +24,10 @@
   background: color-mix(in srgb, var(--c-surface) 86%, transparent);
   backdrop-filter: saturate(180%) blur(10px);
   border-bottom: 1px solid var(--c-line);
+  /* Hueco de la barra de estado (app instalada en iPhone/iPad, Android nativo):
+     sin él la marca y el enlace de regreso quedan tapados. 0 en el navegador.
+     Ver "Barra de estado" en index.css. */
+  padding-top: var(--at-inset-top, 0px);
 }
 @supports not (color: color-mix(in srgb, red 50%, blue)) { .at-root .legal-topbar { background: var(--at-surface); } }
 .at-root .legal-topbar-inner {

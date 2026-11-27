@@ -101,7 +101,7 @@ export function RegisterScreen({ onBack, onRegistered }: Props) {
   }
 
   return (
-    <div style={{
+    <div className="at-bajo-barra-estado" style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)',
       display: 'flex',

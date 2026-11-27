@@ -93,7 +93,7 @@ export default function OAuthOnboardingScreen({ oauthUser, onSuccess, onCancel }
   }
 
   return (
-    <div style={{
+    <div className="at-bajo-barra-estado" style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'linear-gradient(135deg, var(--at-primary) 0%, var(--at-accent-2) 50%, var(--at-accent-2) 100%)',
       padding: '16px',

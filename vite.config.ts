@@ -90,13 +90,22 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'robots.txt'],
       manifest: {
+        // `id` fija la identidad de la app instalada: sin él se deriva de
+        // start_url, y cambiar esa URL más adelante haría que el navegador la
+        // tratara como una app distinta (los usuarios tendrían que reinstalar).
+        id: '/',
         name: 'AdministraTodo',
         short_name: 'AdministraTodo',
         description: 'Software de administración de condominios y control de agua',
+        categories: ['business', 'productivity'],
         theme_color: '#1B3B36',
         background_color: '#1B3B36',
         display: 'standalone',
-        orientation: 'portrait',
+        // 'any', no 'portrait': Android aplica este campo a la app instalada, y
+        // bloquearla en vertical la dejaba girada en una tablet apoyada en
+        // horizontal (portería, escritorio). iOS lo ignora y siempre gira. La
+        // app nativa tampoco bloquea la orientación (Info.plist).
+        orientation: 'any',
         scope: '/',
         start_url: '/',
         lang: 'es',
