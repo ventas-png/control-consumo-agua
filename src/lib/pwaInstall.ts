@@ -85,11 +85,18 @@ export function viaDeInstalacion(e: Entorno): ViaInstalacion {
  * `true` cuando la página corre como app instalada. `display-mode` lo reportan
  * Android, escritorio e iOS reciente; `navigator.standalone` es la vía clásica
  * de iOS y la única en versiones anteriores.
+ *
+ * `fullscreen` NO cuenta, a propósito: también lo reporta una pestaña normal
+ * con el navegador en pantalla completa (F11, modo quiosco), y de esta función
+ * depende que la sesión se guarde de forma persistente (lib/authStorage.ts). El
+ * manifiesto pide `standalone`, así que la app instalada nunca arranca en
+ * `fullscreen`; `minimal-ui` y `window-controls-overlay` son las variantes que
+ * un navegador puede darle en su lugar.
  */
 export function estaInstalada(): boolean {
   if (typeof window === 'undefined') return false
   const modo = (m: string) => window.matchMedia?.(`(display-mode: ${m})`).matches === true
-  if (modo('standalone') || modo('fullscreen') || modo('minimal-ui')) return true
+  if (modo('standalone') || modo('minimal-ui') || modo('window-controls-overlay')) return true
   return (navigator as Navigator & { standalone?: boolean }).standalone === true
 }
 

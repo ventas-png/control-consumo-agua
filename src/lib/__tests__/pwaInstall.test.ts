@@ -37,7 +37,7 @@ function simularNavegador(ua: string, maxTouchPoints = 0) {
 }
 
 /** jsdom no trae matchMedia. `modo` es el display-mode que reporta el navegador. */
-function simularDisplayMode(modo: 'browser' | 'standalone' | 'fullscreen' | 'minimal-ui') {
+function simularDisplayMode(modo: 'browser' | 'standalone' | 'fullscreen' | 'minimal-ui' | 'window-controls-overlay') {
   window.matchMedia = vi.fn((q: string) => ({
     matches: q === `(display-mode: ${modo})`, media: q, onchange: null,
     addEventListener: vi.fn(), removeEventListener: vi.fn(),
@@ -153,10 +153,16 @@ describe('estaInstalada', () => {
     expect(estaInstalada()).toBe(false)
   })
 
-  it.each(['standalone', 'fullscreen', 'minimal-ui'] as const)('es true con display-mode %s', async (modo) => {
+  it.each(['standalone', 'minimal-ui', 'window-controls-overlay'] as const)('es true con display-mode %s', async (modo) => {
     simularDisplayMode(modo)
     const { estaInstalada } = await cargar()
     expect(estaInstalada()).toBe(true)
+  })
+
+  it('una pestaña en pantalla completa (F11, modo quiosco) no es la app instalada', async () => {
+    simularDisplayMode('fullscreen')
+    const { estaInstalada } = await cargar()
+    expect(estaInstalada()).toBe(false)
   })
 
   it('es true con navigator.standalone, la vía clásica de iOS', async () => {

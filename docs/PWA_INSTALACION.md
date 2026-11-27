@@ -37,7 +37,7 @@ la app instalada guarda sus datos aparte de Safari.
 | --- | --- | --- |
 | Cómo llega | Desde el navegador, sin revisión | Publicación y revisión en cada tienda |
 | Actualizaciones | Solas, con cada despliegue de la web | Hay que compilar y subir cada versión |
-| Sesión | Se cierra al cerrar la app, como en la web | Se mantiene abierta |
+| Sesión | Se mantiene abierta, igual que en la app de las tiendas. En una pestaña del navegador se sigue cerrando al cerrarla | Se mantiene abierta |
 | Notificaciones push | No | Sí, cuando se configure Firebase (`MOBILE.md`, paso 6) |
 | Planes y precios | Se muestran: es la web | Ocultos (reglas de las tiendas, `src/lib/ventaDePlanes.ts`) |
 | Cámara y ubicación | Sí, con el permiso del navegador | Sí, con el permiso del sistema |
@@ -67,6 +67,10 @@ la app instalada guarda sus datos aparte de Safari.
   a abrir en cualquier dispositivo.
 - **Instalada abre en el login** (`src/components/landing/LandingPage.tsx`): la
   página comercial queda detrás y se puede ver cerrando el login.
+- **Instalada mantiene la sesión** (`src/lib/authStorage.ts`): el token de
+  Supabase va a `localStorage` en la app instalada y en la nativa, y a
+  `sessionStorage` en una pestaña del navegador, que es la regla de seguridad
+  de siempre para la web. Ese archivo explica el porqué y qué lo acota.
 - **Barra de estado y bordes de la pantalla** (`src/index.css`, «Barra de
   estado»): instalada en iPhone o iPad la página se dibuja debajo de la barra de
   estado. Una franja con el verde de la marca la hace legible, y cada pantalla
@@ -99,13 +103,17 @@ recomendarla a los usuarios, revisar en un dispositivo de cada tipo:
    teléfono la muesca no tapa el menú.
 5. **Lectura con foto y ubicación**: el navegador pide los dos permisos y la
    foto se adjunta.
-6. **Cerrar la app y volver a abrirla**: pide iniciar sesión de nuevo (es lo
-   esperado hoy, ver sección 2).
+6. **Cerrar la app del todo y volver a abrirla**: entra directo, sin pedir
+   correo ni contraseña. Con «Cerrar sesión» sí vuelve a pedirlos.
 
 ---
 
 ## 5. Límites conocidos
 
+- **Tablets compartidas** (portería, recepción): la app instalada no cierra la
+  sesión sola. Quien termina su turno tiene que usar «Cerrar sesión», o el
+  siguiente entra con su cuenta. Si se pierde un dispositivo, su sesión se
+  cierra desde otro equipo en **Mi perfil → Sesiones activas**.
 - **iPhone y iPad no muestran pantalla de carga propia**: al abrir se ve la
   pantalla en blanco un instante. Se puede añadir con imágenes
   `apple-touch-startup-image` (una por tamaño de dispositivo).
